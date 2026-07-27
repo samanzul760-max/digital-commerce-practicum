@@ -1,7 +1,7 @@
 <template>
   <ClientOnly>
     <PracticumShell context-title="审核中心" context-meta="OWNER 审核工作区">
-      <p v-if="store.state.activeRole !== 'OWNER'" data-forbidden class="empty-state">你没有访问审核中心的权限。</p>
+      <p v-if="!canReview(store.state.activeRole)" data-forbidden class="empty-state">你没有访问审核中心的权限。</p>
 
       <p v-else-if="isLoading" data-review-loading class="empty-state">正在加载审核队列...</p>
 
@@ -88,6 +88,7 @@
 import { computed, onMounted, ref } from 'vue'
 import type { SubmissionStatus } from '~/domain/practicum/types'
 import { usePracticumStore } from '~/composables/usePracticumStore'
+import { canReview } from '~/domain/practicum/permissions'
 
 const store = usePracticumStore()
 const isLoading = ref(true)

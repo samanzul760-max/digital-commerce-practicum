@@ -5,7 +5,7 @@
       <p v-if="isLoading" data-loading class="empty-state">正在加载进度数据...</p>
 
       <!-- Forbidden for non-authorized roles -->
-      <p v-else-if="store.state.activeRole !== 'STUDENT' && store.state.activeRole !== 'OWNER'" data-forbidden class="empty-state">你没有访问进度页面的权限。</p>
+      <p v-else-if="!canViewProgress(store.state.activeRole)" data-forbidden class="empty-state">你没有访问进度页面的权限。</p>
 
       <!-- Student view -->
       <div v-else-if="store.state.activeRole === 'STUDENT'" data-student-progress>
@@ -155,6 +155,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
 import { usePracticumStore } from '../../composables/usePracticumStore'
+import { canViewProgress } from '../../domain/practicum/permissions'
 
 const store = usePracticumStore()
 const isLoading = ref(true)

@@ -3,6 +3,7 @@ import type { Activity, ActivityType, PracticumRole, Plan, TrainingRoom, Curricu
 import { seedPlans, seedRoom, seedNodes } from '../data/practicum/seed'
 import { seedActivities } from '../data/practicum/activity-seed'
 import { commerceCaseActivities, commerceCaseNodes, commerceCases } from '../data/practicum/commerce-case-seed'
+import { canEditPlan, canManageMembers, canManageResources, canManageRoomSettings, canReview, canSubmitWork, canViewPlan } from '../domain/practicum/permissions'
 
 interface PracticumState {
   schemaVersion: 1
@@ -86,8 +87,40 @@ function mergeById<T extends { id: string }>(base: T[], additions: T[]): T[] {
 }
 
 export function usePracticumStore() {
+  function syncStorageError() {
+    if (typeof window === 'undefined') return
+    try {
+      const raw = window.localStorage.getItem(storageKey)
+      if (!raw) {
+        storageError.value = null
+        return
+      }
+      const parsed = JSON.parse(raw) as Partial<PracticumState> | null
+      if (!parsed || (parsed.schemaVersion !== undefined && parsed.schemaVersion !== 1)) {
+        storageError.value = '你的工作数据版本不兼容。重置后将加载新的示例数据，所有自定义内容都会丢失。'
+        return
+      }
+      storageError.value = null
+    } catch {
+      storageError.value = '你的工作数据无法读取。重置后将加载新的示例数据。'
+    }
+  }
+
   function persist() {
     if (typeof window !== 'undefined') {
+      const existing = window.localStorage.getItem(storageKey)
+      if (existing) {
+        try {
+          const parsed = JSON.parse(existing) as Partial<PracticumState> | null
+          if (!parsed || (parsed.schemaVersion !== undefined && parsed.schemaVersion !== 1)) {
+            storageError.value = '你的工作数据版本不兼容。重置后将加载新的示例数据，所有自定义内容都会丢失。'
+            return
+          }
+        } catch {
+          storageError.value = '你的工作数据无法读取。重置后将加载新的示例数据。'
+          return
+        }
+      }
       window.localStorage.setItem(storageKey, JSON.stringify({ schemaVersion: state.schemaVersion, activeRole: state.activeRole, learningPosition: state.learningPosition, softwareAttempts: state.softwareAttempts, trainingAttempts: state.trainingAttempts, practiceDrafts: state.practiceDrafts, practiceSubmissions: state.practiceSubmissions, planDeadlines: state.planDeadlines, lockedActivityIds: state.lockedActivityIds, notifications: state.notifications, room: state.room, plans: state.plans, nodes: state.nodes, activities: state.activities, resources: state.resources, members: state.members }))
     }
   }
@@ -132,12 +165,11 @@ export function usePracticumStore() {
   }
 
   function visiblePlansFor(role: PracticumRole | null): Plan[] {
-    if (!role) return []
-    if (role === 'STUDENT') return state.plans.filter(plan => plan.status === 'PUBLISHED')
-    return state.plans
+    return state.plans.filter(plan => canViewPlan(role, plan.status))
   }
 
-  function createPlan(input: { title: string; description: string }): Plan {
+  function createPlan(input: { title: string; description: string }): Plan | null {
+    if (!canEditPlan(state.activeRole)) return null
     const now = new Date().toISOString()
     const plan: Plan = {
       id: `plan-custom-${nextPlanId++}`,
@@ -155,7 +187,8 @@ export function usePracticumStore() {
     return plan
   }
 
-  function addNode(input: { planId: string; parentId: string | null; level: 1 | 2 | 3; title: string; activityType?: ActivityType }): CurriculumNode {
+  function addNode(input: { planId: string; parentId: string | null; level: 1 | 2 | 3; title: string; activityType?: ActivityType }): CurriculumNode | null {
+    if (!canEditPlan(state.activeRole)) return null
     const siblings = state.nodes.filter(n => n.planId === input.planId && n.parentId === input.parentId)
     const nodeId = `node-custom-${nextNodeId++}`
     const node: CurriculumNode = {
@@ -220,6 +253,7 @@ export function usePracticumStore() {
   }
 
   function addActivityStep(activityId: string, label: string, required: boolean) {
+    if (!canEditPlan(state.activeRole)) return
     const activity = state.activities.find(a => a.id === activityId)
     if (!activity || activity.config.type !== 'SOFTWARE_ACTION') return
     const step: SoftwareStep = { id: `step-${Date.now()}`, label, required }
@@ -228,6 +262,7 @@ export function usePracticumStore() {
   }
 
   function removeActivityStep(activityId: string, stepId: string) {
+    if (!canEditPlan(state.activeRole)) return
     const activity = state.activities.find(a => a.id === activityId)
     if (!activity || activity.config.type !== 'SOFTWARE_ACTION') return
     activity.config.steps = activity.config.steps.filter(s => s.id !== stepId)
@@ -235,6 +270,7 @@ export function usePracticumStore() {
   }
 
   function updateActivityStep(activityId: string, stepId: string, label: string, required: boolean) {
+    if (!canEditPlan(state.activeRole)) return
     const activity = state.activities.find(a => a.id === activityId)
     if (!activity || activity.config.type !== 'SOFTWARE_ACTION') return
     const step = activity.config.steps.find(s => s.id === stepId)
@@ -242,6 +278,7 @@ export function usePracticumStore() {
   }
 
   function updateTrainingConfig(activityId: string, maxAttempts: number, timeLimitMinutes?: number) {
+    if (!canEditPlan(state.activeRole)) return
     const activity = state.activities.find(a => a.id === activityId)
     if (!activity || activity.config.type !== 'TRAINING') return
     activity.config.maxAttempts = maxAttempts
@@ -250,6 +287,7 @@ export function usePracticumStore() {
   }
 
   function addDeliverable(activityId: string, label: string) {
+    if (!canEditPlan(state.activeRole)) return
     const activity = state.activities.find(a => a.id === activityId)
     if (!activity || activity.config.type !== 'PRACTICE_ACTIVITY') return
     activity.config.deliverables.push(label)
@@ -257,6 +295,7 @@ export function usePracticumStore() {
   }
 
   function addRubricDimension(activityId: string, label: string, maxScore: number, required: boolean) {
+    if (!canEditPlan(state.activeRole)) return
     const activity = state.activities.find(a => a.id === activityId)
     if (!activity || activity.config.type !== 'PRACTICE_ACTIVITY') return
     const dim: RubricDimension = { id: `rubric-${Date.now()}`, label, maxScore, required }
@@ -265,6 +304,7 @@ export function usePracticumStore() {
   }
 
   function removeRubricDimension(activityId: string, dimensionId: string) {
+    if (!canEditPlan(state.activeRole)) return
     const activity = state.activities.find(a => a.id === activityId)
     if (!activity || activity.config.type !== 'PRACTICE_ACTIVITY') return
     activity.config.rubric = activity.config.rubric.filter(d => d.id !== dimensionId)
@@ -275,7 +315,8 @@ export function usePracticumStore() {
     return state.resources.filter(resource => resource.planId === planId)
   }
 
-  function addSupportingResource(input: { planId: string; name: string; kind: ResourceKind; url: string }): SupportingResource {
+  function addSupportingResource(input: { planId: string; name: string; kind: ResourceKind; url: string }): SupportingResource | null {
+    if (!canManageResources(state.activeRole)) return null
     const resource: SupportingResource = { id: `resource-custom-${nextResourceId++}`, ...input }
     state.resources.push(resource)
     persist()
@@ -283,17 +324,20 @@ export function usePracticumStore() {
   }
 
   function removeResource(resourceId: string) {
+    if (!canManageResources(state.activeRole)) return
     state.resources = state.resources.filter(r => r.id !== resourceId)
     persist()
   }
 
   function renameNode(nodeId: string, newTitle: string): CurriculumNode | null {
+    if (!canEditPlan(state.activeRole)) return null
     const node = state.nodes.find(n => n.id === nodeId)
     if (node) { node.title = newTitle; persist() }
     return node ?? null
   }
 
   function reorderNode(nodeId: string, direction: 'up' | 'down') {
+    if (!canEditPlan(state.activeRole)) return
     const node = state.nodes.find(n => n.id === nodeId)
     if (!node) return
     const siblings = state.nodes
@@ -310,6 +354,7 @@ export function usePracticumStore() {
   }
 
   function deleteNode(nodeId: string): { success: boolean; reason?: string } {
+    if (!canEditPlan(state.activeRole)) return { success: false, reason: '当前身份无权编辑教学计划。' }
     const impact = getDeletionImpact(nodeId)
     if (impact.evidenceCount > 0) {
       return { success: false, reason: '该节点包含已提交证据，不能删除。' }
@@ -377,6 +422,7 @@ export function usePracticumStore() {
   }
 
   function publishPlan(planId: string): { success: boolean; errors: string[] } {
+    if (!canEditPlan(state.activeRole)) return { success: false, errors: ['当前身份无权发布教学计划。'] }
     const errors = validatePlanForPublish(planId)
     if (errors.length > 0) return { success: false, errors }
     const plan = state.plans.find(item => item.id === planId)
@@ -389,6 +435,7 @@ export function usePracticumStore() {
   }
 
   function unpublishPlan(planId: string): boolean {
+    if (!canEditPlan(state.activeRole)) return false
     const plan = state.plans.find(item => item.id === planId)
     if (!plan || plan.status !== 'PUBLISHED') return false
     plan.status = 'DRAFT'
@@ -398,16 +445,19 @@ export function usePracticumStore() {
   }
 
   function updateMemberGroup(memberId: string, group: string) {
+    if (!canManageMembers(state.activeRole)) return
     const member = state.members.find(item => item.id === memberId)
     if (member) { member.group = group; persist() }
   }
 
   function updateMemberRole(memberId: string, role: 'OWNER' | 'STUDENT') {
+    if (!canManageMembers(state.activeRole)) return
     const member = state.members.find(item => item.id === memberId)
     if (member) { member.role = role; persist() }
   }
 
   function removeMember(memberId: string) {
+    if (!canManageMembers(state.activeRole)) return
     state.members = state.members.filter(m => m.id !== memberId)
     persist()
   }
@@ -430,7 +480,7 @@ export function usePracticumStore() {
 
   function saveSoftwareSteps(nodeId: string, completedStepIds: string[]) {
     const activity = getActivityByNodeId(nodeId)
-    if (state.activeRole !== 'STUDENT' || activity?.config.type !== 'SOFTWARE_ACTION') return
+    if (!canSubmitWork(state.activeRole) || activity?.config.type !== 'SOFTWARE_ACTION') return
     const allowed = new Set(activity.config.steps.map(step => step.id))
     state.softwareAttempts[nodeId] = {
       completedStepIds: completedStepIds.filter(stepId => allowed.has(stepId)),
@@ -441,7 +491,7 @@ export function usePracticumStore() {
 
   function completeSoftwareActivity(nodeId: string): { success: boolean; missing: string[] } {
     const activity = getActivityByNodeId(nodeId)
-    if (state.activeRole !== 'STUDENT' || activity?.config.type !== 'SOFTWARE_ACTION') return { success: false, missing: [] }
+    if (!canSubmitWork(state.activeRole) || activity?.config.type !== 'SOFTWARE_ACTION') return { success: false, missing: [] }
     const attempt = getSoftwareAttempt(nodeId)
     const missing = activity.config.steps.filter(step => step.required && !attempt.completedStepIds.includes(step.id)).map(step => step.label)
     if (missing.length) return { success: false, missing }
@@ -452,14 +502,14 @@ export function usePracticumStore() {
   }
 
   function resetSoftwareActivity(nodeId: string) {
-    if (state.activeRole !== 'STUDENT' || !state.softwareAttempts[nodeId]) return
+    if (!canSubmitWork(state.activeRole) || !state.softwareAttempts[nodeId]) return
     delete state.softwareAttempts[nodeId]
     persist()
   }
 
   function submitTrainingAttempt(nodeId: string, answer: string) {
     const activity = getActivityByNodeId(nodeId)
-    if (state.activeRole !== 'STUDENT' || activity?.config.type !== 'TRAINING' || !answer.trim()) return null
+    if (!canSubmitWork(state.activeRole) || activity?.config.type !== 'TRAINING' || !answer.trim()) return null
     const attempts = state.trainingAttempts[nodeId] ?? []
     if (attempts.length >= activity.config.maxAttempts) return null
     const text = answer.trim()
@@ -472,7 +522,7 @@ export function usePracticumStore() {
 
   function savePracticeDraft(nodeId: string, text: string) {
     const activity = getActivityByNodeId(nodeId)
-    if (state.activeRole !== 'STUDENT' || activity?.config.type !== 'PRACTICE_ACTIVITY') return false
+    if (!canSubmitWork(state.activeRole) || activity?.config.type !== 'PRACTICE_ACTIVITY') return false
     state.practiceDrafts[nodeId] = text
     persist()
     return true
@@ -481,7 +531,7 @@ export function usePracticumStore() {
   function submitPracticeWork(nodeId: string) {
     const activity = getActivityByNodeId(nodeId)
     const text = state.practiceDrafts[nodeId]?.trim()
-    if (state.activeRole !== 'STUDENT' || activity?.config.type !== 'PRACTICE_ACTIVITY' || !text) return null
+    if (!canSubmitWork(state.activeRole) || activity?.config.type !== 'PRACTICE_ACTIVITY' || !text) return null
     const current = state.practiceSubmissions[nodeId] ?? { status: 'NOT_STARTED' as const, versions: [] }
     if (!['NOT_STARTED', 'IN_PROGRESS', 'RETURNED'].includes(current.status)) return null
     const version = { id: `submission-${nodeId}-${current.versions.length + 1}`, submissionId: nodeId, version: current.versions.length + 1, text, links: [], attachments: [], submittedAt: new Date().toISOString() }
@@ -533,7 +583,7 @@ export function usePracticumStore() {
   }
 
   function getReviewQueue(): ReviewQueueItem[] {
-    if (state.activeRole !== 'OWNER') return []
+    if (!canReview(state.activeRole)) return []
     return Object.entries(state.practiceSubmissions).flatMap(([nodeId, submission]) => {
       const version = submission.versions.at(-1)
       const node = state.nodes.find(item => item.id === nodeId)
@@ -562,7 +612,7 @@ export function usePracticumStore() {
     const submission = state.practiceSubmissions[nodeId]
     const latestVersion = submission?.versions.at(-1)
     const text = feedback.trim()
-    if (state.activeRole !== 'OWNER' || submission?.status !== 'SUBMITTED' || !latestVersion || !text) return false
+    if (!canReview(state.activeRole) || submission?.status !== 'SUBMITTED' || !latestVersion || !text) return false
     const createdAt = new Date().toISOString()
     submission.status = 'RETURNED'
     submission.feedback = text
@@ -587,7 +637,7 @@ export function usePracticumStore() {
     const submission = state.practiceSubmissions[nodeId]
     const activity = getActivityByNodeId(nodeId)
     const text = feedback.trim()
-    if (state.activeRole !== 'OWNER' || submission?.status !== 'SUBMITTED' || activity?.config.type !== 'PRACTICE_ACTIVITY' || !text) return false
+    if (!canReview(state.activeRole) || submission?.status !== 'SUBMITTED' || activity?.config.type !== 'PRACTICE_ACTIVITY' || !text) return false
     const rubric = activity.config.rubric
     const missingRequired = rubric.some(dimension => dimension.required && rubricScores[dimension.id] === undefined)
     const invalidScore = rubric.some(dimension => {
@@ -608,9 +658,11 @@ export function usePracticumStore() {
   }
 
   function updateRoomSettings(input: { description: string; promotionalMediaUrl: string }) {
+    if (!canManageRoomSettings(state.activeRole)) return false
     state.room.description = input.description
     state.room.promotionalMediaUrl = input.promotionalMediaUrl
     persist()
+    return true
   }
 
   // --- Notifications ---
@@ -774,6 +826,7 @@ export function usePracticumStore() {
   return {
     state: readonly(state),
     storageError: readonly(storageError),
+    syncStorageError,
     resetDemo,
     switchRole,
     getPlanNodes,

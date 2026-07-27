@@ -11,7 +11,7 @@
         </div>
 
         <p v-if="isLoading" data-loading class="empty-state">正在加载资源列表...</p>
-        <p v-else-if="store.state.activeRole !== 'OWNER'" data-forbidden class="empty-state">只有管理员可以管理资源。</p>
+        <p v-else-if="!canManageResources(store.state.activeRole)" data-forbidden class="empty-state">只有管理员可以管理资源。</p>
 
         <template v-else>
           <div class="section-heading">
@@ -87,6 +87,7 @@
 import { computed, ref, onMounted } from 'vue'
 import type { ResourceKind } from '../../domain/practicum/types'
 import { usePracticumStore } from '../../composables/usePracticumStore'
+import { canManageResources } from '../../domain/practicum/permissions'
 
 const PER_PAGE = 5
 

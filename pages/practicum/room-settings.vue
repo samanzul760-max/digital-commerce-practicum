@@ -11,7 +11,7 @@
         </div>
 
         <p v-if="isLoading" data-loading class="empty-state">正在加载实训室设置...</p>
-        <p v-else-if="store.state.activeRole !== 'OWNER'" data-forbidden class="empty-state">只有管理员可以编辑实训室设置。</p>
+        <p v-else-if="!canManageRoomSettings(store.state.activeRole)" data-forbidden class="empty-state">只有管理员可以编辑实训室设置。</p>
 
         <form v-else class="form-panel" @submit.prevent="save">
           <label class="field">实训室介绍
@@ -39,6 +39,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { usePracticumStore } from '../../composables/usePracticumStore'
+import { canManageRoomSettings } from '../../domain/practicum/permissions'
 
 const store = usePracticumStore()
 const isLoading = ref(true)

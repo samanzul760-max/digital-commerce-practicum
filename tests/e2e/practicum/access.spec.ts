@@ -10,8 +10,13 @@ test('[CASE-S1-002] student cannot see draft plans or manage plans', async ({ pa
   await page.locator('[data-role-option="STUDENT"]').click()
   await expect(page).toHaveURL('/practicum')
 
-  await expect(page.getByRole('link', { name: /网店运营/ })).toBeVisible()
+  // 已发布计划作为链接可见
+  await expect(page.locator('[data-plan-link][data-plan-id="plan-wdds"]')).toBeVisible()
+  await expect(page.getByRole('link', { name: '网店运营', exact: true })).toBeVisible()
+  // 草稿计划不可见
+  await expect(page.locator('[data-plan-link][data-plan-id="plan-wdsj"]')).toHaveCount(0)
   await expect(page.getByRole('link', { name: /网店视觉设计/ })).toHaveCount(0)
+  // 无管理操作
   await expect(page.locator('[data-action="edit-plan"], [data-action="publish-plan"]')).toHaveCount(0)
 })
 

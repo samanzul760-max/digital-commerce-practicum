@@ -3,7 +3,7 @@
     <PracticumShell :context-title="isPublishedStudentActivity ? activityNode?.title ?? '活动' : '活动不可访问'" :context-meta="isPublishedStudentActivity ? activityTypeLabel(activity?.type) : ''">
       <p v-if="isLoading" data-loading class="empty-state">正在加载活动...</p>
 
-      <p v-else-if="store.state.activeRole !== 'STUDENT' || (activityNode && activity && !isPublishedStudentActivity)" data-forbidden class="empty-state">当前活动不可访问。</p>
+      <p v-else-if="!canSubmitWork(store.state.activeRole) || (activityNode && activity && !isPublishedStudentActivity)" data-forbidden class="empty-state">当前活动不可访问。</p>
 
       <div v-else-if="!activityNode || !activity || !activityPlan" data-empty class="empty-state">活动未找到。</div>
 
@@ -151,6 +151,7 @@
 import { computed, onMounted, ref } from 'vue'
 import type { ActivityType } from '~/domain/practicum/types'
 import { usePracticumStore } from '~/composables/usePracticumStore'
+import { canSubmitWork } from '~/domain/practicum/permissions'
 
 const route = useRoute()
 const store = usePracticumStore()

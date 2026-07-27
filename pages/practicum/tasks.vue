@@ -1,7 +1,7 @@
 <template>
   <ClientOnly>
     <PracticumShell context-title="任务" context-meta="集中查看待提交、待修改、已通过和老师反馈">
-      <section v-if="store.state.activeRole !== 'STUDENT'" data-forbidden class="empty-state">
+      <section v-if="!canSubmitWork(store.state.activeRole)" data-forbidden class="empty-state">
         学生任务页仅学生视角可用。请切换到学生视角后查看。
       </section>
 
@@ -59,6 +59,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { usePracticumStore } from '../../composables/usePracticumStore'
+import { canSubmitWork } from '../../domain/practicum/permissions'
 
 const store = usePracticumStore()
 const primaryPlan = computed(() => store.visiblePlansFor('STUDENT')[0] ?? null)

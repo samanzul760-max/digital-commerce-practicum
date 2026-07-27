@@ -3,7 +3,7 @@
     <PracticumShell :context-title="plan?.title ?? '课程编辑'" :context-meta="planMeta">
       <p v-if="isLoading" data-loading class="empty-state">正在加载课程编辑器...</p>
 
-      <p v-else-if="store.state.activeRole !== 'OWNER'" data-forbidden class="empty-state">学生只能查看已发布课程目录，不能进入编辑页面。</p>
+      <p v-else-if="!canEditPlan(store.state.activeRole)" data-forbidden class="empty-state">学生只能查看已发布课程目录，不能进入编辑页面。</p>
 
       <template v-else>
         <div data-plan-editor>
@@ -238,6 +238,7 @@
 import { computed, ref, onMounted } from 'vue'
 import type { ActivityType, ResourceKind } from '../../../../domain/practicum/types'
 import { usePracticumStore } from '../../../../composables/usePracticumStore'
+import { canEditPlan } from '../../../../domain/practicum/permissions'
 
 const route = useRoute()
 const store = usePracticumStore()

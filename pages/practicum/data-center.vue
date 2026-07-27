@@ -3,7 +3,7 @@
     <PracticumShell context-title="数据中心" context-meta="学习数据概览">
       <p v-if="isLoading" data-loading class="empty-state">正在加载数据...</p>
 
-      <p v-else-if="store.state.activeRole !== 'OWNER'" data-forbidden class="empty-state">只有管理员可以访问数据中心。</p>
+          <p v-else-if="!canAccessDataCenter(store.state.activeRole)" data-forbidden class="empty-state">只有管理员可以访问数据中心。</p>
 
       <div v-else data-data-center>
         <!-- Overview metrics -->
@@ -163,6 +163,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
 import { usePracticumStore } from '../../composables/usePracticumStore'
+import { canAccessDataCenter } from '../../domain/practicum/permissions'
 
 const store = usePracticumStore()
 const isLoading = ref(true)

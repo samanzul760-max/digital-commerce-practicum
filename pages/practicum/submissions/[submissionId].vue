@@ -2,7 +2,7 @@
   <ClientOnly>
     <PracticumShell :context-title="canView ? activityNode?.title ?? '提交详情' : '提交不可访问'" :context-meta="canView ? '审核详情' : ''">
       <p v-if="isLoading" data-loading class="empty-state">正在加载提交详情...</p>
-      <p v-else-if="store.state.activeRole !== 'OWNER'" data-forbidden class="empty-state">你没有查看或审核该提交的权限。</p>
+      <p v-else-if="!canReview(store.state.activeRole)" data-forbidden class="empty-state">你没有查看或审核该提交的权限。</p>
       <p v-else-if="!submission || !activityNode" data-empty class="empty-state">提交记录未找到。</p>
 
       <div v-else data-submission-detail>
@@ -111,6 +111,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
 import { usePracticumStore } from '~/composables/usePracticumStore'
+import { canReview } from '~/domain/practicum/permissions'
 
 const route = useRoute()
 const store = usePracticumStore()
@@ -120,7 +121,7 @@ const submissionId = computed(() => route.params.submissionId as string)
 const submission = computed(() => store.state.practiceSubmissions[submissionId.value] ?? null)
 const activityNode = computed(() => store.state.nodes.find(node => node.id === submissionId.value) ?? null)
 const activity = computed(() => activityNode.value ? store.getActivityByNodeId(activityNode.value.id) : null)
-const canView = computed(() => store.state.activeRole === 'OWNER' && Boolean(submission.value && activityNode.value))
+const canView = computed(() => canReview(store.state.activeRole) && Boolean(submission.value && activityNode.value))
 const latestVersion = computed(() => submission.value?.versions.at(-1))
 const rubricDimensions = computed(() => activity.value?.config.type === 'PRACTICE_ACTIVITY' ? activity.value.config.rubric : [])
 const scoredDimensions = computed(() => rubricDimensions.value

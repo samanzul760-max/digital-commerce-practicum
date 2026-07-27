@@ -3,7 +3,7 @@
     <PracticumShell :context-title="plan?.title ?? '教学计划'" :context-meta="planMeta">
       <p v-if="isLoading" data-loading class="empty-state">正在加载计划详情...</p>
 
-      <div v-else-if="plan && plan.status === 'DRAFT' && store.state.activeRole !== 'OWNER'" data-forbidden class="empty-state">
+      <div v-else-if="plan && !canViewPlan(store.state.activeRole, plan.status)" data-forbidden class="empty-state">
         该计划暂未发布，无法查看。
       </div>
 
@@ -16,7 +16,7 @@
           <span v-if="plan" class="status-pill" :class="plan.status === 'DRAFT' ? 'status-pill-orange' : ''">
             {{ planStatusLabel }}
           </span>
-          <NuxtLink v-if="store.state.activeRole === 'OWNER' && planReview" data-plan-review-link :to="`/practicum/submissions/${planReview.submissionId}`" class="primary-button">打开计划审核</NuxtLink>
+          <NuxtLink v-if="canReview(store.state.activeRole) && planReview" data-plan-review-link :to="`/practicum/submissions/${planReview.submissionId}`" class="primary-button">打开计划审核</NuxtLink>
         </div>
 
         <div v-if="plan && plan.description === '内容待授权导入'" data-plan-pending class="empty-state">
@@ -78,6 +78,7 @@
 import { computed, ref, onMounted } from 'vue'
 import type { ActivityType } from '../../../../domain/practicum/types'
 import { usePracticumStore } from '../../../../composables/usePracticumStore'
+import { canReview, canViewPlan } from '../../../../domain/practicum/permissions'
 
 const route = useRoute()
 const store = usePracticumStore()

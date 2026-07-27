@@ -23,7 +23,7 @@
         <section v-else-if="store.state.activeRole === 'STUDENT'" data-student-home>
           <div class="metric-strip">
             <div class="metric"><span>当前课程</span><strong>{{ visiblePlans.length }}</strong><small>{{ todayTaskHint }}</small></div>
-            <div class="metric"><span>待完成</span><strong>{{ pendingTaskCount }}</strong><small>最近截止 {{ deadlineLabel }}</small></div>
+            <div class="metric"><span>待完成</span><strong>{{ pendingTaskCount }}</strong><small data-deadline>最近截止 {{ deadlineLabel }}</small></div>
             <div data-task-summary class="metric metric-summary">
               <span>今日待办 · {{ pendingTaskCount }} 项</span>
               <strong>{{ nextActivity?.title ?? '查看当前任务' }}</strong>
@@ -39,7 +39,19 @@
           </div>
 
           <div class="dashboard-split dashboard-split-single">
-            <section class="panel">
+            <section v-if="primaryPlan" data-plan-progress class="progress-band" aria-labelledby="student-progress-title">
+              <div>
+                <span class="eyebrow">学习进度</span>
+                <h2 id="student-progress-title">{{ primaryPlan.title }}</h2>
+                <p>{{ studentProgress.completed }} / {{ studentProgress.total }} 个必修活动已完成</p>
+              </div>
+              <div class="progress-track" role="progressbar" :aria-label="`完成 ${studentProgress.percent}%`" :aria-valuenow="studentProgress.percent" aria-valuemin="0" aria-valuemax="100">
+                <span :style="{ width: studentProgress.percent + '%' }" />
+              </div>
+                <strong class="progress-number">{{ studentProgress.percent }}%<small>{{ studentProgress.completed }} / {{ studentProgress.total }}</small></strong>
+            </section>
+
+            <section data-next-task class="panel">
               <div class="panel-head">
                 <div>
                   <strong>继续学习</strong>
@@ -55,6 +67,45 @@
                 <div v-if="returnedWork" class="timeline-row">
                   <span class="timeline-dot" />
                   <div><strong>修改老师退回的作业</strong><span>{{ latestFeedback || '查看老师反馈并重新提交。' }}</span></div>
+                </div>
+              </div>
+            </section>
+
+            <section v-if="primaryPlan" data-learning-route class="panel" style="margin-top: 16px;">
+              <div class="panel-head"><div><strong>学习路线</strong><span>按模块查看实训进度</span></div></div>
+              <div class="row-list">
+                <NuxtLink v-for="module in modules" :key="module.id" data-route-item :to="`/practicum/learn/${primaryPlan.id}`" class="row-item">
+                  <div><strong>{{ module.title }}</strong><span>进入模块学习</span></div>
+                  <span class="mini-progress" :aria-label="`${store.getModuleProgress(module.id).percent}%`">{{ store.getModuleProgress(module.id).percent }}%</span>
+                </NuxtLink>
+              </div>
+            </section>
+
+            <section v-if="returnedWork" data-returned-work class="panel" style="margin-top: 16px;">
+              <div class="panel-head"><div><strong>退回作业</strong><span>请根据老师反馈修改后重新提交</span></div></div>
+              <p>{{ returnedWork.title }}</p>
+              <p data-recent-feedback class="muted-copy">{{ latestFeedback || '暂无文字反馈。' }}</p>
+            </section>
+
+            <section v-if="visiblePlans.length" class="panel" style="margin-top: 16px;">
+              <div class="panel-head">
+                <div>
+                  <strong>可用课程</strong>
+                  <span>已发布的课程计划</span>
+                </div>
+              </div>
+              <div class="row-list">
+                <div v-for="plan in visiblePlans" :key="plan.id" class="row-item">
+                  <div>
+                    <NuxtLink :to="`/practicum/learn/${plan.id}`" data-plan-link :data-plan-id="plan.id">
+                      <strong>{{ plan.title }}</strong>
+                    </NuxtLink>
+                    <span>{{ plan.description }}</span>
+                  </div>
+                  <div class="row-actions">
+                    <span class="status-pill">已发布</span>
+                    <NuxtLink :to="`/practicum/learn/${plan.id}`" :aria-label="`开始学习${plan.title}`" class="secondary-button compact-action">开始学习</NuxtLink>
+                  </div>
                 </div>
               </div>
             </section>
@@ -117,7 +168,7 @@
                   <label class="field">计划描述<input data-plan-desc-input v-model="newPlanDesc" type="text" placeholder="输入教学计划描述"></label>
                 </div>
                 <div class="form-actions">
-                  <button data-plan-submit class="primary-button" type="submit">确认创建</button>
+                  <button data-plan-submit class="primary-button" type="submit" :disabled="isCreating">确认创建</button>
                   <button data-plan-cancel class="secondary-button" type="button" @click="showCreateForm = false">取消</button>
                 </div>
               </form>
@@ -194,6 +245,7 @@ const deadlineLabel = computed(() => {
   if (!primaryPlan.value) return '暂无'
   const raw = store.state.planDeadlines[primaryPlan.value.id]
   if (!raw) return '暂无'
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10)
   const d = new Date(raw)
   return `${d.getMonth() + 1}月${d.getDate()}日`
 })
@@ -212,13 +264,19 @@ const contextMeta = computed(() => {
 const showCreateForm = ref(false)
 const newPlanTitle = ref('')
 const newPlanDesc = ref('')
+const isCreating = ref(false)
 
 function handleCreatePlan() {
-  if (!newPlanTitle.value.trim()) return
-  store.createPlan({ title: newPlanTitle.value.trim(), description: newPlanDesc.value.trim() })
-  newPlanTitle.value = ''
-  newPlanDesc.value = ''
-  showCreateForm.value = false
+  if (!newPlanTitle.value.trim() || isCreating.value) return
+  isCreating.value = true
+  try {
+    store.createPlan({ title: newPlanTitle.value.trim(), description: newPlanDesc.value.trim() })
+    newPlanTitle.value = ''
+    newPlanDesc.value = ''
+    showCreateForm.value = false
+  } finally {
+    isCreating.value = false
+  }
 }
 
 function planStatusLabel(status: PlanStatus) {

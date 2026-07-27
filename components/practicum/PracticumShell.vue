@@ -24,7 +24,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { usePracticumStore } from '../../composables/usePracticumStore'
 import PracticumSidebar from './PracticumSidebar.vue'
 import PracticumTopbar from './PracticumTopbar.vue'
@@ -39,6 +39,7 @@ withDefaults(defineProps<{
 
 const store = usePracticumStore()
 const storageError = computed(() => store.storageError.value)
+onMounted(() => store.syncStorageError())
 const roleLabels = {
   OWNER: '管理员',
   STUDENT: '学生',

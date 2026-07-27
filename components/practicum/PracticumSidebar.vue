@@ -30,38 +30,15 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import type { PracticumRole } from '../../domain/practicum/types'
 import { usePracticumStore } from '../../composables/usePracticumStore'
-
-interface NavItem {
-  key: string
-  label: string
-  icon: string
-  to: string
-  roles: PracticumRole[]
-  active: (path: string) => boolean
-}
+import { visibleNavItems as getVisibleNavItems } from '../../domain/practicum/permissions'
 
 const route = useRoute()
 const store = usePracticumStore()
 
-const navItems: NavItem[] = [
-  { key: 'workspace', label: '总览', icon: 'dashboard', to: '/practicum', roles: ['OWNER', 'STUDENT'], active: path => path === '/practicum' },
-  { key: 'plans', label: '教学', icon: 'book', to: '/practicum#plans', roles: ['OWNER'], active: path => path.startsWith('/practicum/plans') || path.startsWith('/practicum/resources') || path.startsWith('/practicum/learn') || path.startsWith('/practicum/activities') },
-  { key: 'cases', label: '案例', icon: 'layers', to: '/practicum/cases', roles: ['OWNER', 'STUDENT'], active: path => path.startsWith('/practicum/cases') },
-  { key: 'reviews', label: '教学管理', icon: 'clipboard-check', to: '/practicum/reviews', roles: ['OWNER'], active: path => path.startsWith('/practicum/reviews') || path.startsWith('/practicum/submissions') || path.startsWith('/practicum/members') || path.startsWith('/practicum/room-settings') },
-  { key: 'tasks', label: '任务', icon: 'check-square', to: '/practicum/tasks', roles: ['STUDENT'], active: path => path === '/practicum/tasks' },
-  { key: 'data-center', label: '数据', icon: 'chart', to: '/practicum/data-center', roles: ['OWNER'], active: path => path === '/practicum/data-center' },
-  { key: 'progress', label: '成长数据', icon: 'trending-up', to: '/practicum/progress', roles: ['STUDENT'], active: path => path === '/practicum/progress' },
-]
+const visibleNavItems = computed(() => getVisibleNavItems(store.state.activeRole))
 
-const visibleNavItems = computed(() => {
-  const role = store.state.activeRole
-  if (!role) return navItems.filter(item => ['workspace', 'plans', 'cases'].includes(item.key) && item.roles.includes('OWNER'))
-  return navItems.filter(item => item.roles.includes(role))
-})
-
-function isActive(item: NavItem) {
-  return item.active(route.path)
+function isActive(item: { activeMatch: (path: string) => boolean }) {
+  return item.activeMatch(route.path)
 }
 </script>

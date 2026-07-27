@@ -4,9 +4,9 @@
       <p v-if="isLoading" data-loading class="empty-state">正在加载课程...</p>
 
       <!-- Block non-STUDENT or draft/unpublished plans -->
-      <p v-else-if="store.state.activeRole !== 'STUDENT'" data-forbidden class="empty-state">请使用学生身份访问学习内容。</p>
+      <p v-else-if="!canAccessLearning(store.state.activeRole)" data-forbidden class="empty-state">请使用学生身份访问学习内容。</p>
 
-      <div v-else-if="plan && plan.status !== 'PUBLISHED'" data-forbidden class="empty-state">
+      <div v-else-if="plan && !canViewPlan(store.state.activeRole, plan.status)" data-forbidden class="empty-state">
         该计划暂未发布，无法学习。
       </div>
 
@@ -79,6 +79,7 @@
 import { computed, ref, onMounted } from 'vue'
 import type { ActivityType } from '~/domain/practicum/types'
 import { usePracticumStore } from '~/composables/usePracticumStore'
+import { canAccessLearning, canViewPlan } from '~/domain/practicum/permissions'
 
 const route = useRoute()
 const store = usePracticumStore()

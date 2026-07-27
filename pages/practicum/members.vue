@@ -11,7 +11,7 @@
         </div>
 
         <p v-if="isLoading" data-loading class="empty-state">正在加载成员列表...</p>
-        <p v-else-if="store.state.activeRole !== 'OWNER'" data-forbidden class="empty-state">只有管理员可以管理成员。</p>
+        <p v-else-if="!canManageMembers(store.state.activeRole)" data-forbidden class="empty-state">只有管理员可以管理成员。</p>
 
         <template v-else>
           <div class="section-heading">
@@ -78,6 +78,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, onMounted } from 'vue'
 import { usePracticumStore } from '../../composables/usePracticumStore'
+import { canManageMembers } from '../../domain/practicum/permissions'
 
 const store = usePracticumStore()
 const isLoading = ref(true)
