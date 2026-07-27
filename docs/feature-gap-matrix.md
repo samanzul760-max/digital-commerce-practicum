@@ -1,23 +1,26 @@
-# 智能体与参考产品功能差距表
+# 功能差距矩阵
 
-状态分类：已实现 = 当前代码有可用原型；部分实现 = 有页面或本地状态但缺少完整业务闭环；缺失 = 未发现对应实现。参考产品一栏只写功能抽象，不复制品牌、文案、素材或私有接口。
+审计日期：2026-07-27。状态以当前源码、测试文件和本轮新鲜命令为准。`PASS` 只用于已具备实现和对应证据的单一能力；未完成项保持原状态，不因局部 API 存在而升级。
 
-| 功能模块 | 参考产品中的功能 | 智能体当前状态 | 缺失内容 | 优先级 | 预计涉及的页面 | 预计涉及的数据和接口 | 验收标准 |
-|---|---|---|---|---|---|---|---|
-| 登录认证 | 账号登录、退出、会话失效 | 缺失；本地身份选择 | 登录、退出、会话续期、失效跳转 | P0 | `/practicum/profile`、所有受保护页 | `User`、`Session`；登录/退出/当前用户 | 未登录访问受保护页被拦截；退出后数据不泄露 |
-| 角色权限 | 管理员、教师、学生分工 | 部分实现；OWNER/STUDENT 主流程 | TEACHER、MENTOR 独立权限和服务端校验 | P0 | Shell、profile、members、reviews、data | `Role`、`Permission`、`Membership` | 菜单、直达 URL、接口三层权限一致 |
-| 实训室工作台 | 实训室上下文、状态、快捷入口 | 已实现本地工作台 | 真实实训室切换、状态同步 | P0 | `/practicum`、room-settings | `TrainingRoom`；room detail | 不同组织/实训室数据隔离 |
-| 教学计划列表 | 计划列表、创建、发布状态 | 部分实现；创建和展示已有 | 搜索、筛选、排序、分页、真实共享 | P0 | `/practicum`、plans | `Plan`；list/create/update/publish | 管理员可创建并看到状态；学生只见已发布 |
-| 计划编辑器 | 多级目录、活动、辅助资料维护 | 已实现本地编辑器 | 服务端保存、并发冲突、批量操作 | P0 | `plans/:planId/edit` | `CurriculumNode`、`Activity`；tree CRUD | 新增/编辑/删除/刷新后状态保留 |
-| 学生学习 | 进入教学、按活动学习和完成 | 已实现主要活动类型 | 学生端实际导航、计划卡片链接契约需统一 | P0 | learn、activities、tasks | `LearningPosition`、`ActivityProgress` | 学生能从首页进入下一项并恢复位置 |
-| 实训活动 | 软件操作、训练、实践提交 | 已实现本地状态机 | 多用户提交、附件、服务端状态 | P0 | activities、submissions | `ActivityAttempt`、`SubmissionVersion` | 草稿、提交、退回、再提交可持久化 |
-| 资源管理 | 资源添加、查看、发布、移除、筛选 | 部分实现；列表和分页本地化 | 资源详情、真实资源库、上传和发布接口 | P1 | resources、activities | `Resource`；resource CRUD/upload | 筛选/分页正确；移除需确认；资源权限正确 |
-| 成员管理 | 添加成员、邀请、分组、角色管理 | 部分实现；本地成员和角色修改 | 邀请链接、申请列表、教师角色、批量管理 | P0 | members、profile | `Membership`、`Invite`、`Group` | 邀请、加入、角色变更、移除有审计和权限 |
-| 落地页/介绍 | 实训室介绍和图片视频营销位 | 部分实现；只保存文本和媒体元数据 | 文件上传、预览、大小/格式校验、发布 | P1 | room-settings | `LandingPage`、`Asset`；upload/save | 上传失败可重试；刷新后内容不丢失 |
-| 批阅中心 | 待批阅、已批阅、计划/课堂作业、详情 | 已实现计划审核和评分原型 | 课堂作业视图、教师工作台、真实队列 | P0 | reviews、submissions | `ReviewQueue`、`Grade`；review/grade | 退回、评分、量规校验和历史不可变 |
-| 数据中心 | 完成率、成员数据、计划数据、播报、排行、导出 | 部分实现；本地统计和导出模拟 | 真实聚合、时间范围、成员/计划详情、文件导出 | P1 | data-center、progress | `RoomStats`、`MemberStats`；stats/export | 统计与提交状态一致；导出可下载 |
-| 通知反馈 | 通知数量、列表、已读、深链 | 已实现本地通知 | 服务端推送、跨端同步、更多异常 | P1 | topbar、notifications | `Notification`；list/read/count | 已读持久化；无权深链不泄露 |
-| 搜索筛选分页 | 资源、成员、批阅等列表查询 | 部分实现；主要是前端过滤/分页 | 服务端查询、排序、分页边界 | P1 | resources、members、reviews | Query DTO、分页响应 | 查询条件刷新后可解释且数据正确 |
-| 异常状态 | loading、空数据、失败、无权限、重复提交 | 已实现较多页面状态 | 统一错误码、重试、网络断开、会话失效 | P0 | 全部页面、Shell | `ApiError`、error boundary | 每类异常有明确反馈和安全返回路径 |
-| 移动端 | 管理端和学生端响应式使用 | 已有 375/1440 回归和 CSS | 关键页面逐页验证 768/1024，表格移动策略 | P1 | 全部页面 | 无新增核心模型 | 无水平溢出；关键操作可达且目标尺寸足够 |
-| 安全审计 | 权限、数据隔离、敏感信息保护 | 原型前端守卫 | 后端授权、审计日志、CSRF、上传安全 | P0 | API 层、所有管理页 | AuthZ、AuditLog、UploadPolicy | 越权请求服务端拒绝；无凭据进入前端 |
+| 模块 | 功能 | 证据 | 角色/路由 | 当前状态 | 缺失行为 | 数据/API | BDD | TDD/API | Playwright | 优先级 | 验收标准 | 验证结果 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 认证 | 登录、退出、会话刷新 | FACT：认证 API、HttpOnly cookie、`auth-session.spec.ts` | OWNER/STUDENT；`/practicum/profile`、受保护页 | IMPLEMENTED_UNVERIFIED | 本轮未重新跑全量认证证据 | `User`、`Session`；`/api/auth/*` | AUTH-001~005 | `auth-session.spec.ts` | auth-session | P0 | 未登录拦截、错误不泄露、刷新保持、退出失效 | 待本轮总验收 |
+| 权限 | OWNER/STUDENT 菜单与服务端对象授权 | FACT：服务端角色和 room 过滤存在 | OWNER/STUDENT；管理路由/API | PARTIAL | TEACHER/MENTOR、审计日志、CSRF 缺失 | `Role`、`roomIds` | A-02~A-04 | `platform-api.spec.ts` | access/navigation | P0 | 菜单、直达 URL、API 三层一致 | 部分验证 |
+| 工作台 | 实训室上下文与计划入口 | FACT：页面和 seed 存在 | OWNER/STUDENT；`/practicum` | PARTIAL | 实训室切换和跨组织隔离 UI 不完整 | `TrainingRoom`、`Plan` | A-05~A-06 | plans API | shell/access | P0 | 角色看到正确入口和可见计划 | 部分验证 |
+| 计划 | 列表、创建、编辑、发布、归档 | FACT：服务端计划 API 已存在，页面仍有 store 路径 | OWNER/STUDENT；`/practicum/plans` | PARTIAL | 页面完整迁移、共享数据和刷新证据不足 | `Plan`、`CurriculumNode`；`/api/practicum/plans*` | PLANS-001 | `plans-api.spec.ts` | curriculum-editor | P0 | 服务端状态、版本冲突、刷新保持 | 部分验证 |
+| 学习 | 学习位置、进度、活动完成 | FACT：主要逻辑在 store/localStorage | STUDENT；`/practicum/learn/*` | MOCK | 多用户服务端进度和跨端恢复缺失 | `LearningPosition`、`ActivityProgress` | S3-01~S3-10 | 现有 E2E | student-activities | P0 | 进度服务端持久化并隔离 | MOCK |
+| 提交 | 保存草稿、提交、退回、再提交、评分 | FACT：提交 API 和审核 API 已有；页面仍保留本地兼容路径 | STUDENT/OWNER；activities/reviews/submissions | PARTIAL | 草稿服务端化、页面彻底移除本地回退 | `SubmissionVersion`；`/api/practicum/submissions*` | BDD-SUBMISSION-001~006 | `submissions-api.spec.ts` | teacher-review、submission-server-source | P0 | 版本不可变、幂等、刷新、越权、错误状态 | 本轮队列来源 GREEN；整体 PARTIAL |
+| 资源 | 列表、筛选、删除、上传元数据 | FACT：查询/删除/API 校验存在 | OWNER；`/practicum/resources` | PARTIAL | 详情、发布、对象存储、病毒扫描、断点续传 | `Resource`、`Asset`；`/api/practicum/resources`、`/assets` | ASSUME-S2-001 | platform API | administration | P1 | 权限、确认、分页、上传校验 | 部分验证 |
+| 成员 | 列表、角色修改、移除 | FACT：API 存在，页面保留 store 渲染 | OWNER；`/practicum/members` | MOCK | 邀请、申请、批量管理、审计 | `Membership`、`Invite`；`/api/practicum/members` | MEMBER-001 | platform API | administration | P0 | 变更服务端持久化且有权限 | MOCK |
+| 实训室介绍 | 文本、媒体元数据 | FACT：页面保存原型数据 | OWNER；`/practicum/room-settings` | MOCK | 文件上传、预览、发布 | `LandingPage`、`Asset`；assets API | ROOM-001 | upload contract | administration | P1 | 格式/大小校验、失败重试、刷新保持 | MOCK |
+| 审核中心 | 队列、退回、评分、历史 | FACT：服务端队列和提交动作已存在 | OWNER；`/practicum/reviews`、`submissions/*` | PARTIAL | 旧 store 兼容路径仍在详情页，教师工作台缺失 | `ReviewQueue`、`Grade` | BDD-SUBMISSION-001~006 | submissions-api | teacher-review、submission-server-source | P0 | 空/失败不泄漏本地数据，历史不可变 | 本轮 3/3 GREEN |
+| 数据中心 | 统计、排行、导出 | FACT：stats API 存在，页面有模拟导出 | OWNER/STUDENT；`/practicum/data-center`、progress | PARTIAL | 时间范围、下钻、真实文件导出 | `RoomStats`、`MemberStats`；`/api/practicum/stats` | S5-09~S5-11 | platform API | slice-6-quality | P1 | 统计与服务端提交状态一致 | 部分验证 |
+| 通知 | 列表、未读、已读、深链 | FACT：API 存在，页面仍有 store 路径 | OWNER/STUDENT；notifications | MOCK | 页面服务端迁移、跨端同步、完整深链授权 | `Notification`；`/api/practicum/notifications` | S5-05、S5-07 | platform API | existing E2E | P1 | 已读刷新保持且无权深链不泄露 | MOCK |
+| 查询 | 搜索、筛选、排序、分页 | FACT：部分 API 支持 query，页面混用前端过滤 | OWNER/STUDENT；resources/members/reviews | PARTIAL | 全部列表统一服务端查询和边界证据 | `ListQuery`、`Pagination` | QUERY-001 | plans/platform API | focused list tests | P1 | 条件刷新保持，边界稳定 | 部分验证 |
+| 异常 | loading、empty、error、forbidden、重复提交 | FACT：多页面已有状态，本轮新增空/错和重复来源覆盖 | 全角色；全路由 | IMPLEMENTED_UNVERIFIED | 网络断开、统一错误映射、会话失效需全量复核 | `ApiError`、request id | BDD-SUBMISSION-005/006 | API error assertions | submission-server-source | P0 | 每类状态可见且不泄露数据 | 本轮 3/3 GREEN |
+| 移动端 | 关键页面响应式 | FACT：已有多尺寸测试，本轮新增 390px 审核队列 | 全角色；关键路由 | IMPLEMENTED_UNVERIFIED | 关键页面逐页复核 768/1024 | 无新增模型 | S6-Responsive | existing E2E | submission-server-source | P1 | 无水平溢出、操作可达 | 本轮 390px GREEN |
+| 安全审计 | 认证、隔离、上传安全 | FACT：HttpOnly、限流、request id、上传约束存在 | API 层 | PARTIAL | 审计日志、CSRF、多实例 session/DB/Redis | AuthZ、AuditLog、UploadPolicy | G-001 | platform API | access/navigation | P0 | 越权服务端拒绝，敏感信息不入代码日志 | 部分验证 |
+
+## 缺失交付文档
+
+本轮审计前 `reference-page-inventory.md`、`user-journeys.md`、`data-model.md`、`permission-matrix.md` 不存在，已按当前项目事实补齐，作为矩阵的引用依据。

@@ -52,3 +52,18 @@ npx.cmd playwright test tests/e2e/practicum/shell.spec.ts tests/e2e/practicum/ac
 ## 结论规则
 
 只有命令退出码为 0 且输出明确显示无失败用例，才能将对应行标记为 PASS。任何命令因端口占用、超时、启动失败或浏览器错误结束，都标记为 FAIL/未完成并记录原因。
+
+## 本轮提交审核来源验收
+
+| 用例 | 预期 | 实际 | 状态 | 证据 |
+|---|---|---|---|---|
+| 服务端空队列 | 不显示 localStorage 残留，显示空态 | 修复后通过，刷新后仍为空态 | PASS | `BDD-SUBMISSION-005`，桌面 Playwright |
+| 服务端队列失败 | 显示错误，不渲染残留数据 | 修复后通过 | PASS | `BDD-SUBMISSION-006` |
+| 移动端审核队列 | 390px 空态可见且无水平溢出 | 通过 | PASS | `submission-server-source.spec.ts` |
+
+本轮切片结论：`PARTIAL`。审核队列来源约束已验证，但学生草稿、活动进度和提交详情仍有 store 兼容路径，不能将整个提交模块标记为 PASS。
+
+## 本轮未通过或未验证
+
+- 完整 `npx.cmd playwright test tests/e2e/practicum --reporter=list` 在 243 秒后超时并出现 `EPIPE`，记为 `UNVERIFIED/FAILED`，旧报告的 128/128 不能作为本轮证据。
+- 相关回归套件 19 个用例中 15 个通过、4 个失败。失败均来自 `teacher-review.spec.ts` 使用 OWNER session 切换“学生视角”后仍把提交写入 localStorage；服务端队列按新契约为空。该身份预览与真实服务端角色尚未统一，提交/审核整体保持 `PARTIAL`。

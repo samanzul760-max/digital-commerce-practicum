@@ -12,6 +12,12 @@
 
 Submission states are `NOT_STARTED`, `IN_PROGRESS`, `SUBMITTED`, `RETURNED`, and `GRADED`. A graded submission is immutable; a returned submission may create a new version. Student writes accept `Idempotency-Key` to prevent duplicate requests.
 
+### 本轮 UI 数据来源约束
+
+- `GET /api/practicum/submissions` 返回 `{ items, total }`；`items: []` 是成功的空结果，不得回退到浏览器 `localStorage` 或 store 队列。
+- 服务端 5xx/网络错误必须进入页面 error 状态，不得渲染本地残留审核数据。
+- 本轮证据：`BDD-SUBMISSION-005`、`BDD-SUBMISSION-006`；`tests/e2e/practicum/submission-server-source.spec.ts`。
+
 所有 `/api/practicum/*` 接口都要求 HttpOnly session。服务端按用户角色和 `roomIds` 做对象级过滤；前端守卫不等于安全边界。
 
 ## 计划

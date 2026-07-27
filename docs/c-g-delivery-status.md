@@ -29,3 +29,11 @@
 - 文件当前保存到本机 `.data/uploads`，尚未接入对象存储、病毒扫描和断点续传。
 - 数据层尚未迁移数据库/Redis，多实例部署和跨进程 session 仍不适合生产。
 - 尚未新增独立 Vitest 单元测试；本次用 BDD + Playwright API/浏览器契约完成 RED/GREEN 验证。
+
+## 本轮 H-提交来源切片
+
+- BDD：`BDD-SUBMISSION-005`、`BDD-SUBMISSION-006`。
+- RED：`npx.cmd playwright test tests/e2e/practicum/submission-server-source.spec.ts --reporter=list`，修复前空队列场景失败；审核页回退到 `store.getReviewQueue()`。
+- GREEN：同命令修复后 3/3 通过，覆盖桌面空队列、服务端失败、390px 移动端空态和刷新保持。
+- 变更：审核队列成功响应（包括空数组）成为唯一数据源，服务端错误不再泄漏本地残留提交。
+- 限定：学生草稿、活动进度、提交详情的 store 兼容路径仍未全部迁移，提交模块整体继续标记 `PARTIAL`。

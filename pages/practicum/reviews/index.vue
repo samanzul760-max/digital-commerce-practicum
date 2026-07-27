@@ -106,7 +106,8 @@ onMounted(async () => {
     isLoading.value = false
   }
 })
-const queue = computed(() => serverQueue.value.length ? serverQueue.value : store.getReviewQueue())
+// An empty server response is authoritative; never expose stale browser-only submissions.
+const queue = computed(() => serverQueue.value)
 const planFilter = ref('')
 const unitFilter = ref('')
 const statusFilter = ref('')
