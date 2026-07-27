@@ -13,6 +13,8 @@
         <p v-if="isLoading" data-loading class="empty-state">正在加载资源列表...</p>
         <p v-else-if="!canManageResources(store.state.activeRole)" data-forbidden class="empty-state">只有管理员可以管理资源。</p>
 
+        <p v-else-if="loadError" data-resource-error class="empty-state">Resource loading failed. Please retry.</p>
+
         <template v-else>
           <div class="section-heading">
             <h2>资源列表</h2>
@@ -85,7 +87,7 @@
 
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
-import type { ResourceKind } from '../../domain/practicum/types'
+import type { ResourceKind, SupportingResource } from '../../domain/practicum/types'
 import { usePracticumStore } from '../../composables/usePracticumStore'
 import { canManageResources } from '../../domain/practicum/permissions'
 
@@ -93,7 +95,19 @@ const PER_PAGE = 5
 
 const store = usePracticumStore()
 const isLoading = ref(true)
-onMounted(() => { isLoading.value = false })
+const loadError = ref(false)
+const isSaving = ref(false)
+const serverResources = ref<SupportingResource[]>([])
+onMounted(async () => {
+  try {
+    const result = await $fetch<{ items: SupportingResource[] }>('/api/practicum/resources?page=1&pageSize=50')
+    serverResources.value = result.items
+  } catch {
+    loadError.value = true
+  } finally {
+    isLoading.value = false
+  }
+})
 const showForm = ref(false)
 const name = ref('')
 const url = ref('')
@@ -104,7 +118,7 @@ const page = ref(1)
 const removeTarget = ref<string | null>(null)
 
 const filteredResources = computed(() => {
-  let list = store.state.resources
+  let list = serverResources.value
   if (query.value.trim()) {
     const q = query.value.trim().toLowerCase()
     list = list.filter(r => r.name.toLowerCase().includes(q))
@@ -122,19 +136,37 @@ const paginatedResources = computed(() => {
   return filteredResources.value.slice(start, start + PER_PAGE)
 })
 
-function saveResource() {
-  if (!name.value.trim() || !url.value.trim()) return
-  store.addSupportingResource({ planId: 'library', name: name.value.trim(), kind: kind.value, url: url.value.trim() })
-  name.value = ''; url.value = ''; showForm.value = false
+async function saveResource() {
+  if (!name.value.trim() || !url.value.trim() || isSaving.value) return
+  isSaving.value = true
+  try {
+    const result = await $fetch<{ resource: SupportingResource }>('/api/practicum/resources', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': `resource-ui-${Date.now()}` },
+      body: { planId: 'library', name: name.value.trim(), kind: kind.value, url: url.value.trim() },
+    })
+    serverResources.value = [result.resource, ...serverResources.value]
+    name.value = ''; url.value = ''; showForm.value = false
+  } catch {
+    loadError.value = true
+  } finally {
+    isSaving.value = false
+  }
 }
 
 function confirmRemove(resourceId: string) {
   removeTarget.value = resourceId
 }
 
-function handleRemove() {
+async function handleRemove() {
   if (!removeTarget.value) return
-  store.removeResource(removeTarget.value)
+  const target = removeTarget.value
+  try {
+    await $fetch(`/api/practicum/resources/${target}`, { method: 'DELETE' })
+    serverResources.value = serverResources.value.filter(resource => resource.id !== target)
+  } catch {
+    loadError.value = true
+  }
   removeTarget.value = null
   if (paginatedResources.value.length === 0 && page.value > 1) page.value--
 }
