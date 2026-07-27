@@ -8,7 +8,7 @@ export default defineConfig({
   workers: 1,
   reporter: 'list',
   use: {
-    baseURL: 'http://127.0.0.1:4174',
+    baseURL: 'http://127.0.0.1:4175',
     storageState: 'output/playwright/auth-state.json',
     channel: 'msedge',
     screenshot: 'only-on-failure',
@@ -16,9 +16,9 @@ export default defineConfig({
     viewport: { width: 1366, height: 768 },
   },
   webServer: {
-    command: 'set NUXT_IGNORE_LOCK=1&& npm.cmd run dev -- --host 127.0.0.1 --port 4174',
-    url: 'http://127.0.0.1:4174/practicum',
-    reuseExistingServer: true,
+    command: 'set NUXT_IGNORE_LOCK=1&& set PRACTICUM_DATA_DIR=.data-e2e&& npm.cmd run dev -- --host 127.0.0.1 --port 4175',
+    url: 'http://127.0.0.1:4175/practicum',
+    reuseExistingServer: false,
     timeout: 120_000,
   },
 })

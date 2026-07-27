@@ -1,5 +1,17 @@
 # 智能体服务端 API 契约（C-G 已实现切片）
 
+## Submission review API
+
+| Method | Path | Purpose | Permission |
+|---|---|---|---|
+| GET | `/api/practicum/submissions?page&pageSize&status` | Paginated review queue | OWNER |
+| POST | `/api/practicum/submissions` | Create a student submission version | STUDENT |
+| GET | `/api/practicum/submissions/:activityId` | Read current submission and version history | OWNER; owning STUDENT |
+| POST | `/api/practicum/submissions/:activityId/return` | Return a submitted version with required feedback | OWNER |
+| POST | `/api/practicum/submissions/:activityId/grade` | Validate rubric scores and finalize grading | OWNER |
+
+Submission states are `NOT_STARTED`, `IN_PROGRESS`, `SUBMITTED`, `RETURNED`, and `GRADED`. A graded submission is immutable; a returned submission may create a new version. Student writes accept `Idempotency-Key` to prevent duplicate requests.
+
 所有 `/api/practicum/*` 接口都要求 HttpOnly session。服务端按用户角色和 `roomIds` 做对象级过滤；前端守卫不等于安全边界。
 
 ## 计划

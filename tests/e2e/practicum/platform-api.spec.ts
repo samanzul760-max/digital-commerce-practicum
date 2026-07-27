@@ -38,7 +38,7 @@ test.describe('platform API contract', () => {
     expect(await notifications.json()).toEqual(expect.objectContaining({ items: expect.any(Array), unread: expect.any(Number) }))
     const stats = await page.request.get('/api/practicum/stats?roomId=room-001')
     expect(stats.ok()).toBeTruthy()
-    expect((await stats.json()).stats).toEqual(expect.objectContaining({ planCount: expect.any(Number), memberCount: expect.any(Number) }))
+    expect((await stats.json()).stats).toEqual(expect.objectContaining({ planCount: expect.any(Number), memberCount: expect.any(Number), submissionCount: expect.any(Number), gradedSubmissionCount: expect.any(Number) }))
   })
 
   test('asset upload enforces type and size policy', async ({ page }) => {

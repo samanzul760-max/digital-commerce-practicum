@@ -1,5 +1,19 @@
 # C-G 实施状态
 
+## Verified C-G additions in this delivery
+
+- C: Submission review queue has server-side status filtering and pagination; the manager review page reads the queue from `/api/practicum/submissions`.
+- D: Student submission, manager return, and manager grading are persisted server-side with version history and rubric validation. The activity page and review detail page call these APIs.
+- E: Repository persistence remains `.data/practicum-data.json`; E2E runs use an isolated `.data-e2e` directory so test runs are repeatable without modifying development data.
+- F: Submission events create role-scoped notifications; stats include submitted, graded, and returned counts; existing resource and notification APIs remain available.
+- G: HttpOnly session checks, role checks, room isolation, idempotency, status transition checks, rubric range checks, and stable error codes are covered by API tests.
+
+## Still not complete
+
+- Plan, progress, data-center, member, and notification views still contain local prototype data in some paths. They are not yet a full server-backed migration.
+- The repository is suitable for a single-process prototype, not multi-instance production deployment.
+- File upload stores metadata and local files only; object storage, virus scanning, and resumable upload are outside this delivery.
+
 ## 已完成
 
 - C：计划、资源、成员查询接口支持关键词、状态/类型筛选、排序或分页；计划 API 已覆盖详情。

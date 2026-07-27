@@ -6,4 +6,5 @@ playwright-report/
 .artifacts/
 *.log
 .data/
+.data-e2e/
 output/playwright/auth-state.json

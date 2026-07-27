@@ -4,6 +4,7 @@
       <p v-if="!canReview(store.state.activeRole)" data-forbidden class="empty-state">你没有访问审核中心的权限。</p>
 
       <p v-else-if="isLoading" data-review-loading class="empty-state">正在加载审核队列...</p>
+      <p v-else-if="loadError" data-review-error class="empty-state" role="alert">审核队列加载失败，请刷新重试。</p>
 
       <div v-else data-review-queue>
         <div class="page-heading">
@@ -89,11 +90,23 @@ import { computed, onMounted, ref } from 'vue'
 import type { SubmissionStatus } from '~/domain/practicum/types'
 import { usePracticumStore } from '~/composables/usePracticumStore'
 import { canReview } from '~/domain/practicum/permissions'
+import { usePracticumServer } from '~/composables/usePracticumServer'
 
 const store = usePracticumStore()
+const server = usePracticumServer()
 const isLoading = ref(true)
-onMounted(() => setTimeout(() => { isLoading.value = false }, 300))
-const queue = computed(() => store.getReviewQueue())
+const loadError = ref(false)
+const serverQueue = ref<Awaited<ReturnType<typeof server.listSubmissions>>['items']>([])
+onMounted(async () => {
+  try {
+    serverQueue.value = (await server.listSubmissions()).items
+  } catch {
+    loadError.value = true
+  } finally {
+    isLoading.value = false
+  }
+})
+const queue = computed(() => serverQueue.value.length ? serverQueue.value : store.getReviewQueue())
 const planFilter = ref('')
 const unitFilter = ref('')
 const statusFilter = ref('')

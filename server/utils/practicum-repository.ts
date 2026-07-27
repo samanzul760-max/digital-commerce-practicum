@@ -2,9 +2,9 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { seedActivities } from '../../data/practicum/activity-seed'
-import { commerceCaseActivities } from '../../data/practicum/commerce-case-seed'
+import { commerceCaseActivities, commerceCaseNodes } from '../../data/practicum/commerce-case-seed'
 import { seedNodes, seedPlans, seedRoom } from '../../data/practicum/seed'
-import type { Activity, CurriculumNode, Plan, PlanStatus, PrototypeMember, PracticumNotification, ResourceKind, SupportingResource } from '../../domain/practicum/types'
+import type { Activity, CurriculumNode, Plan, PlanStatus, PrototypeMember, PracticumNotification, ResourceKind, SupportingResource, PracticeSubmissionState, SubmissionVersion, ReviewQueueItem, FeedbackEntry } from '../../domain/practicum/types'
 import type { AuthUser } from './auth-store'
 
 export interface PersistedPlan extends Plan {
@@ -21,6 +21,7 @@ interface RepositoryState {
   members: PrototypeMember[]
   notifications: PracticumNotification[]
   assets: StoredAsset[]
+  submissions: Record<string, PracticeSubmissionState>
   idempotency: Record<string, { userId: string; method: string; path: string; entityId: string }>
 }
 
@@ -40,17 +41,18 @@ const repositoryPath = join(dataRoot, 'practicum-data.json')
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T
 
 function initialState(): RepositoryState {
-  const plans = clone(seedPlans).map(plan => ({ ...plan, version: 1 }))
+  const plans = [...clone(seedPlans), { id: 'case-plan', roomId: 'room-001', title: '实践案例', description: '用于案例实践和审核的公开计划。', status: 'PUBLISHED' as const, sort: 99, moduleIds: [], createdAt: '2026-07-01T08:00:00Z', updatedAt: '2026-07-01T08:00:00Z' }].map(plan => ({ ...plan, version: 1 }))
   return {
     schemaVersion: 1,
     rooms: [clone(seedRoom)],
     plans,
-    nodes: clone(seedNodes),
+    nodes: [...clone(seedNodes), ...clone(commerceCaseNodes)],
     activities: [...clone(seedActivities), ...clone(commerceCaseActivities)],
     resources: [],
     members: [{ id: 'member-001', label: '学生 001', role: 'STUDENT', group: '未分组' }],
     notifications: [],
     assets: [],
+    submissions: {},
     idempotency: {},
   }
 }
@@ -63,9 +65,13 @@ function readState(): RepositoryState {
       return {
         ...defaults,
         ...parsed,
+        plans: [...defaults.plans.filter(plan => !parsed.plans.some(item => item.id === plan.id)), ...parsed.plans],
+        nodes: [...defaults.nodes.filter(node => !parsed.nodes.some(item => item.id === node.id)), ...parsed.nodes],
+        activities: [...defaults.activities.filter(activity => !parsed.activities.some(item => item.id === activity.id)), ...parsed.activities],
         members: parsed.members ?? defaults.members,
         notifications: parsed.notifications ?? defaults.notifications,
         assets: parsed.assets ?? defaults.assets,
+        submissions: parsed.submissions ?? defaults.submissions,
         idempotency: parsed.idempotency ?? defaults.idempotency,
       }
     }
@@ -241,6 +247,12 @@ export function getStats(user: AuthUser, roomId: string) {
   const state = readState()
   if (!canAccessRoom(user, roomId)) return null
   const plans = state.plans.filter(plan => plan.roomId === roomId && (user.role === 'OWNER' || plan.status === 'PUBLISHED'))
+  const planIds = new Set(plans.map(plan => plan.id))
+  const submissions = Object.values(state.submissions).filter(submission => {
+    const activityId = submission.versions.at(-1)?.submissionId
+    const context = activityId ? activityContext(state, activityId) : undefined
+    return Boolean(context?.plan && planIds.has(context.plan.id))
+  })
   return {
     planCount: plans.length,
     publishedPlanCount: plans.filter(plan => plan.status === 'PUBLISHED').length,
@@ -248,6 +260,9 @@ export function getStats(user: AuthUser, roomId: string) {
     memberCount: state.members.length,
     resourceCount: state.resources.length,
     activityCount: state.nodes.filter(node => plans.some(plan => plan.id === node.planId) && node.level === 3).length,
+    submissionCount: submissions.length,
+    gradedSubmissionCount: submissions.filter(submission => submission.status === 'GRADED').length,
+    returnedSubmissionCount: submissions.filter(submission => submission.status === 'RETURNED').length,
   }
 }
 
@@ -257,6 +272,132 @@ export function saveAsset(user: AuthUser, asset: StoredAsset) {
   state.assets.push(asset)
   writeState(state)
   return true
+}
+
+function activityContext(state: RepositoryState, activityId: string) {
+  const node = state.nodes.find(item => item.id === activityId)
+  const plan = node ? state.plans.find(item => item.id === node.planId) : undefined
+  const activity = state.activities.find(item => item.id === node?.activityId || item.id === activityId || item.id === `activity-${activityId}`)
+  return { node, plan, activity }
+}
+
+function appendNotification(state: RepositoryState, notification: PracticumNotification) {
+  state.notifications.unshift(notification)
+}
+
+export function listSubmissions(user: AuthUser, input: { status?: string; page: number; pageSize: number }) {
+  const state = readState()
+  if (user.role !== 'OWNER') return { forbidden: true as const }
+  const items: ReviewQueueItem[] = Object.entries(state.submissions).flatMap(([activityId, submission]) => {
+    const context = activityContext(state, activityId)
+    const version = submission.versions.at(-1)
+    const unit = context.node?.parentId ? state.nodes.find(item => item.id === context.node!.parentId) : undefined
+    if (!context.node || !context.plan || !version || !unit || !canAccessRoom(user, context.plan.roomId)) return []
+    if (input.status && submission.status !== input.status) return []
+    return [{
+      submissionId: activityId,
+      studentId: submission.studentId ?? 'student-001',
+      studentLabel: submission.studentLabel ?? '瀛︾敓 001',
+      planId: context.plan.id,
+      planTitle: context.plan.title,
+      unitId: unit.id,
+      unitTitle: unit.title,
+      activityId,
+      activityTitle: context.node.title,
+      version: version.version,
+      submittedAt: version.submittedAt,
+      status: submission.status,
+      reviewScope: submission.reviewScope ?? 'PLAN',
+    }]
+  })
+  const total = items.length
+  const totalPages = Math.max(1, Math.ceil(total / input.pageSize))
+  const page = Math.min(Math.max(1, input.page), totalPages)
+  return { items: clone(items.slice((page - 1) * input.pageSize, page * input.pageSize)), page, pageSize: input.pageSize, total, totalPages }
+}
+
+export function getSubmission(user: AuthUser, activityId: string) {
+  const state = readState()
+  const submission = state.submissions[activityId]
+  const context = activityContext(state, activityId)
+  if (!submission || !context.node || !context.plan || !canAccessRoom(user, context.plan.roomId)) return { kind: 'NOT_FOUND' as const }
+  if (user.role !== 'OWNER' && submission.studentId !== user.id) return { kind: 'FORBIDDEN' as const }
+  return { kind: 'OK' as const, submission: clone(submission), node: clone(context.node), activity: clone(context.activity) }
+}
+
+export function submitPractice(user: AuthUser, input: { activityId: string; text: string }, idempotencyKey?: string) {
+  const state = readState()
+  if (user.role !== 'STUDENT') return { kind: 'FORBIDDEN' as const }
+  const context = activityContext(state, input.activityId)
+  if (!context.node || !context.plan || !context.activity || !canAccessRoom(user, context.plan.roomId)) return { kind: 'NOT_FOUND' as const }
+  if (context.plan.status !== 'PUBLISHED' || context.activity.type !== 'PRACTICE_ACTIVITY') return { kind: 'STATE' as const }
+  const text = input.text.trim()
+  if (!text) return { kind: 'VALIDATION' as const }
+  if (idempotencyKey) {
+    const existing = state.idempotency[`${user.id}:${idempotencyKey}`]
+    if (existing) return { kind: 'OK' as const, replayed: true, submission: clone(state.submissions[existing.entityId]) }
+  }
+  const current = state.submissions[input.activityId]
+  if (current && !['NOT_STARTED', 'IN_PROGRESS', 'RETURNED'].includes(current.status)) return { kind: 'STATE' as const }
+  const now = new Date().toISOString()
+  const version: SubmissionVersion = {
+    id: `submission-${input.activityId}-${(current?.versions.length ?? 0) + 1}`,
+    submissionId: input.activityId,
+    version: (current?.versions.length ?? 0) + 1,
+    text,
+    links: [],
+    attachments: [],
+    submittedAt: now,
+  }
+  const submission: PracticeSubmissionState = {
+    ...(current ?? { versions: [] }),
+    studentId: user.id,
+    studentLabel: user.displayName,
+    status: 'SUBMITTED',
+    versions: [...(current?.versions ?? []), version],
+    reviewScope: current?.reviewScope ?? 'PLAN',
+  }
+  state.submissions[input.activityId] = submission
+  if (idempotencyKey) state.idempotency[`${user.id}:${idempotencyKey}`] = { userId: user.id, method: 'POST', path: '/submissions', entityId: input.activityId }
+  appendNotification(state, { id: `notification-${randomUUID()}`, type: 'NEW_SUBMISSION', title: '收到新的实践提交', message: `${user.displayName} 提交了“${context.node.title}”。`, targetRole: 'OWNER', targetRoute: `/practicum/submissions/${input.activityId}`, read: false, createdAt: now })
+  writeState(state)
+  return { kind: 'OK' as const, replayed: false, submission: clone(submission) }
+}
+
+export function returnSubmission(user: AuthUser, activityId: string, feedback: string) {
+  const state = readState()
+  if (user.role !== 'OWNER') return { kind: 'FORBIDDEN' as const }
+  const submission = state.submissions[activityId]
+  const context = activityContext(state, activityId)
+  const text = feedback.trim()
+  if (!submission || !context.node || !context.plan || !canAccessRoom(user, context.plan.roomId)) return { kind: 'NOT_FOUND' as const }
+  if (submission.status !== 'SUBMITTED' || !text) return { kind: 'VALIDATION' as const }
+  const entry: FeedbackEntry = { id: `feedback-${randomUUID()}`, authorId: user.id, authorRole: user.role, text, version: submission.versions.at(-1)?.version ?? 1, createdAt: new Date().toISOString() }
+  submission.status = 'RETURNED'
+  submission.feedback = text
+  submission.feedbackEntries = [...(submission.feedbackEntries ?? []), entry]
+  appendNotification(state, { id: `notification-${randomUUID()}`, type: 'WORK_RETURNED', title: '实践提交已退回', message: `你的“${context.node.title}”提交需要补充后再提交。`, targetRole: 'STUDENT', targetRoute: `/practicum/activities/${activityId}`, read: false, createdAt: entry.createdAt })
+  writeState(state)
+  return { kind: 'OK' as const, submission: clone(submission) }
+}
+
+export function gradeSubmission(user: AuthUser, activityId: string, input: { rubricScores: Record<string, number>; feedback: string }) {
+  const state = readState()
+  if (user.role !== 'OWNER') return { kind: 'FORBIDDEN' as const }
+  const submission = state.submissions[activityId]
+  const context = activityContext(state, activityId)
+  if (!submission || !context.node || !context.plan || !context.activity || !canAccessRoom(user, context.plan.roomId)) return { kind: 'NOT_FOUND' as const }
+  if (submission.status !== 'SUBMITTED' || context.activity.config.type !== 'PRACTICE_ACTIVITY' || !input.feedback.trim()) return { kind: 'VALIDATION' as const }
+  const rubric = context.activity.config.rubric
+  const missing = rubric.filter(item => item.required && input.rubricScores[item.id] === undefined)
+  const invalid = rubric.some(item => input.rubricScores[item.id] !== undefined && (!Number.isFinite(input.rubricScores[item.id]) || input.rubricScores[item.id] < 0 || input.rubricScores[item.id] > item.maxScore))
+  if (missing.length || invalid) return { kind: 'RUBRIC' as const }
+  const now = new Date().toISOString()
+  submission.status = 'GRADED'
+  submission.grade = { reviewerId: user.id, rubricScores: input.rubricScores, feedback: input.feedback.trim(), createdAt: now }
+  appendNotification(state, { id: `notification-${randomUUID()}`, type: 'WORK_GRADED', title: '实践提交已评分', message: `你的“${context.node.title}”提交已完成评分。`, targetRole: 'STUDENT', targetRoute: `/practicum/activities/${activityId}`, read: false, createdAt: now })
+  writeState(state)
+  return { kind: 'OK' as const, submission: clone(submission) }
 }
 
 export function updatePlan(user: AuthUser, planId: string, input: { title?: string; description?: string; version: number }) {

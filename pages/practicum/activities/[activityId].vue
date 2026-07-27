@@ -114,17 +114,18 @@
           </label>
 
           <p v-if="draftSaved" data-draft-saved class="status-pill">草稿已保存</p>
+          <p v-if="submissionError" data-submission-error class="empty-state" role="alert">{{ submissionError }}</p>
 
           <div class="form-actions">
             <button data-save-draft class="secondary-button" type="button" @click="saveDraft">保存草稿</button>
-            <button data-submit-practice class="primary-button" type="button" @click="showSubmitConfirm = true">提交成果</button>
+            <button data-submit-practice class="primary-button" type="button" :disabled="submissionPending" @click="showSubmitConfirm = true">提交成果</button>
           </div>
 
           <!-- Submit confirmation -->
           <div v-if="showSubmitConfirm" class="form-panel" style="margin-top:12px;">
             <p>提交后将创建一个编号的不可变版本，状态将变为"已提交"。</p>
             <div class="form-actions">
-              <button data-confirm-submit class="primary-button" type="button" @click="submitPractice">确认提交</button>
+              <button data-confirm-submit class="primary-button" type="button" :disabled="submissionPending" @click="submitPractice">{{ submissionPending ? '提交中...' : '确认提交' }}</button>
               <button class="secondary-button" type="button" @click="showSubmitConfirm = false">取消</button>
             </div>
           </div>
@@ -152,11 +153,28 @@ import { computed, onMounted, ref } from 'vue'
 import type { ActivityType } from '~/domain/practicum/types'
 import { usePracticumStore } from '~/composables/usePracticumStore'
 import { canSubmitWork } from '~/domain/practicum/permissions'
+import { usePracticumServer } from '~/composables/usePracticumServer'
+import { useAuthSession } from '~/composables/useAuthSession'
 
 const route = useRoute()
 const store = usePracticumStore()
+const server = usePracticumServer()
+const auth = useAuthSession()
 const isLoading = ref(true)
-onMounted(() => setTimeout(() => { isLoading.value = false }, 250))
+const serverSubmission = ref<Awaited<ReturnType<typeof server.getSubmission>>['submission'] | null>(null)
+onMounted(async () => {
+  if (auth.state.value.user?.role !== 'STUDENT') {
+    isLoading.value = false
+    return
+  }
+  try {
+    serverSubmission.value = (await server.getSubmission(route.params.activityId as string)).submission
+  } catch {
+    // A first-time activity has no server submission yet.
+  } finally {
+    isLoading.value = false
+  }
+})
 const nodeId = computed(() => route.params.activityId as string)
 const activityNode = computed(() => store.state.nodes.find(n => n.id === nodeId.value) ?? null)
 const activity = computed(() => {
@@ -225,21 +243,36 @@ const practiceDraft = ref(store.state.practiceDrafts[nodeId.value] ?? '')
 const draftSaved = ref(false)
 const showSubmitConfirm = ref(false)
 const showUnsavedLeave = ref(false)
-const submissionVersions = computed(() => store.state.practiceSubmissions[nodeId.value]?.versions ?? [])
-const submissionStatus = computed(() => store.state.practiceSubmissions[nodeId.value]?.status ?? 'NOT_STARTED')
-const returnedFeedback = computed(() => store.state.practiceSubmissions[nodeId.value]?.feedback ?? '')
+const submissionVersions = computed(() => serverSubmission.value?.versions ?? store.state.practiceSubmissions[nodeId.value]?.versions ?? [])
+const submissionStatus = computed(() => serverSubmission.value?.status ?? store.state.practiceSubmissions[nodeId.value]?.status ?? 'NOT_STARTED')
+const returnedFeedback = computed(() => serverSubmission.value?.feedback ?? store.state.practiceSubmissions[nodeId.value]?.feedback ?? '')
 const submissionStatusLabel = computed(() => submissionStatus.value === 'RETURNED' ? '已退回' : submissionStatus.value === 'GRADED' ? '已评分' : '已提交')
+const submissionPending = ref(false)
+const submissionError = ref('')
 
 function saveDraft() {
   draftSaved.value = store.savePracticeDraft(nodeId.value, practiceDraft.value)
   setTimeout(() => { draftSaved.value = false }, 3000)
 }
 
-function submitPractice() {
+async function submitPractice() {
   if (!practiceDraft.value.trim()) return
-  store.submitPracticeWork(nodeId.value)
-  showSubmitConfirm.value = false
-  draftSaved.value = false
+  if (submissionPending.value) return
+  submissionPending.value = true
+  submissionError.value = ''
+  try {
+    if (auth.state.value.user?.role === 'STUDENT') {
+      const result = await server.submitPractice(nodeId.value, practiceDraft.value)
+      serverSubmission.value = result.submission
+    }
+    store.submitPracticeWork(nodeId.value)
+    showSubmitConfirm.value = false
+    draftSaved.value = false
+  } catch {
+    submissionError.value = '提交失败，请检查网络后重试。'
+  } finally {
+    submissionPending.value = false
+  }
 }
 
 function leaveActivity() {

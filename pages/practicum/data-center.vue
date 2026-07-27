@@ -3,6 +3,8 @@
     <PracticumShell context-title="数据中心" context-meta="学习数据概览">
       <p v-if="isLoading" data-loading class="empty-state">正在加载数据...</p>
 
+      <p v-else-if="loadError" data-data-center-error class="empty-state" role="alert">数据加载失败，请刷新重试。</p>
+
           <p v-else-if="!canAccessDataCenter(store.state.activeRole)" data-forbidden class="empty-state">只有管理员可以访问数据中心。</p>
 
       <div v-else data-data-center>
@@ -164,9 +166,13 @@
 import { computed, ref, onMounted } from 'vue'
 import { usePracticumStore } from '../../composables/usePracticumStore'
 import { canAccessDataCenter } from '../../domain/practicum/permissions'
+import { usePracticumServer } from '../../composables/usePracticumServer'
 
 const store = usePracticumStore()
+const server = usePracticumServer()
 const isLoading = ref(true)
+const loadError = ref(false)
+const serverStats = ref<Record<string, number> | null>(null)
 const exportStep = ref<'confirm' | null>(null)
 const exportPending = ref(false)
 const exportSuccess = ref(false)
@@ -195,13 +201,19 @@ const sortLabel = computed(() => {
   return labels[sortKey.value ?? ''] ?? ''
 })
 
-onMounted(() => {
-  isLoading.value = false
+onMounted(async () => {
+  try {
+    serverStats.value = (await server.getStats('room-001')).stats
+  } catch {
+    loadError.value = true
+  } finally {
+    isLoading.value = false
+  }
 })
 
 const publishedPlan = computed(() => store.state.plans.find(p => p.status === 'PUBLISHED'))
 
-const totalLearners = computed(() => store.state.members.filter(m => m.role === 'STUDENT').length || 1)
+const totalLearners = computed(() => (serverStats.value?.memberCount ?? store.state.members.filter(m => m.role === 'STUDENT').length) || 1)
 
 const allSubmissions = computed(() => Object.entries(store.state.practiceSubmissions))
 
@@ -219,6 +231,10 @@ const completedLearners = computed(() => {
 const inactiveLearners = computed(() => Math.max(0, totalLearners.value - allSubmissions.value.length))
 
 const overallCompletion = computed(() => {
+  if (serverStats.value && serverStats.value.activityCount > 0) {
+    const total = serverStats.value.activityCount * totalLearners.value
+    return { percent: total ? Math.round((serverStats.value.gradedSubmissionCount / total) * 100) : 0 }
+  }
   if (!publishedPlan.value) return { percent: 0 }
   const activityCount = store.state.nodes.filter(n => n.planId === publishedPlan.value!.id && n.level === 3).length
   const total = activityCount * totalLearners.value

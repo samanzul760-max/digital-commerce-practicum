@@ -3,6 +3,7 @@
     <PracticumShell :context-title="canView ? activityNode?.title ?? '提交详情' : '提交不可访问'" :context-meta="canView ? '审核详情' : ''">
       <p v-if="isLoading" data-loading class="empty-state">正在加载提交详情...</p>
       <p v-else-if="!canReview(store.state.activeRole)" data-forbidden class="empty-state">你没有查看或审核该提交的权限。</p>
+      <p v-else-if="loadError" data-submission-error class="empty-state" role="alert">提交详情加载失败，请刷新重试。</p>
       <p v-else-if="!submission || !activityNode" data-empty class="empty-state">提交记录未找到。</p>
 
       <div v-else data-submission-detail>
@@ -112,15 +113,28 @@
 import { computed, ref, onMounted } from 'vue'
 import { usePracticumStore } from '~/composables/usePracticumStore'
 import { canReview } from '~/domain/practicum/permissions'
+import { usePracticumServer } from '~/composables/usePracticumServer'
 
 const route = useRoute()
 const store = usePracticumStore()
+const server = usePracticumServer()
 const isLoading = ref(true)
-onMounted(() => { isLoading.value = false })
+const loadError = ref(false)
+const serverDetail = ref<Awaited<ReturnType<typeof server.getSubmission>> | null>(null)
+onMounted(async () => {
+  try {
+    serverDetail.value = await server.getSubmission(route.params.submissionId as string)
+  } catch (error: unknown) {
+    const status = (error as { status?: number }).status
+    if (status && status >= 500) loadError.value = true
+  } finally {
+    isLoading.value = false
+  }
+})
 const submissionId = computed(() => route.params.submissionId as string)
-const submission = computed(() => store.state.practiceSubmissions[submissionId.value] ?? null)
-const activityNode = computed(() => store.state.nodes.find(node => node.id === submissionId.value) ?? null)
-const activity = computed(() => activityNode.value ? store.getActivityByNodeId(activityNode.value.id) : null)
+const submission = computed(() => serverDetail.value?.submission ?? store.state.practiceSubmissions[submissionId.value] ?? null)
+const activityNode = computed(() => serverDetail.value?.node ?? store.state.nodes.find(node => node.id === submissionId.value) ?? null)
+const activity = computed(() => serverDetail.value?.activity ?? (activityNode.value ? store.getActivityByNodeId(activityNode.value.id) : null))
 const canView = computed(() => canReview(store.state.activeRole) && Boolean(submission.value && activityNode.value))
 const latestVersion = computed(() => submission.value?.versions.at(-1))
 const rubricDimensions = computed(() => activity.value?.config.type === 'PRACTICE_ACTIVITY' ? activity.value.config.rubric : [])
@@ -155,12 +169,20 @@ function requestReturn() {
   showReturnConfirmation.value = true
 }
 
-function confirmReturn() {
+async function confirmReturn() {
   if (returnPending.value) return
   returnPending.value = true
-  if (store.returnPracticeWork(submissionId.value, returnFeedback.value)) {
+  try {
+    if (serverDetail.value) {
+      const result = await server.returnSubmission(submissionId.value, returnFeedback.value)
+      serverDetail.value = { ...serverDetail.value, submission: result.submission }
+    } else if (!store.returnPracticeWork(submissionId.value, returnFeedback.value)) {
+      throw new Error('local return failed')
+    }
     showReturnConfirmation.value = false
     returnFeedback.value = ''
+  } catch {
+    returnError.value = '退回失败，请刷新后重试。'
   }
   returnPending.value = false
 }
@@ -173,12 +195,20 @@ function requestGrade() {
   showGradeConfirmation.value = missing.length === 0
 }
 
-function confirmGrade() {
+async function confirmGrade() {
   if (gradePending.value) return
   gradePending.value = true
   const scores = Object.fromEntries(scoredDimensions.value.map(dimension => [dimension.id, dimension.score]))
-  if (store.gradePracticeWork(submissionId.value, scores, gradeFeedback.value)) {
+  try {
+    if (serverDetail.value) {
+      const result = await server.gradeSubmission(submissionId.value, scores, gradeFeedback.value)
+      serverDetail.value = { ...serverDetail.value, submission: result.submission }
+    } else if (!store.gradePracticeWork(submissionId.value, scores, gradeFeedback.value)) {
+      throw new Error('local grade failed')
+    }
     showGradeConfirmation.value = false
+  } catch {
+    gradeError.value = '评分失败，请检查评分项和网络后重试。'
   }
   gradePending.value = false
 }
