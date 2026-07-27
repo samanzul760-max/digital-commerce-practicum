@@ -4,6 +4,7 @@
     <PracticumSidebar />
     <div data-shell-main class="workspace-main">
       <PracticumTopbar :context-title="contextTitle" :context-meta="contextMeta" />
+      <span v-if="auth.state.value.user" data-workspace-authenticated class="sr-only">当前账号：{{ auth.state.value.user.displayName }}</span>
       <div class="sr-only" data-role-live-region aria-live="polite" aria-atomic="true">
         {{ roleAnnouncement }}
       </div>
@@ -28,6 +29,7 @@ import { computed, onMounted } from 'vue'
 import { usePracticumStore } from '../../composables/usePracticumStore'
 import PracticumSidebar from './PracticumSidebar.vue'
 import PracticumTopbar from './PracticumTopbar.vue'
+import { useAuthSession } from '../../composables/useAuthSession'
 
 withDefaults(defineProps<{
   contextTitle?: string
@@ -38,6 +40,7 @@ withDefaults(defineProps<{
 })
 
 const store = usePracticumStore()
+const auth = useAuthSession()
 const storageError = computed(() => store.storageError.value)
 onMounted(() => store.syncStorageError())
 const roleLabels = {

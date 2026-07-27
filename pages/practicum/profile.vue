@@ -1,50 +1,60 @@
 <template>
   <ClientOnly>
-    <PracticumShell context-title="账号与权限" context-meta="头像、通知偏好和身份选择">
+    <PracticumShell context-title="账号与权限" context-meta="登录、身份和会话状态">
       <div data-profile-page class="profile-page">
         <NuxtLink to="/practicum" data-back-link class="ghost-button">返回工作台</NuxtLink>
 
         <div class="page-heading" style="margin-top: 22px">
           <div>
-            <p class="eyebrow">账号设置</p>
-            <h1>账号与身份</h1>
-            <p>选择后会回到对应工作台，导航位置不会改变。</p>
+            <p class="eyebrow">账号登录</p>
+            <h1>进入实训工作台</h1>
+            <p>登录后才能访问计划、课程、成员和学习数据。</p>
           </div>
         </div>
 
-        <section data-current-identity class="account-panel" aria-label="当前账号">
-          <div class="account-avatar" aria-hidden="true">琦</div>
-          <div>
-            <h2>琦琦</h2>
-            <p v-if="store.state.activeRole" data-active-identity>数字商贸实训室 · 当前身份：{{ activeRoleLabel }}</p>
-            <p v-else data-no-role>数字商贸实训室 · 尚未选择身份</p>
-          </div>
+        <section v-if="!auth.state.value.user" data-login-panel class="account-panel">
+          <form data-login-form class="form-panel" @submit.prevent="handleLogin">
+            <h2>登录账号</h2>
+            <p class="muted">使用已分配的账号进入所属实训室。</p>
+            <label class="field">账号<input data-login-identifier v-model="identifier" autocomplete="username" required type="text"></label>
+            <label class="field">密码<input data-login-password v-model="password" autocomplete="current-password" required type="password"></label>
+            <p v-if="auth.state.value.error" data-auth-error class="form-error" role="alert">{{ auth.state.value.error }}</p>
+            <button data-login-submit class="primary-button" type="submit" :disabled="auth.state.value.loading">
+              {{ auth.state.value.loading ? '登录中…' : '登录' }}
+            </button>
+          </form>
         </section>
 
-        <section data-identity-choices class="identity-section">
-          <h2>切换身份</h2>
-          <p>学生查看已发布课程；管理员维护教学计划和课程目录。</p>
+        <section v-else data-authenticated-user class="account-panel" aria-live="polite">
+          <div class="account-avatar" aria-hidden="true">{{ auth.state.value.user.displayName.slice(0, 1) }}</div>
+          <div>
+            <h2>{{ auth.state.value.user.displayName }}</h2>
+            <p>当前身份：{{ roleLabel }}</p>
+            <p class="muted">已连接 {{ auth.state.value.user.roomIds.length }} 个实训室</p>
+          </div>
+          <button data-logout class="secondary-button" type="button" :disabled="auth.state.value.loading" @click="handleLogout">退出登录</button>
+        </section>
+
+        <section v-if="auth.state.value.user" data-identity-choices class="identity-section">
+          <h2>工作区视角</h2>
+          <p>当前账号的角色权限由服务端确定；这里保留已有原型的视角预览，便于验收学生端和管理端页面。</p>
           <div data-role-options class="identity-list">
             <button
-              v-for="role in standardRoles"
-              :key="role.value"
-              :data-role-option="role.value"
-              :data-role-current="role.value === store.state.activeRole ? 'true' : undefined"
+              :data-role-option="'STUDENT'"
+              :data-role-current="store.state.activeRole === 'STUDENT' ? 'true' : undefined"
               class="identity-card"
-              :class="{ 'identity-card-active': role.value === store.state.activeRole }"
+              :class="{ 'identity-card-active': store.state.activeRole === 'STUDENT' }"
               type="button"
-              @click="selectRole(role.value)"
+              @click="selectRole('STUDENT')"
             >
-              <span class="identity-icon" aria-hidden="true">{{ role.symbol }}</span>
-              <span class="identity-copy"><strong>{{ role.label }}</strong><span>{{ role.description }}</span></span>
-              <span class="identity-state">{{ role.value === store.state.activeRole ? '当前身份' : '进入' }}</span>
+              <span class="identity-copy"><strong>学生</strong><span>学习已发布计划并提交实践任务</span></span>
+              <span class="identity-state">{{ store.state.activeRole === 'STUDENT' ? '当前视角' : '进入' }}</span>
             </button>
           </div>
         </section>
 
-        <section data-management-group class="identity-section">
-          <h2>管理身份</h2>
-          <p>管理员负责教学计划、课程目录和发布前配置。</p>
+        <section v-if="auth.state.value.user" data-management-group class="identity-section">
+          <h2>管理视角</h2>
           <div class="identity-list">
             <button
               data-role-option="OWNER"
@@ -54,9 +64,8 @@
               type="button"
               @click="selectRole('OWNER')"
             >
-              <span class="identity-icon" aria-hidden="true">管</span>
-              <span class="identity-copy"><strong>管理员</strong><span>创建教学计划、维护一级目录和二级目录</span></span>
-              <span class="identity-state">{{ store.state.activeRole === 'OWNER' ? '当前身份' : '进入' }}</span>
+              <span class="identity-copy"><strong>管理员</strong><span>管理教学计划、成员、资源和审核</span></span>
+              <span class="identity-state">{{ store.state.activeRole === 'OWNER' ? '当前视角' : '进入' }}</span>
             </button>
           </div>
         </section>
@@ -66,24 +75,33 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import type { PracticumRole } from '../../domain/practicum/types'
-import { usePracticumStore } from '../../composables/usePracticumStore'
+import { computed, onMounted, ref } from 'vue'
+import { useAuthSession } from '~/composables/useAuthSession'
+import { usePracticumStore } from '~/composables/usePracticumStore'
 
+const auth = useAuthSession()
 const store = usePracticumStore()
 const router = useRouter()
+const identifier = ref('')
+const password = ref('')
 
-const standardRoles: { value: PracticumRole; label: string; symbol: string; description: string }[] = [
-  { value: 'STUDENT', label: '学生', symbol: '学', description: '查看已发布课程和学习目录' },
-]
+const roleLabel = computed(() => auth.state.value.user?.role === 'OWNER' ? '管理员' : '学生')
 
-const roleLabels: Record<PracticumRole, string> = {
-  OWNER: '管理员',
-  STUDENT: '学生',
+onMounted(() => auth.load())
+
+async function handleLogin() {
+  const user = await auth.login(identifier.value, password.value)
+  if (!user) return
+  store.switchRole(user.role)
+  await router.push('/practicum')
 }
-const activeRoleLabel = computed(() => store.state.activeRole ? roleLabels[store.state.activeRole] : '')
 
-function selectRole(role: PracticumRole) {
+async function handleLogout() {
+  await auth.logout()
+  store.resetDemo()
+}
+
+function selectRole(role: 'OWNER' | 'STUDENT') {
   store.switchRole(role)
   router.push('/practicum')
 }

@@ -63,6 +63,7 @@
       </div>
 
       <div class="profile-wrapper">
+        <button data-logout class="text-link compact-link" type="button" :disabled="auth.state.value.loading" @click="handleLogout">退出登录</button>
         <button
           data-personal-entry
           class="profile-button"
@@ -130,6 +131,7 @@
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePracticumStore } from '../../composables/usePracticumStore'
+import { useAuthSession } from '../../composables/useAuthSession'
 
 defineProps<{
   contextTitle: string
@@ -138,6 +140,7 @@ defineProps<{
 
 const router = useRouter()
 const store = usePracticumStore()
+const auth = useAuthSession()
 const notificationOpen = ref(false)
 const profileOpen = ref(false)
 const unreadCount = computed(() => store.notificationsUnread())
@@ -181,6 +184,13 @@ function switchRole() {
   store.switchRole(nextRole)
   closeMenus()
   router.push('/practicum')
+}
+
+async function handleLogout() {
+  await auth.logout()
+  store.resetDemo()
+  closeMenus()
+  await router.push('/practicum/profile')
 }
 
 function canAccess(n: { targetRoute: string }) {
