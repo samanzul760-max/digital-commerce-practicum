@@ -157,6 +157,53 @@ export function createPlan(user: AuthUser, input: { roomId: string; title: strin
   return { plan: clone(plan), replayed: false }
 }
 
+export function createCurriculumNode(user: AuthUser, planId: string, input: {
+  title?: string
+  level?: number
+  parentId?: string | null
+  version?: number
+}, idempotencyKey?: string) {
+  const state = readState()
+  const plan = state.plans.find(item => item.id === planId)
+  if (!plan || !canAccessRoom(user, plan.roomId)) return { kind: 'NOT_FOUND' as const }
+  if (!ownerOnly(user)) return { kind: 'FORBIDDEN' as const }
+  if (plan.status !== 'DRAFT') return { kind: 'STATE' as const }
+  if (!Number.isInteger(input.version)) return { kind: 'VALIDATION' as const }
+  if (input.version !== plan.version) return { kind: 'CONFLICT' as const, currentVersion: plan.version }
+
+  const title = input.title?.trim() ?? ''
+  const level = input.level
+  const parentId = input.parentId ?? null
+  if (!title || level === undefined || ![1, 2, 3].includes(level)) return { kind: 'VALIDATION' as const }
+
+  const parent = parentId ? state.nodes.find(node => node.id === parentId && node.planId === planId) : undefined
+  if ((level === 1 && parentId !== null) || (level !== 1 && (!parent || parent.level !== level - 1))) {
+    return { kind: 'VALIDATION' as const }
+  }
+
+  if (idempotencyKey) {
+    const existing = state.idempotency[`${user.id}:${idempotencyKey}`]
+    if (existing) return { kind: 'OK' as const, replayed: true, ...getPlan(user, planId)! }
+  }
+
+  const siblingSort = state.nodes.filter(node => node.planId === planId && node.parentId === parentId).length + 1
+  const node: CurriculumNode = {
+    id: `node-${randomUUID()}`,
+    planId,
+    parentId,
+    level: level as CurriculumNode['level'],
+    title,
+    description: '',
+    sort: siblingSort,
+  }
+  state.nodes.push(node)
+  plan.version += 1
+  plan.updatedAt = new Date().toISOString()
+  if (idempotencyKey) state.idempotency[`${user.id}:${idempotencyKey}`] = { userId: user.id, method: 'POST', path: `/plans/${planId}/nodes`, entityId: node.id }
+  writeState(state)
+  return { kind: 'OK' as const, replayed: false, ...getPlan(user, planId)! }
+}
+
 function ownerOnly(user: AuthUser) {
   return user.role === 'OWNER'
 }
