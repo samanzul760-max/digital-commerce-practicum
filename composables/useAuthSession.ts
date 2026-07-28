@@ -33,24 +33,29 @@ export function useAuthSession() {
     return state.value.user
   }
 
-  async function login(identifier: string, password: string) {
+  async function authenticate(path: string, body: Record<string, string>, fallbackError: string) {
     state.value.loading = true
     state.value.error = null
     try {
-      const response = await $fetch<{ user: AuthUser }>('/api/auth/login', {
-        method: 'POST',
-        body: { identifier, password },
-      })
+      const response = await $fetch<{ user: AuthUser }>(path, { method: 'POST', body })
       state.value.user = response.user
       state.value.loaded = true
       return response.user
     } catch {
       state.value.user = null
-      state.value.error = '账号或密码错误，请重新输入。'
+      state.value.error = fallbackError
       return null
     } finally {
       state.value.loading = false
     }
+  }
+
+  function login(identifier: string, password: string) {
+    return authenticate('/api/auth/login', { identifier, password }, '账号或密码错误，请重新输入。')
+  }
+
+  function bootstrapOwner(identifier: string, displayName: string, password: string) {
+    return authenticate('/api/auth/bootstrap-owner', { identifier, displayName, password }, '管理员开通失败，请检查输入后重试。')
   }
 
   async function logout() {
@@ -64,5 +69,5 @@ export function useAuthSession() {
     }
   }
 
-  return { state, load, login, logout }
+  return { state, load, login, bootstrapOwner, logout }
 }

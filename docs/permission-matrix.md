@@ -2,7 +2,8 @@
 
 | 角色 | 页面/数据 | 读取 | 写入 | 服务端证据 |
 |---|---|---|---|---|
-| 未登录 | 受保护工作台/API | 拒绝 | 拒绝 | `AUTH_REQUIRED`、登录中间件 |
+| 未登录 | `/practicum/login`、开通状态 | 只允许登录与首次开通状态 | 只允许尚未完成时的首次 OWNER 开通 | `AUTH_REQUIRED`、登录中间件、`BOOTSTRAP_ALREADY_COMPLETED` |
+| 未登录 | 受保护工作台/API | 拒绝 | 拒绝 | 跳转 `/practicum/login`、`AUTH_REQUIRED` |
 | OWNER | 本实训室计划、资源、成员、审核、统计、通知 | 允许 | 创建/编辑/发布/归档/删除/退回/评分 | API role + roomIds |
 | STUDENT | 已发布计划、自己的学习和提交、自己的通知 | 允许 | 学习状态、自己的草稿/提交 | API role + owner studentId |
 | STUDENT | 草稿计划、管理资源/成员、审核队列和他人提交 | 拒绝 | 拒绝 | `403` 稳定错误码和 E2E |

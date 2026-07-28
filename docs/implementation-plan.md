@@ -90,3 +90,10 @@
 ## C-G 当前交付记录
 
 C-G 已完成第一批服务端切片，详见 `docs/c-g-delivery-status.md` 和 `docs/api-contract.md`。已验证计划 CRUD/状态流转、对象级权限、资源/成员/通知/统计/上传 API、request id 和登录限流；学习活动、提交审核和成员/通知页面的完整服务端迁移仍在后续切片中，不标记为全部完成。
+
+## 2026-07-28 认证补充切片
+
+- 已完成：独立 `/practicum/login`、一次性管理员开通、服务端摘要持久化、会话刷新、退出、未登录跳转和 390px 登录页验收。
+- 已完成：部署脚本保留远程 `.data/`，避免后续发布删除账号与 session 数据。
+- 验收门：BDD-AUTH-006~008 已有 RED/GREEN 证据；目标测试、typecheck 和 build 通过。
+- 仍需：全量 Playwright、生产部署、PM2 与远程健康检查。完成前认证矩阵保持 `IMPLEMENTED_UNVERIFIED`。

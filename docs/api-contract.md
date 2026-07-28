@@ -20,6 +20,18 @@ Submission states are `NOT_STARTED`, `IN_PROGRESS`, `SUBMITTED`, `RETURNED`, and
 
 所有 `/api/practicum/*` 接口都要求 HttpOnly session。服务端按用户角色和 `roomIds` 做对象级过滤；前端守卫不等于安全边界。
 
+## 认证与管理员开通
+
+| 方法 | 路径 | 请求/响应 | 权限与错误 |
+|---|---|---|---|
+| GET | `/api/auth/bootstrap` | 返回 `{ available }` | 匿名可读；只暴露是否允许首次开通 |
+| POST | `/api/auth/bootstrap-owner` | 请求 `identifier`、`displayName`、`password`；返回 `{ user }` 和 HttpOnly session cookie | 仅允许首次自定义 OWNER；`422 BOOTSTRAP_INVALID_INPUT`、`409 BOOTSTRAP_ALREADY_COMPLETED` |
+| POST | `/api/auth/login` | 请求 `identifier`、`password`；返回 `{ user }` 和 HttpOnly session cookie | 失败为 `401 AUTH_INVALID_CREDENTIALS`，按来源地址限流 |
+| GET | `/api/auth/session` | 返回当前 `{ user }` | 无有效会话为 `401 AUTH_REQUIRED` |
+| POST | `/api/auth/logout` | 返回成功并清理 cookie | 撤销服务端会话 |
+
+`user` 只包含 `id`、`identifier`、`displayName`、`role` 和 `roomIds`。密码、salt、摘要和 session token 永不出现在响应中。首次开通账号持久化于被 Git 忽略的 `.data/auth-users.json`。
+
 ## 计划
 
 | 方法 | 路径 | 说明 | 权限 |

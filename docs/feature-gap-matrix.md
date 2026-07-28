@@ -4,7 +4,7 @@
 
 | 模块 | 功能 | 证据 | 角色/路由 | 当前状态 | 缺失行为 | 数据/API | BDD | TDD/API | Playwright | 优先级 | 验收标准 | 验证结果 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 认证 | 登录、退出、会话刷新 | FACT：认证 API、HttpOnly cookie、`auth-session.spec.ts` | OWNER/STUDENT；`/practicum/profile`、受保护页 | IMPLEMENTED_UNVERIFIED | 本轮未重新跑全量认证证据 | `User`、`Session`；`/api/auth/*` | AUTH-001~005 | `auth-session.spec.ts` | auth-session | P0 | 未登录拦截、错误不泄露、刷新保持、退出失效 | 待本轮总验收 |
+| 认证 | 独立登录、首次管理员开通、退出、会话刷新 | FACT：认证 API、HttpOnly cookie、`auth-session.spec.ts`、`auth-bootstrap.spec.ts` | OWNER/STUDENT；`/practicum/login`、受保护页 | IMPLEMENTED_UNVERIFIED | 仍待全量回归、生产部署与远程健康验证；多实例 session/账号存储未实现 | `User`、`Session`；`/api/auth/*` | AUTH-001~008 | 认证 Playwright | auth-session、auth-bootstrap（含 390px） | P0 | 未登录拦截、一次开通、错误不泄露、刷新保持、退出失效 | 本轮 focused 8/8 GREEN；typecheck/build GREEN |
 | 权限 | OWNER/STUDENT 菜单与服务端对象授权 | FACT：服务端角色和 room 过滤存在 | OWNER/STUDENT；管理路由/API | PARTIAL | TEACHER/MENTOR、审计日志、CSRF 缺失 | `Role`、`roomIds` | A-02~A-04 | `platform-api.spec.ts` | access/navigation | P0 | 菜单、直达 URL、API 三层一致 | 部分验证 |
 | 工作台 | 实训室上下文与计划入口 | FACT：页面和 seed 存在 | OWNER/STUDENT；`/practicum` | PARTIAL | 实训室切换和跨组织隔离 UI 不完整 | `TrainingRoom`、`Plan` | A-05~A-06 | plans API | shell/access | P0 | 角色看到正确入口和可见计划 | 部分验证 |
 | 计划 | 列表、创建、编辑、发布、归档 | FACT：服务端计划 API 已存在，页面仍有 store 路径 | OWNER/STUDENT；`/practicum/plans` | PARTIAL | 页面完整迁移、共享数据和刷新证据不足 | `Plan`、`CurriculumNode`；`/api/practicum/plans*` | PLANS-001 | `plans-api.spec.ts` | curriculum-editor | P0 | 服务端状态、版本冲突、刷新保持 | 部分验证 |
@@ -18,7 +18,7 @@
 | 通知 | 列表、未读、已读、深链 | FACT：API 存在，页面仍有 store 路径 | OWNER/STUDENT；notifications | MOCK | 页面服务端迁移、跨端同步、完整深链授权 | `Notification`；`/api/practicum/notifications` | S5-05、S5-07 | platform API | existing E2E | P1 | 已读刷新保持且无权深链不泄露 | MOCK |
 | 查询 | 搜索、筛选、排序、分页 | FACT：部分 API 支持 query，页面混用前端过滤 | OWNER/STUDENT；resources/members/reviews | PARTIAL | 全部列表统一服务端查询和边界证据 | `ListQuery`、`Pagination` | QUERY-001 | plans/platform API | focused list tests | P1 | 条件刷新保持，边界稳定 | 部分验证 |
 | 异常 | loading、empty、error、forbidden、重复提交 | FACT：多页面已有状态，本轮新增空/错和重复来源覆盖 | 全角色；全路由 | IMPLEMENTED_UNVERIFIED | 网络断开、统一错误映射、会话失效需全量复核 | `ApiError`、request id | BDD-SUBMISSION-005/006 | API error assertions | submission-server-source | P0 | 每类状态可见且不泄露数据 | 本轮 3/3 GREEN |
-| 移动端 | 关键页面响应式 | FACT：已有多尺寸测试，本轮新增 390px 审核队列 | 全角色；关键路由 | IMPLEMENTED_UNVERIFIED | 关键页面逐页复核 768/1024 | 无新增模型 | S6-Responsive | existing E2E | submission-server-source | P1 | 无水平溢出、操作可达 | 本轮 390px GREEN |
+| 移动端 | 关键页面响应式 | FACT：已有多尺寸测试，本轮新增 390px 登录表单 | 全角色；关键路由 | IMPLEMENTED_UNVERIFIED | 关键页面逐页复核 768/1024 | 无新增模型 | S6-Responsive、AUTH-007 | existing E2E | submission-server-source、auth-bootstrap | P1 | 无水平溢出、操作可达 | 本轮登录 390px GREEN |
 | 安全审计 | 认证、隔离、上传安全 | FACT：HttpOnly、限流、request id、上传约束存在 | API 层 | PARTIAL | 审计日志、CSRF、多实例 session/DB/Redis | AuthZ、AuditLog、UploadPolicy | G-001 | platform API | access/navigation | P0 | 越权服务端拒绝，敏感信息不入代码日志 | 部分验证 |
 
 ## 缺失交付文档

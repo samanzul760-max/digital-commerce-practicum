@@ -188,7 +188,7 @@ case {remote_dir!r} in
   *) echo "Refusing unsafe remote dir: {remote_dir}" >&2; exit 1 ;;
 esac
 mkdir -p {remote_dir!r}
-find {remote_dir!r} -mindepth 1 -maxdepth 1 -exec rm -rf {{}} +
+find {remote_dir!r} -mindepth 1 -maxdepth 1 ! -name .data -exec rm -rf {{}} +
 tar -xzf {remote_archive!r} -C {remote_dir!r}
 cd {remote_dir!r}
 test -f package.json

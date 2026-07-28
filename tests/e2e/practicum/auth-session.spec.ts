@@ -2,14 +2,14 @@ import { expect, test } from '@playwright/test'
 
 test.beforeEach(async ({ page }) => {
   await page.context().clearCookies()
-  await page.goto('/practicum/profile')
+  await page.goto('/practicum/login')
   await page.evaluate(() => window.localStorage.clear())
 })
 
 test('[BDD-AUTH-001] unauthenticated users cannot see the protected workspace', async ({ page }) => {
   await page.goto('/practicum')
 
-  await expect(page).toHaveURL(/\/practicum\/profile$/)
+  await expect(page).toHaveURL(/\/practicum\/login$/)
   await expect(page.locator('[data-login-form]')).toBeVisible()
   await expect(page.locator('[data-plan-card]')).toHaveCount(0)
   await expect(page.locator('[data-member-row]')).toHaveCount(0)
@@ -32,7 +32,7 @@ test('[BDD-AUTH-003] invalid credentials stay on login and expose a generic erro
   await page.locator('[data-login-submit]').click()
 
   await expect(page.locator('[data-auth-error]')).toBeVisible()
-  await expect(page).toHaveURL(/\/practicum\/profile$/)
+  await expect(page).toHaveURL(/\/practicum\/login$/)
   await expect(page.locator('[data-authenticated-user]')).toHaveCount(0)
 })
 
@@ -59,8 +59,8 @@ test('[BDD-AUTH-005] logout revokes access to the protected workspace', async ({
 
   await page.locator('[data-logout]').first().click()
 
-  await expect(page).toHaveURL(/\/practicum\/profile$/)
+  await expect(page).toHaveURL(/\/practicum\/login$/)
   await page.goto('/practicum')
-  await expect(page).toHaveURL(/\/practicum\/profile$/)
+  await expect(page).toHaveURL(/\/practicum\/login$/)
   await expect(page.locator('[data-plan-card]')).toHaveCount(0)
 })

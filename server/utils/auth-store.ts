@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
+import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto'
 import type { PracticumRole } from '../../domain/practicum/types'
 
 export interface AuthUser {
@@ -21,11 +21,19 @@ interface StoredSession {
   expiresAt: number
 }
 
+export interface BootstrapOwnerInput {
+  identifier?: string
+  displayName?: string
+  password?: string
+}
+
 const dataRoot = process.env.PRACTICUM_DATA_DIR || join(process.cwd(), '.data')
+const usersPath = join(dataRoot, 'auth-users.json')
 const sessionsPath = join(dataRoot, 'auth-sessions.json')
 const sessionTtlMs = 8 * 60 * 60 * 1000
+const identifierPattern = /^[a-zA-Z0-9_-]{3,64}$/
 
-const users: StoredUser[] = [
+const seedUsers: StoredUser[] = [
   {
     id: 'user-owner-001',
     identifier: 'owner@example.test',
@@ -45,6 +53,24 @@ const users: StoredUser[] = [
     passwordHash: 'a7b4adca45fb69fa09ea05850a6f5afc79b9156bf219c2364b3553c24274b32a',
   },
 ]
+
+function readCustomUsers(): StoredUser[] {
+  try {
+    const value = JSON.parse(readFileSync(usersPath, 'utf8'))
+    return Array.isArray(value) ? value as StoredUser[] : []
+  } catch {
+    return []
+  }
+}
+
+function writeCustomUsers(users: StoredUser[]) {
+  mkdirSync(dirname(usersPath), { recursive: true })
+  writeFileSync(usersPath, JSON.stringify(users), 'utf8')
+}
+
+function allUsers() {
+  return [...seedUsers, ...readCustomUsers()]
+}
 
 function readSessions(): Record<string, StoredSession> {
   try {
@@ -66,7 +92,33 @@ function publicUser(user: StoredUser): AuthUser {
 
 function findUser(identifier: string) {
   const normalized = identifier.trim().toLowerCase()
-  return users.find(user => user.identifier.toLowerCase() === normalized)
+  return allUsers().find(user => user.identifier.toLowerCase() === normalized)
+}
+
+export function isBootstrapAvailable() {
+  return !readCustomUsers().some(user => user.role === 'OWNER')
+}
+
+export function bootstrapOwner(input: BootstrapOwnerInput) {
+  if (!isBootstrapAvailable()) return { kind: 'ALREADY_COMPLETED' as const }
+  const identifier = input.identifier?.trim() ?? ''
+  const displayName = input.displayName?.trim() ?? ''
+  const password = input.password ?? ''
+  if (!identifierPattern.test(identifier) || !displayName || displayName.length > 40 || password.length < 3 || findUser(identifier)) {
+    return { kind: 'INVALID' as const }
+  }
+  const passwordSalt = randomBytes(16).toString('hex')
+  const user: StoredUser = {
+    id: `user-${randomUUID()}`,
+    identifier,
+    displayName,
+    role: 'OWNER',
+    roomIds: ['room-001'],
+    passwordSalt,
+    passwordHash: scryptSync(password, passwordSalt, 32).toString('hex'),
+  }
+  writeCustomUsers([...readCustomUsers(), user])
+  return { kind: 'OK' as const, user: publicUser(user) }
 }
 
 export function verifyCredentials(identifier: string, password: string): AuthUser | null {
@@ -97,7 +149,7 @@ export function getSessionUser(token: string | undefined): AuthUser | null {
     writeSessions(sessions)
     return null
   }
-  const user = users.find(item => item.id === session.userId)
+  const user = allUsers().find(item => item.id === session.userId)
   return user ? publicUser(user) : null
 }
 

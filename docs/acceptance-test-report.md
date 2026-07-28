@@ -63,6 +63,29 @@ npx.cmd playwright test tests/e2e/practicum/shell.spec.ts tests/e2e/practicum/ac
 
 本轮切片结论：`PARTIAL`。审核队列来源约束已验证，但学生草稿、活动进度和提交详情仍有 store 兼容路径，不能将整个提交模块标记为 PASS。
 
+## 本轮管理员开通与登录验收
+
+| 用户动作 | 预期结果 | 实际结果 | 状态 | 证据 |
+|---|---|---|---|---|
+| 首次管理员开通 | 只保存摘要，建立 HttpOnly 会话并进入工作台 | Playwright 创建运行时测试账号，刷新后仍为认证状态 | PASS | `BDD-AUTH-006`、`auth-bootstrap.spec.ts` |
+| 重复开通 | 不再展示表单，接口稳定拒绝 | 登录表单可见，API 返回 `409 BOOTSTRAP_ALREADY_COMPLETED` | PASS | `BDD-AUTH-007`、`auth-bootstrap.spec.ts` |
+| 未登录直达工作台 | 跳转独立登录页，不展示业务数据 | 跳转 `/practicum/login` | PASS | `BDD-AUTH-008`、`auth-bootstrap.spec.ts` |
+| 账号登录、错误、刷新、退出 | 会话正确建立、恢复与撤销 | 5 个既有认证场景全部通过 | PASS | `auth-session.spec.ts` |
+| 移动端登录 | 390px 可访问且无水平溢出 | 通过 | PASS | `auth-bootstrap.spec.ts` |
+
+TDD 证据：`npx.cmd playwright test tests/e2e/practicum/auth-bootstrap.spec.ts --reporter=list` 在实现前为 2 failed/1 passed（缺少开通表单和独立登录路由）；实现后与 `auth-session.spec.ts` 合计 8 passed。
+
+本轮质量门：`npm.cmd run typecheck` PASS；`NUXT_IGNORE_LOCK=1 npm.cmd run build` PASS；`lint` 未配置。生产部署、远程 PM2 与健康检查尚未执行，整体结论仍为 `PARTIAL`。
+
+## 本轮全量回归
+
+`npx.cmd playwright test tests/e2e/practicum --reporter=list` 于 2026-07-28 完成，结果为 145 passed、5 failed，耗时约 4.7 分钟，故全量门禁为 `FAILED`。
+
+- `student-activities-s3-010.spec.ts`：等待瞬时 `[data-loading]` 状态失败。
+- `teacher-review.spec.ts` 4 项：审核队列仍依赖旧本地身份预览和数据状态，与服务端权威队列为空的当前契约不一致。
+
+认证开通与登录的 8 项 focused 测试均通过，但因为上述全量回归失败，本轮不能报告生产发布完成，部署状态为 `UNVERIFIED`。
+
 ## 本轮未通过或未验证
 
 - 完整 `npx.cmd playwright test tests/e2e/practicum --reporter=list` 在 243 秒后超时并出现 `EPIPE`，记为 `UNVERIFIED/FAILED`，旧报告的 128/128 不能作为本轮证据。
