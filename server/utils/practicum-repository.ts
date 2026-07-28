@@ -225,6 +225,25 @@ export function updateCurriculumNode(user: AuthUser, planId: string, nodeId: str
   return { kind: 'OK' as const, ...getPlan(user, planId)! }
 }
 
+export function deleteCurriculumNode(user: AuthUser, planId: string, nodeId: string, input: { version?: number }) {
+  const state = readState()
+  const plan = state.plans.find(item => item.id === planId)
+  if (!plan || !canAccessRoom(user, plan.roomId)) return { kind: 'NOT_FOUND' as const }
+  if (!ownerOnly(user)) return { kind: 'FORBIDDEN' as const }
+  if (plan.status !== 'DRAFT') return { kind: 'STATE' as const }
+  if (!Number.isInteger(input.version)) return { kind: 'VALIDATION' as const }
+  if (input.version !== plan.version) return { kind: 'CONFLICT' as const, currentVersion: plan.version }
+  const index = state.nodes.findIndex(item => item.id === nodeId && item.planId === planId)
+  if (index < 0) return { kind: 'NOT_FOUND' as const }
+  if (state.nodes.some(item => item.parentId === nodeId)) return { kind: 'STATE' as const }
+
+  state.nodes.splice(index, 1)
+  plan.version += 1
+  plan.updatedAt = new Date().toISOString()
+  writeState(state)
+  return { kind: 'OK' as const, ...getPlan(user, planId)! }
+}
+
 function ownerOnly(user: AuthUser) {
   return user.role === 'OWNER'
 }
