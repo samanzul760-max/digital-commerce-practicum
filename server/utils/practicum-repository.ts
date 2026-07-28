@@ -204,6 +204,27 @@ export function createCurriculumNode(user: AuthUser, planId: string, input: {
   return { kind: 'OK' as const, replayed: false, ...getPlan(user, planId)! }
 }
 
+export function updateCurriculumNode(user: AuthUser, planId: string, nodeId: string, input: { title?: string; version?: number }) {
+  const state = readState()
+  const plan = state.plans.find(item => item.id === planId)
+  if (!plan || !canAccessRoom(user, plan.roomId)) return { kind: 'NOT_FOUND' as const }
+  if (!ownerOnly(user)) return { kind: 'FORBIDDEN' as const }
+  if (plan.status !== 'DRAFT') return { kind: 'STATE' as const }
+  if (!Number.isInteger(input.version)) return { kind: 'VALIDATION' as const }
+  if (input.version !== plan.version) return { kind: 'CONFLICT' as const, currentVersion: plan.version }
+
+  const node = state.nodes.find(item => item.id === nodeId && item.planId === planId)
+  const title = input.title?.trim() ?? ''
+  if (!node) return { kind: 'NOT_FOUND' as const }
+  if (!title) return { kind: 'VALIDATION' as const }
+
+  node.title = title
+  plan.version += 1
+  plan.updatedAt = new Date().toISOString()
+  writeState(state)
+  return { kind: 'OK' as const, ...getPlan(user, planId)! }
+}
+
 function ownerOnly(user: AuthUser) {
   return user.role === 'OWNER'
 }

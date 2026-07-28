@@ -22,4 +22,32 @@ test.describe('curriculum API contract', () => {
       expect.objectContaining({ planId: plan.id, level: 1, parentId: null, title: '第一模块' }),
     ]))
   })
+
+  test('owner renames a curriculum node with version protection', async ({ page }) => {
+    const key = `curriculum-rename-${Date.now()}`
+    const created = await page.request.post('/api/practicum/plans', {
+      headers: { 'Idempotency-Key': key },
+      data: { roomId: 'room-001', title: `目录重命名 ${key}`, description: '用于验证服务端目录更新' },
+    })
+    const plan = (await created.json()).plan
+    const nodeResponse = await page.request.post(`/api/practicum/plans/${plan.id}/nodes`, {
+      data: { title: '待重命名目录', level: 1, parentId: null, version: plan.version },
+    })
+    const nodeSnapshot = await nodeResponse.json()
+    const node = nodeSnapshot.nodes.find((item: { title: string }) => item.title === '待重命名目录')
+
+    const renamed = await page.request.patch(`/api/practicum/plans/${plan.id}/nodes/${node.id}`, {
+      data: { title: '已重命名目录', version: nodeSnapshot.plan.version },
+    })
+    expect(renamed.status()).toBe(200)
+    expect((await renamed.json()).nodes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: node.id, title: '已重命名目录' }),
+    ]))
+
+    const stale = await page.request.patch(`/api/practicum/plans/${plan.id}/nodes/${node.id}`, {
+      data: { title: '不应保存', version: nodeSnapshot.plan.version },
+    })
+    expect(stale.status()).toBe(409)
+    expect((await stale.json()).data.code).toBe('PLAN_VERSION_CONFLICT')
+  })
 })
