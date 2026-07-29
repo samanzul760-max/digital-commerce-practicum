@@ -303,6 +303,43 @@ export function updateCurriculumNode(user: AuthUser, planId: string, nodeId: str
   return { kind: 'OK' as const, ...getPlan(user, planId)! }
 }
 
+export function updateActivity(user: AuthUser, planId: string, activityId: string, input: { config?: Activity['config']; version?: number }) {
+  const state = readState()
+  const plan = state.plans.find(item => item.id === planId)
+  if (!plan || !canAccessRoom(user, plan.roomId)) return { kind: 'NOT_FOUND' as const }
+  if (!ownerOnly(user)) return { kind: 'FORBIDDEN' as const }
+  if (plan.status !== 'DRAFT') return { kind: 'STATE' as const }
+  if (!Number.isInteger(input.version)) return { kind: 'VALIDATION' as const }
+  if (input.version !== plan.version) return { kind: 'CONFLICT' as const, currentVersion: plan.version }
+  const activity = state.activities.find(item => item.id === activityId && state.nodes.some(node => node.planId === planId && node.activityId === activityId))
+  if (!activity || !input.config || input.config.type !== activity.config.type) return { kind: 'VALIDATION' as const }
+  activity.config = clone(input.config)
+  plan.version += 1
+  plan.updatedAt = new Date().toISOString()
+  writeState(state)
+  return { kind: 'OK' as const, ...getPlan(user, planId)! }
+}
+
+export function reorderCurriculumNode(user: AuthUser, planId: string, nodeId: string, input: { targetNodeId?: string; version?: number }) {
+  const state = readState()
+  const plan = state.plans.find(item => item.id === planId)
+  if (!plan || !canAccessRoom(user, plan.roomId)) return { kind: 'NOT_FOUND' as const }
+  if (!ownerOnly(user)) return { kind: 'FORBIDDEN' as const }
+  if (plan.status !== 'DRAFT') return { kind: 'STATE' as const }
+  if (!Number.isInteger(input.version)) return { kind: 'VALIDATION' as const }
+  if (input.version !== plan.version) return { kind: 'CONFLICT' as const, currentVersion: plan.version }
+  const node = state.nodes.find(item => item.id === nodeId && item.planId === planId)
+  const target = state.nodes.find(item => item.id === input.targetNodeId && item.planId === planId)
+  if (!node || !target || node.parentId !== target.parentId || node.level !== target.level) return { kind: 'VALIDATION' as const }
+  const sort = node.sort
+  node.sort = target.sort
+  target.sort = sort
+  plan.version += 1
+  plan.updatedAt = new Date().toISOString()
+  writeState(state)
+  return { kind: 'OK' as const, ...getPlan(user, planId)! }
+}
+
 export function deleteCurriculumNode(user: AuthUser, planId: string, nodeId: string, input: { version?: number }) {
   const state = readState()
   const plan = state.plans.find(item => item.id === planId)

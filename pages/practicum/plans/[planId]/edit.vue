@@ -3,7 +3,9 @@
     <PracticumShell :context-title="plan?.title ?? '课程编辑'" :context-meta="planMeta">
       <p v-if="isLoading" data-loading class="empty-state">正在加载课程编辑器...</p>
 
-      <p v-else-if="!canEditPlan(store.state.activeRole)" data-forbidden class="empty-state">学生只能查看已发布课程目录，不能进入编辑页面。</p>
+      <p v-else-if="errorMessage" data-error class="empty-state">{{ errorMessage }}</p>
+
+      <p v-else-if="!canEditPlan(activeRole)" data-forbidden class="empty-state">学生只能查看已发布课程目录，不能进入编辑页面。</p>
 
       <template v-else>
         <div data-plan-editor>
@@ -87,8 +89,8 @@
                   <span>{{ mod.title }}</span><span aria-hidden="true">{{ isExpanded(mod.id) ? '-' : '+' }}</span>
                 </button>
                 <div style="display:flex;gap:6px;">
-                  <button data-move-up class="ghost-button" type="button" @click="store.reorderNode(mod.id, 'up')" style="font-size:12px;min-height:44px;" :disabled="isFirstSibling(mod.id)">↑</button>
-                  <button data-move-down class="ghost-button" type="button" @click="store.reorderNode(mod.id, 'down')" style="font-size:12px;min-height:44px;" :disabled="isLastSibling(mod.id)">↓</button>
+                  <button data-move-up class="ghost-button" type="button" @click="reorderNode(mod.id, 'up')" style="font-size:12px;min-height:44px;" :disabled="isFirstSibling(mod.id)">↑</button>
+                  <button data-move-down class="ghost-button" type="button" @click="reorderNode(mod.id, 'down')" style="font-size:12px;min-height:44px;" :disabled="isLastSibling(mod.id)">↓</button>
                   <button data-rename-module class="ghost-button" type="button" @click="startRename(mod.id, mod.title)" style="font-size:12px;min-height:44px;">重命名</button>
                   <button data-delete-module class="ghost-button" type="button" @click="openDeleteImpact(mod.id)" style="font-size:12px;min-height:44px;">删除</button>
                 </div>
@@ -109,8 +111,8 @@
                       <span>{{ unit.title }}</span><span aria-hidden="true">{{ isExpanded(unit.id) ? '-' : '+' }}</span>
                     </button>
                     <div style="display:flex;gap:6px;">
-                      <button data-move-up class="ghost-button" type="button" @click="store.reorderNode(unit.id, 'up')" style="font-size:12px;min-height:44px;" :disabled="isFirstSibling(unit.id)">↑</button>
-                      <button data-move-down class="ghost-button" type="button" @click="store.reorderNode(unit.id, 'down')" style="font-size:12px;min-height:44px;" :disabled="isLastSibling(unit.id)">↓</button>
+                      <button data-move-up class="ghost-button" type="button" @click="reorderNode(unit.id, 'up')" style="font-size:12px;min-height:44px;" :disabled="isFirstSibling(unit.id)">↑</button>
+                      <button data-move-down class="ghost-button" type="button" @click="reorderNode(unit.id, 'down')" style="font-size:12px;min-height:44px;" :disabled="isLastSibling(unit.id)">↓</button>
                       <button data-rename-unit class="ghost-button" type="button" @click="startRename(unit.id, unit.title)" style="font-size:12px;min-height:44px;">重命名</button>
                       <button data-delete-unit class="ghost-button" type="button" @click="openDeleteImpact(unit.id)">删除</button>
                     </div>
@@ -178,13 +180,13 @@
 
           <!-- SOFTWARE_ACTION config -->
           <template v-if="selectedActivity.config.type === 'SOFTWARE_ACTION'">
-            <div class="section-heading"><h3>操作步骤</h3><button data-add-step class="secondary-button" type="button" @click="store.addActivityStep(selectedActivity.id, '', false)">+ 添加步骤</button></div>
+            <div class="section-heading"><h3>操作步骤</h3><button data-add-step class="secondary-button" type="button" @click="addActivityStep">+ 添加步骤</button></div>
             <div v-for="(step, idx) in selectedActivity.config.steps" :key="step.id" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-              <input data-step-label-input :value="step.label" @input="(e: Event) => store.updateActivityStep(selectedActivity!.id, step.id, (e.target as HTMLInputElement).value, step.required)" placeholder="步骤名称" style="flex:1;min-height:44px;padding:9px 11px;border:1px solid #afbcc8;border-radius:4px;">
+              <input data-step-label-input :value="step.label" @input="(e: Event) => updateActivityStep(step.id, (e.target as HTMLInputElement).value, step.required)" placeholder="步骤名称" style="flex:1;min-height:44px;padding:9px 11px;border:1px solid #afbcc8;border-radius:4px;">
               <label style="display:flex;align-items:center;gap:4px;font-size:13px;white-space:nowrap;">
-                <input data-step-required-checkbox type="checkbox" :checked="step.required" @change="(e: Event) => store.updateActivityStep(selectedActivity!.id, step.id, step.label, (e.target as HTMLInputElement).checked)" :style="{width:'44px',height:'44px'}"> 必做
+                <input data-step-required-checkbox type="checkbox" :checked="step.required" @change="(e: Event) => updateActivityStep(step.id, step.label, (e.target as HTMLInputElement).checked)" :style="{width:'44px',height:'44px'}"> 必做
               </label>
-              <button class="ghost-button" type="button" @click="store.removeActivityStep(selectedActivity!.id, step.id)" style="font-size:12px;min-height:44px;">移除</button>
+              <button class="ghost-button" type="button" @click="removeActivityStep(step.id)" style="font-size:12px;min-height:44px;">移除</button>
             </div>
             <p v-if="!selectedActivity.config.steps.length" class="empty-state">暂无操作步骤</p>
           </template>
@@ -192,17 +194,17 @@
           <!-- TRAINING config -->
           <template v-if="selectedActivity.config.type === 'TRAINING'">
             <div class="form-grid">
-              <label class="field">允许尝试次数<input data-training-max-attempts type="number" :value="(selectedActivity.config as any).maxAttempts" @input="(e: Event) => store.updateTrainingConfig(selectedActivity!.id, Number((e.target as HTMLInputElement).value))" min="1"></label>
-              <label class="field">时限（分钟，可选）<input type="number" :value="(selectedActivity.config as any).timeLimitMinutes ?? ''" @input="(e: Event) => { const v = (e.target as HTMLInputElement).value; store.updateTrainingConfig(selectedActivity!.id, (selectedActivity!.config as any).maxAttempts, v ? Number(v) : undefined) }" min="0" placeholder="不限制"></label>
+              <label class="field">允许尝试次数<input data-training-max-attempts type="number" :value="(selectedActivity.config as any).maxAttempts" @input="(e: Event) => updateTrainingConfig(Number((e.target as HTMLInputElement).value))" min="1"></label>
+              <label class="field">时限（分钟，可选）<input type="number" :value="(selectedActivity.config as any).timeLimitMinutes ?? ''" @input="(e: Event) => { const v = (e.target as HTMLInputElement).value; updateTrainingConfig((selectedActivity!.config as any).maxAttempts, v ? Number(v) : undefined) }" min="0" placeholder="不限制"></label>
             </div>
           </template>
 
           <!-- PRACTICE_ACTIVITY config -->
           <template v-if="selectedActivity.config.type === 'PRACTICE_ACTIVITY'">
-            <div class="section-heading"><h3>交付物</h3><button class="secondary-button" type="button" @click="store.addDeliverable(selectedActivity!.id, `交付物 ${selectedActivity!.config.deliverables.length + 1}`)">+ 添加</button></div>
+            <div class="section-heading"><h3>交付物</h3><button class="secondary-button" type="button" @click="addDeliverable">+ 添加</button></div>
             <p v-if="!selectedActivity.config.deliverables.length" class="empty-state">暂无交付物</p>
             <ul v-else><li v-for="d in selectedActivity.config.deliverables" :key="d">{{ d }}</li></ul>
-            <div class="section-heading"><h3>评分维度</h3><button data-add-rubric-dimension class="secondary-button" type="button" @click="store.addRubricDimension(selectedActivity!.id, '', 10, true)">+ 添加维度</button></div>
+            <div class="section-heading"><h3>评分维度</h3><button data-add-rubric-dimension class="secondary-button" type="button" @click="addRubricDimension">+ 添加维度</button></div>
             <div v-for="dim in selectedActivity.config.rubric" :key="dim.id" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
               <input data-rubric-label-input :value="dim.label" @input="(e: Event) => { dim.label = (e.target as HTMLInputElement).value }" placeholder="维度名称" style="flex:1;min-height:44px;padding:9px 11px;border:1px solid #afbcc8;border-radius:4px;">
               <label>分值<input type="number" :value="dim.maxScore" @input="(e: Event) => { dim.maxScore = Number((e.target as HTMLInputElement).value) }" min="1" style="width:60px;min-height:44px;"></label>
@@ -212,7 +214,7 @@
           </template>
 
           <div class="form-actions">
-            <button data-save-activity-config class="primary-button" type="button" @click="store.persist(); selectedActivityNodeId = null">完成配置</button>
+            <button data-save-activity-config class="primary-button" type="button" @click="saveActivityConfig">完成配置</button>
           </div>
         </section>
 
@@ -235,23 +237,23 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
-import type { ActivityType, ResourceKind } from '../../../../domain/practicum/types'
-import { usePracticumStore } from '../../../../composables/usePracticumStore'
+import { computed, onMounted, ref } from 'vue'
+import type { Activity, ActivityType, CurriculumNode, Plan, ResourceKind, SupportingResource, PracticumRole } from '../../../../domain/practicum/types'
 import { canEditPlan } from '../../../../domain/practicum/permissions'
+import { useAuthSession } from '../../../../composables/useAuthSession'
+import { useCsrfHeaders } from '../../../../composables/useCsrfHeaders'
 
+type Snapshot = { plan: Plan & { version: number }; nodes: CurriculumNode[]; activities: Activity[]; resources: SupportingResource[] }
 const route = useRoute()
-const store = usePracticumStore()
-const isLoading = ref(true)
-onMounted(() => { isLoading.value = false })
 const planId = computed(() => route.params.planId as string)
-const plan = computed(() => store.state.plans.find(item => item.id === planId.value) ?? null)
-const planNodes = computed(() => store.getPlanNodes(planId.value))
-const modules = computed(() => planNodes.value.filter(node => node.level === 1).sort((a, b) => a.sort - b.sort))
-const unitCount = computed(() => planNodes.value.filter(node => node.level === 2).length)
-const activityCount = computed(() => planNodes.value.filter(node => node.level === 3).length)
-const planStatusLabel = computed(() => plan.value?.status === 'PUBLISHED' ? '已发布' : plan.value?.status === 'ARCHIVED' ? '已归档' : '草稿')
-const planMeta = computed(() => `${planStatusLabel.value} · ${modules.value.length} 模块 · ${unitCount.value} 单元 · ${activityCount.value} 活动`)
+const auth = useAuthSession()
+const activeRole = computed<PracticumRole | null>(() => auth.state.value.user?.role ?? null)
+const isLoading = ref(true)
+const errorMessage = ref('')
+const plan = ref<Snapshot['plan'] | null>(null)
+const planNodes = ref<CurriculumNode[]>([])
+const planActivities = ref<Activity[]>([])
+const planResources = ref<SupportingResource[]>([])
 const expanded = ref<Set<string>>(new Set())
 const showModuleForm = ref(false)
 const createUnitFor = ref<string | null>(null)
@@ -264,153 +266,121 @@ const showStudentPreview = ref(false)
 const resourceName = ref('')
 const resourceKind = ref<ResourceKind>('LINK')
 const resourceUrl = ref('')
-const planResources = computed(() => store.getPlanResources(planId.value))
-const deleteImpact = ref<ReturnType<typeof store.getDeletionImpact> | null>(null)
+const deleteImpact = ref<{ descendantCount: number; activityCount: number; evidenceCount: number } | null>(null)
 const deleteTargetNodeId = ref<string | null>(null)
 const publishValidation = ref<string[] | null>(null)
 const showUnpublishConfirm = ref(false)
 const showArchiveConfirm = ref(false)
 const renameTarget = ref<string | null>(null)
 const renameTitle = ref('')
-
-// Activity config
 const selectedActivityNodeId = ref<string | null>(null)
-const selectedActivity = computed(() => selectedActivityNodeId.value ? store.getActivityByNodeId(selectedActivityNodeId.value) : null)
-const selectedActivityNode = computed(() => selectedActivityNodeId.value ? planNodes.value.find(n => n.id === selectedActivityNodeId.value) ?? null : null)
+const modules = computed(() => planNodes.value.filter(node => node.level === 1).sort((a, b) => a.sort - b.sort))
+const unitCount = computed(() => planNodes.value.filter(node => node.level === 2).length)
+const activityCount = computed(() => planNodes.value.filter(node => node.level === 3).length)
+const planStatusLabel = computed(() => plan.value?.status === 'PUBLISHED' ? '已发布' : plan.value?.status === 'ARCHIVED' ? '已归档' : '草稿')
+const planMeta = computed(() => `${planStatusLabel.value} · ${modules.value.length} 模块 · ${unitCount.value} 单元 · ${activityCount.value} 活动`)
+const selectedActivityNode = computed(() => selectedActivityNodeId.value ? planNodes.value.find(node => node.id === selectedActivityNodeId.value) ?? null : null)
+const selectedActivity = computed(() => {
+  const activityId = selectedActivityNode.value?.activityId
+  return activityId ? planActivities.value.find(activity => activity.id === activityId) ?? null : null
+})
 
-function selectActivity(nodeId: string) {
-  selectedActivityNodeId.value = selectedActivityNodeId.value === nodeId ? null : nodeId
+function applySnapshot(snapshot: Snapshot) {
+  plan.value = snapshot.plan
+  planNodes.value = snapshot.nodes
+  planActivities.value = snapshot.activities
+  planResources.value = snapshot.resources
 }
 
-function startRename(nodeId: string, currentTitle: string) {
-  renameTarget.value = nodeId
-  renameTitle.value = currentTitle
+async function loadSnapshot() {
+  isLoading.value = true
+  errorMessage.value = ''
+  try {
+    await auth.load()
+    if (!canEditPlan(activeRole.value)) return
+    applySnapshot(await $fetch<Snapshot>(`/api/practicum/plans/${planId.value}`))
+  } catch (error: any) {
+    const status = error?.statusCode ?? error?.response?.status
+    if (status === 403) errorMessage.value = '当前角色无权访问此计划。'
+    else if (status === 404) errorMessage.value = '计划不存在或已被移除。'
+    else errorMessage.value = '计划数据加载失败，请刷新重试。'
+  } finally { isLoading.value = false }
+}
+onMounted(loadSnapshot)
+
+async function write(path: string, method: 'POST' | 'PATCH' | 'DELETE', body?: unknown, key?: string) {
+  try {
+    const response = await $fetch<Snapshot>(path, { method, headers: useCsrfHeaders(key ? { 'Idempotency-Key': key } : {}), body: body as Record<string, unknown> | undefined })
+    applySnapshot(response)
+    return true
+  } catch (error: any) {
+    const code = error?.data?.data?.code ?? error?.response?._data?.data?.code
+    errorMessage.value = code === 'PLAN_VERSION_CONFLICT' ? '计划已被其他操作更新，请刷新后重试。' : '保存失败，请检查输入后重试。'
+    if (code === 'PLAN_VERSION_CONFLICT') await loadSnapshot()
+    return false
+  }
 }
 
-function handleRename() {
-  if (!renameTarget.value || !renameTitle.value.trim()) return
-  store.renameNode(renameTarget.value, renameTitle.value.trim())
-  renameTarget.value = null
-  renameTitle.value = ''
+function selectActivity(nodeId: string) { selectedActivityNodeId.value = selectedActivityNodeId.value === nodeId ? null : nodeId }
+function startRename(nodeId: string, title: string) { renameTarget.value = nodeId; renameTitle.value = title }
+async function handleRename() {
+  if (!renameTarget.value || !renameTitle.value.trim() || !plan.value) return
+  if (await write(`/api/practicum/plans/${planId.value}/nodes/${renameTarget.value}`, 'PATCH', { title: renameTitle.value.trim(), version: plan.value.version })) { renameTarget.value = null; renameTitle.value = '' }
 }
-
-function getSiblings(nodeId: string) {
-  const node = planNodes.value.find(n => n.id === nodeId)
-  if (!node) return []
-  return planNodes.value
-    .filter(n => n.planId === node.planId && n.parentId === node.parentId && n.level === node.level)
-    .sort((a, b) => a.sort - b.sort)
+function getSiblings(nodeId: string) { const node = planNodes.value.find(item => item.id === nodeId); return node ? planNodes.value.filter(item => item.planId === node.planId && item.parentId === node.parentId && item.level === node.level).sort((a, b) => a.sort - b.sort) : [] }
+function isFirstSibling(nodeId: string) { const items = getSiblings(nodeId); return items[0]?.id === nodeId }
+function isLastSibling(nodeId: string) { const items = getSiblings(nodeId); return items.at(-1)?.id === nodeId }
+async function reorderNode(nodeId: string, direction: 'up' | 'down') {
+  if (!plan.value) return
+  const siblings = getSiblings(nodeId); const index = siblings.findIndex(item => item.id === nodeId); const target = siblings[index + (direction === 'up' ? -1 : 1)]
+  if (!target) return
+  await write(`/api/practicum/plans/${planId.value}/nodes/${nodeId}/reorder`, 'POST', { targetNodeId: target.id, version: plan.value.version })
 }
-
-function isFirstSibling(nodeId: string) {
-  const siblings = getSiblings(nodeId)
-  return siblings.length > 0 && siblings[0].id === nodeId
+function toggleExpand(id: string) { const next = new Set(expanded.value); next.has(id) ? next.delete(id) : next.add(id); expanded.value = next }
+function isExpanded(id: string) { return expanded.value.has(id) }
+function getChildren(parentId: string, level: number) { return planNodes.value.filter(node => node.parentId === parentId && node.level === level).sort((a, b) => a.sort - b.sort) }
+function activityTypeLabel(type?: ActivityType) { return type === 'SOFTWARE_ACTION' ? '软件操作' : type === 'TRAINING' ? '训练活动' : '实践活动' }
+async function createNode(title: string, level: 1 | 2, parentId: string | null) {
+  if (!plan.value || !title.trim()) return false
+  return write(`/api/practicum/plans/${planId.value}/nodes`, 'POST', { title: title.trim(), level, parentId, version: plan.value.version }, `editor-node-${Date.now()}`)
 }
-
-function isLastSibling(nodeId: string) {
-  const siblings = getSiblings(nodeId)
-  return siblings.length > 0 && siblings[siblings.length - 1].id === nodeId
+async function handleCreateModule() { if (await createNode(newNodeTitle.value, 1, null)) { newNodeTitle.value = ''; showModuleForm.value = false } }
+function openCreateUnit(moduleId: string) { createUnitFor.value = moduleId; newNodeTitle.value = '' }
+async function handleCreateUnit(moduleId: string) { if (await createNode(newNodeTitle.value, 2, moduleId)) { newNodeTitle.value = ''; createUnitFor.value = null } }
+function openCreateActivity(unitId: string) { createActivityFor.value = unitId; newActivityTitle.value = ''; newActivityType.value = 'SOFTWARE_ACTION' }
+async function handleCreateActivity(unitId: string) {
+  if (!plan.value || !newActivityTitle.value.trim()) return
+  if (await write(`/api/practicum/plans/${planId.value}/activities`, 'POST', { parentId: unitId, title: newActivityTitle.value.trim(), type: newActivityType.value, version: plan.value.version }, `editor-activity-${Date.now()}`)) { newActivityTitle.value = ''; createActivityFor.value = null }
 }
-
-function toggleExpand(id: string) {
-  const next = new Set(expanded.value)
-  if (next.has(id)) next.delete(id)
-  else next.add(id)
-  expanded.value = next
-}
-
-function isExpanded(id: string) {
-  return expanded.value.has(id)
-}
-
-function getChildren(parentId: string, level: number) {
-  return planNodes.value.filter(node => node.parentId === parentId && node.level === level).sort((a, b) => a.sort - b.sort)
-}
-
-function activityTypeLabel(type?: ActivityType) {
-  if (type === 'SOFTWARE_ACTION') return '软件操作'
-  if (type === 'TRAINING') return '训练活动'
-  return '实践活动'
-}
-
-function handleCreateModule() {
-  if (!newNodeTitle.value.trim() || !plan.value) return
-  store.addNode({ planId: plan.value.id, parentId: null, level: 1, title: newNodeTitle.value.trim() })
-  newNodeTitle.value = ''
-  showModuleForm.value = false
-}
-
-function openCreateUnit(moduleId: string) {
-  createUnitFor.value = moduleId
-  newNodeTitle.value = ''
-}
-
-function handleCreateUnit(moduleId: string) {
-  if (!newNodeTitle.value.trim() || !plan.value) return
-  store.addNode({ planId: plan.value.id, parentId: moduleId, level: 2, title: newNodeTitle.value.trim() })
-  newNodeTitle.value = ''
-  createUnitFor.value = null
-}
-
-function openCreateActivity(unitId: string) {
-  createActivityFor.value = unitId
-  newActivityTitle.value = ''
-  newActivityType.value = 'SOFTWARE_ACTION'
-}
-
-function handleCreateActivity(unitId: string) {
-  if (!newActivityTitle.value.trim() || !plan.value) return
-  store.addNode({
-    planId: plan.value.id,
-    parentId: unitId,
-    level: 3,
-    title: newActivityTitle.value.trim(),
-    activityType: newActivityType.value,
-  })
-  newActivityTitle.value = ''
-  createActivityFor.value = null
-}
-
-function handleAddResource() {
+async function handleAddResource() {
   if (!plan.value || !resourceName.value.trim() || !resourceUrl.value.trim()) return
-  store.addSupportingResource({ planId: plan.value.id, name: resourceName.value.trim(), kind: resourceKind.value, url: resourceUrl.value.trim() })
-  resourceName.value = ''
-  resourceUrl.value = ''
-  showResourceForm.value = false
+  try { const response = await $fetch<{ resource: SupportingResource }>('/api/practicum/resources', { method: 'POST', headers: useCsrfHeaders({ 'Idempotency-Key': `editor-resource-${Date.now()}` }), body: { planId: plan.value.id, name: resourceName.value.trim(), kind: resourceKind.value, url: resourceUrl.value.trim() } }); planResources.value = [...planResources.value, response.resource]; resourceName.value = ''; resourceUrl.value = ''; showResourceForm.value = false } catch { errorMessage.value = '资源保存失败，请重试。' }
 }
-
-function openDeleteImpact(nodeId: string) {
-  deleteTargetNodeId.value = nodeId
-  deleteImpact.value = store.getDeletionImpact(nodeId)
+function openDeleteImpact(nodeId: string) { const ids = new Set<string>(); const visit = (id: string) => { ids.add(id); planNodes.value.filter(node => node.parentId === id).forEach(node => visit(node.id)) }; visit(nodeId); deleteTargetNodeId.value = nodeId; deleteImpact.value = { descendantCount: ids.size - 1, activityCount: [...ids].filter(id => planNodes.value.find(node => node.id === id)?.level === 3).length, evidenceCount: 0 } }
+async function handleDelete() { if (!deleteTargetNodeId.value || !plan.value) return; if (await write(`/api/practicum/plans/${planId.value}/nodes/${deleteTargetNodeId.value}`, 'DELETE', { version: plan.value.version })) { deleteImpact.value = null; deleteTargetNodeId.value = null } }
+function openPublishValidation() { publishValidation.value = !plan.value ? ['计划不存在'] : [ ...(plan.value.title.trim() ? [] : ['缺少计划标题']), ...(plan.value.description.trim() ? [] : ['缺少计划描述']), ...(modules.value.length ? [] : ['至少需要配置一个一级目录']), ...(activityCount.value ? [] : ['至少需要配置一个活动']) ] }
+async function handlePublish() { if (plan.value && await write(`/api/practicum/plans/${planId.value}/publish`, 'POST')) publishValidation.value = null }
+async function handleUnpublish() { if (plan.value && await write(`/api/practicum/plans/${planId.value}/withdraw`, 'POST')) showUnpublishConfirm.value = false }
+async function archiveCurrentPlan() { if (plan.value && await write(`/api/practicum/plans/${planId.value}/archive`, 'POST')) showArchiveConfirm.value = false }
+function addActivityStep() {
+  if (selectedActivity.value?.config.type === 'SOFTWARE_ACTION') selectedActivity.value.config.steps.push({ id: `step-${Date.now()}`, label: '', required: false })
 }
-
-function handleDelete() {
-  if (!deleteTargetNodeId.value) return
-  store.deleteNode(deleteTargetNodeId.value)
-  deleteImpact.value = null
-  deleteTargetNodeId.value = null
+function updateActivityStep(stepId: string, label: string, required: boolean) {
+  if (selectedActivity.value?.config.type !== 'SOFTWARE_ACTION') return
+  const step = selectedActivity.value.config.steps.find(item => item.id === stepId)
+  if (step) { step.label = label; step.required = required }
 }
-
-function openPublishValidation() {
-  if (!plan.value) return
-  publishValidation.value = store.validatePlanForPublish(plan.value.id)
+function removeActivityStep(stepId: string) {
+  if (selectedActivity.value?.config.type === 'SOFTWARE_ACTION') selectedActivity.value.config.steps = selectedActivity.value.config.steps.filter(item => item.id !== stepId)
 }
-
-function handlePublish() {
-  if (!plan.value) return
-  store.publishPlan(plan.value.id)
-  publishValidation.value = null
+function updateTrainingConfig(maxAttempts: number, timeLimitMinutes?: number) {
+  if (selectedActivity.value?.config.type === 'TRAINING') { selectedActivity.value.config.maxAttempts = Math.max(1, maxAttempts); selectedActivity.value.config.timeLimitMinutes = timeLimitMinutes }
 }
-
-function handleUnpublish() {
-  if (!plan.value) return
-  store.unpublishPlan(plan.value.id)
-  showUnpublishConfirm.value = false
+function addDeliverable() {
+  if (selectedActivity.value?.config.type === 'PRACTICE_ACTIVITY') selectedActivity.value.config.deliverables.push(`交付物 ${selectedActivity.value.config.deliverables.length + 1}`)
 }
-
-function archiveCurrentPlan() {
-  if (!plan.value) return
-  store.archivePlan(plan.value.id)
-  showArchiveConfirm.value = false
+function addRubricDimension() {
+  if (selectedActivity.value?.config.type === 'PRACTICE_ACTIVITY') selectedActivity.value.config.rubric.push({ id: `rubric-${Date.now()}`, label: '', maxScore: 10, required: true })
 }
+async function saveActivityConfig() { if (!selectedActivity.value || !plan.value) return; if (await $fetch<Snapshot>(`/api/practicum/plans/${planId.value}/activities/${selectedActivity.value.id}`, { method: 'PATCH', headers: useCsrfHeaders(), body: { ...selectedActivity.value, version: plan.value.version } }).then(snapshot => { applySnapshot(snapshot); return true }).catch(() => { errorMessage.value = '活动配置保存失败，请刷新后重试。'; return false })) selectedActivityNodeId.value = null }
 </script>

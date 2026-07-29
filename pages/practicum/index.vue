@@ -236,14 +236,21 @@
 
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
-import type { CurriculumNode, PlanStatus } from '../../domain/practicum/types'
+import type { CurriculumNode, Plan, PlanStatus } from '../../domain/practicum/types'
 import { usePracticumStore } from '../../composables/usePracticumStore'
+import { useCsrfHeaders } from '../../composables/useCsrfHeaders'
 
 const store = usePracticumStore()
 const isLoading = ref(true)
-onMounted(() => { isLoading.value = false })
+const serverPlans = ref<Plan[] | null>(null)
+onMounted(async () => {
+  if (store.state.activeRole === 'OWNER') {
+    try { serverPlans.value = (await $fetch<{ items: Plan[] }>('/api/practicum/plans?page=1&pageSize=100&sort=updatedAt&direction=desc')).items } catch { serverPlans.value = [] }
+  }
+  isLoading.value = false
+})
 
-const visiblePlans = computed(() => store.visiblePlansFor(store.state.activeRole))
+const visiblePlans = computed(() => store.state.activeRole === 'OWNER' && serverPlans.value ? serverPlans.value : store.visiblePlansFor(store.state.activeRole))
 const primaryPlan = computed(() => visiblePlans.value.find(plan => plan.status === 'PUBLISHED') ?? visiblePlans.value[0] ?? null)
 const primaryNodes = computed(() => primaryPlan.value ? store.getPlanNodes(primaryPlan.value.id) : [])
 const modules = computed(() => primaryNodes.value.filter(node => node.level === 1).sort((a, b) => a.sort - b.sort))
@@ -284,11 +291,16 @@ const newPlanTitle = ref('')
 const newPlanDesc = ref('')
 const isCreating = ref(false)
 
-function handleCreatePlan() {
+async function handleCreatePlan() {
   if (!newPlanTitle.value.trim() || isCreating.value) return
   isCreating.value = true
   try {
-    store.createPlan({ title: newPlanTitle.value.trim(), description: newPlanDesc.value.trim() })
+    const response = await $fetch<{ plan: Plan }>('/api/practicum/plans', {
+      method: 'POST',
+      headers: useCsrfHeaders({ 'Idempotency-Key': `plan-page-${Date.now()}` }),
+      body: { roomId: store.state.room.id, title: newPlanTitle.value.trim(), description: newPlanDesc.value.trim() },
+    })
+    serverPlans.value = [response.plan, ...(serverPlans.value ?? [])]
     newPlanTitle.value = ''
     newPlanDesc.value = ''
     showCreateForm.value = false
