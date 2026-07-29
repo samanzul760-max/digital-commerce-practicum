@@ -85,6 +85,32 @@ test.describe('submission API contract', () => {
     await context.close()
   })
 
+  test('[BDD-SUBMISSION-005] student activity never renders browser-only stale submission status', async ({ browser }) => {
+    const context = await browser.newContext()
+    const student = await context.newPage()
+    expect((await student.request.post('/api/auth/login', { data: { identifier: 'student@example.test', password: 'StudentPass123!' } })).status()).toBe(200)
+    await student.goto('/practicum/activities/act-01-003')
+    await student.evaluate(() => {
+      localStorage.setItem('digital-commerce-practicum.v1', JSON.stringify({
+        schemaVersion: 1,
+        activeRole: 'STUDENT',
+        practiceSubmissions: {
+          'act-01-003': {
+            status: 'SUBMITTED',
+            versions: [{ id: 'local-version', submissionId: 'act-01-003', version: 1, text: 'Stale local student submission', links: [], attachments: [], submittedAt: '2026-07-29T00:00:00.000Z' }],
+          },
+        },
+        plans: [{ id: 'plan-local', roomId: 'room-001', title: 'Local plan', description: '', status: 'PUBLISHED', sort: 1, moduleIds: [], createdAt: '2026-07-29T00:00:00.000Z', updatedAt: '2026-07-29T00:00:00.000Z' }],
+        nodes: [{ id: 'act-01-003', planId: 'plan-local', parentId: 'unit-local', level: 3, title: 'Local practice activity', description: '', sort: 1, activityId: 'activity-act-01-003', activityType: 'PRACTICE_ACTIVITY' }],
+        activities: [{ id: 'activity-act-01-003', type: 'PRACTICE_ACTIVITY', title: 'Local practice activity', objective: '', instructions: [], required: true, resourceIds: [], config: { type: 'PRACTICE_ACTIVITY', deliverables: [], rubric: [] } }],
+      }))
+    })
+    await student.reload()
+    await expect(student.locator('[data-submission-status]')).toHaveCount(0)
+    await expect(student.locator('[data-activity-page]')).not.toContainText('Stale local student submission')
+    await context.close()
+  })
+
   test('[BDD-REVIEW-010] owner filters the server review queue by plan', async ({ browser }) => {
     const ownerContext = await browser.newContext()
     const owner = await ownerContext.newPage()

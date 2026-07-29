@@ -243,9 +243,9 @@ const practiceDraft = ref(store.state.practiceDrafts[nodeId.value] ?? '')
 const draftSaved = ref(false)
 const showSubmitConfirm = ref(false)
 const showUnsavedLeave = ref(false)
-const submissionVersions = computed(() => serverSubmission.value?.versions ?? store.state.practiceSubmissions[nodeId.value]?.versions ?? [])
-const submissionStatus = computed(() => serverSubmission.value?.status ?? store.state.practiceSubmissions[nodeId.value]?.status ?? 'NOT_STARTED')
-const returnedFeedback = computed(() => serverSubmission.value?.feedback ?? store.state.practiceSubmissions[nodeId.value]?.feedback ?? '')
+const submissionVersions = computed(() => serverSubmission.value?.versions ?? [])
+const submissionStatus = computed(() => serverSubmission.value?.status ?? 'NOT_STARTED')
+const returnedFeedback = computed(() => serverSubmission.value?.feedback ?? '')
 const submissionStatusLabel = computed(() => submissionStatus.value === 'RETURNED' ? '已退回' : submissionStatus.value === 'GRADED' ? '已评分' : '已提交')
 const submissionPending = ref(false)
 const submissionError = ref('')
@@ -261,11 +261,9 @@ async function submitPractice() {
   submissionPending.value = true
   submissionError.value = ''
   try {
-    if (auth.state.value.user?.role === 'STUDENT') {
-      const result = await server.submitPractice(nodeId.value, practiceDraft.value)
-      serverSubmission.value = result.submission
-    }
-    store.submitPracticeWork(nodeId.value)
+    if (auth.state.value.user?.role !== 'STUDENT') throw new Error('student session required')
+    const result = await server.submitPractice(nodeId.value, practiceDraft.value)
+    serverSubmission.value = result.submission
     showSubmitConfirm.value = false
     draftSaved.value = false
   } catch {
