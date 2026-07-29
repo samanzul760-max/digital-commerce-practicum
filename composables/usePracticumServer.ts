@@ -19,7 +19,7 @@ export function usePracticumServer() {
   async function submitPractice(activityId: string, text: string) {
     return await $fetch<{ submission: PracticeSubmissionState }>('/api/practicum/submissions', {
       method: 'POST',
-      headers: { 'Idempotency-Key': `practice-${activityId}-${Date.now()}` },
+      headers: useCsrfHeaders({ 'Idempotency-Key': `practice-${activityId}-${Date.now()}` }),
       body: { activityId, text },
     })
   }
@@ -27,6 +27,7 @@ export function usePracticumServer() {
   async function returnSubmission(activityId: string, feedback: string) {
     return await $fetch<{ submission: PracticeSubmissionState }>(`/api/practicum/submissions/${encodeURIComponent(activityId)}/return`, {
       method: 'POST',
+      headers: useCsrfHeaders(),
       body: { feedback },
     })
   }
@@ -34,6 +35,7 @@ export function usePracticumServer() {
   async function gradeSubmission(activityId: string, rubricScores: Record<string, number>, feedback: string) {
     return await $fetch<{ submission: PracticeSubmissionState }>(`/api/practicum/submissions/${encodeURIComponent(activityId)}/grade`, {
       method: 'POST',
+      headers: useCsrfHeaders(),
       body: { rubricScores, feedback },
     })
   }

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { csrfHeaders } from './csrf'
 
 test.describe('submission API contract', () => {
   test('student submits a practice version and owner can return then grade it', async ({ browser }) => {
@@ -11,7 +12,7 @@ test.describe('submission API contract', () => {
     await owner.request.post('/api/auth/login', { data: { identifier: 'owner@example.test', password: 'OwnerPass123!' } })
 
     const created = await student.request.post('/api/practicum/submissions', {
-      headers: { 'Idempotency-Key': `submission-${Date.now()}` },
+      headers: await csrfHeaders(student, { 'Idempotency-Key': `submission-${Date.now()}` }),
       data: { activityId: 'case-node-review-reply', text: '服务端提交内容' },
     })
     expect(created.status()).toBe(201)
@@ -22,11 +23,12 @@ test.describe('submission API contract', () => {
     expect(detail.ok()).toBeTruthy()
     expect((await detail.json()).submission.versions.at(-1).text).toBe('服务端提交内容')
 
-    const returned = await owner.request.post('/api/practicum/submissions/case-node-review-reply/return', { data: { feedback: '请补充证据' } })
+    const returned = await owner.request.post('/api/practicum/submissions/case-node-review-reply/return', { headers: await csrfHeaders(owner), data: { feedback: '请补充证据' } })
     expect(returned.ok()).toBeTruthy()
     expect((await returned.json()).submission.status).toBe('RETURNED')
 
     const revision = await student.request.post('/api/practicum/submissions', {
+      headers: await csrfHeaders(student),
       data: { activityId: 'case-node-review-reply', text: '服务端修订内容' },
     })
     expect(revision.ok()).toBeTruthy()
@@ -35,6 +37,7 @@ test.describe('submission API contract', () => {
     expect(revisionSubmission.versions.at(-1).text).toBe('服务端修订内容')
 
     const graded = await owner.request.post('/api/practicum/submissions/case-node-review-reply/grade', {
+      headers: await csrfHeaders(owner),
       data: { rubricScores: { 'case-rubric-reply-1': 25, 'case-rubric-reply-2': 35, 'case-rubric-reply-3': 25 }, feedback: '已完成审核' },
     })
     expect(graded.ok()).toBeTruthy()

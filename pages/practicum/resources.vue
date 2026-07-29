@@ -142,7 +142,7 @@ async function saveResource() {
   try {
     const result = await $fetch<{ resource: SupportingResource }>('/api/practicum/resources', {
       method: 'POST',
-      headers: { 'Idempotency-Key': `resource-ui-${Date.now()}` },
+      headers: useCsrfHeaders({ 'Idempotency-Key': `resource-ui-${Date.now()}` }),
       body: { planId: 'library', name: name.value.trim(), kind: kind.value, url: url.value.trim() },
     })
     serverResources.value = [result.resource, ...serverResources.value]
@@ -162,7 +162,7 @@ async function handleRemove() {
   if (!removeTarget.value) return
   const target = removeTarget.value
   try {
-    await $fetch(`/api/practicum/resources/${target}`, { method: 'DELETE' })
+    await $fetch(`/api/practicum/resources/${target}`, { method: 'DELETE', headers: useCsrfHeaders() })
     serverResources.value = serverResources.value.filter(resource => resource.id !== target)
   } catch {
     loadError.value = true

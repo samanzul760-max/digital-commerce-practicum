@@ -19,6 +19,7 @@ interface StoredUser extends AuthUser {
 interface StoredSession {
   userId: string
   expiresAt: number
+  csrfToken: string
   organizationId?: string
   roomId?: string
 }
@@ -141,13 +142,14 @@ export function verifyCredentials(identifier: string, password: string): AuthUse
   return publicUser(user)
 }
 
-export function createSession(user: AuthUser): { token: string; expiresAt: number } {
+export function createSession(user: AuthUser): { token: string; expiresAt: number; csrfToken: string } {
   const token = randomBytes(32).toString('hex')
+  const csrfToken = randomBytes(32).toString('hex')
   const expiresAt = Date.now() + sessionTtlMs
   const sessions = readSessions()
-  sessions[token] = { userId: user.id, expiresAt }
+  sessions[token] = { userId: user.id, expiresAt, csrfToken }
   writeSessions(sessions)
-  return { token, expiresAt }
+  return { token, expiresAt, csrfToken }
 }
 
 export function getSessionUser(token: string | undefined): AuthUser | null {
@@ -171,6 +173,14 @@ export function getSessionContext(token: string | undefined) {
   return { organizationId: session.organizationId, roomId: session.roomId }
 }
 
+export function getSessionCsrfToken(token: string | undefined) {
+  if (!token) return null
+  const sessions = readSessions()
+  const session = sessions[token]
+  if (!session || session.expiresAt <= Date.now()) return null
+  return session.csrfToken
+}
+
 export function setSessionContext(token: string | undefined, context: { organizationId: string; roomId: string }) {
   if (!token) return false
   const sessions = readSessions()
@@ -191,3 +201,4 @@ export function revokeSession(token: string | undefined) {
 }
 
 export const AUTH_COOKIE = 'practicum_session'
+export const CSRF_COOKIE = 'practicum_csrf'

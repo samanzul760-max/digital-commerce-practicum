@@ -12,6 +12,12 @@
 
 Submission states are `NOT_STARTED`, `IN_PROGRESS`, `SUBMITTED`, `RETURNED`, and `GRADED`. A graded submission is immutable; a returned submission may create a new version. Student writes accept `Idempotency-Key` to prevent duplicate requests.
 
+## CSRF write protection
+
+Every `POST`, `PUT`, `PATCH`, and `DELETE` request below `/api/practicum/` requires an authenticated `practicum_session` and the current session's `x-csrf-token` header. Login and first-owner bootstrap issue a same-site, non-HttpOnly `practicum_csrf` cookie only so the first-party client can copy it into that header; the session cookie remains HttpOnly.
+
+Missing, expired, or mismatched tokens return `403 CSRF_INVALID` with `{ data: { code: 'CSRF_INVALID' } }` before any business data is changed. Requests without a session continue to endpoint authentication and retain the existing `401 AUTH_REQUIRED` contract.
+
 ### 本轮 UI 数据来源约束
 
 - `GET /api/practicum/submissions` 返回 `{ items, total }`；`items: []` 是成功的空结果，不得回退到浏览器 `localStorage` 或 store 队列。

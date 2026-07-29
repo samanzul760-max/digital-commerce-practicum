@@ -39,6 +39,7 @@ export function useWorkspaceContext() {
     try {
       const context = await $fetch<Omit<WorkspaceContextState, 'loading'>>(`/api/practicum/organizations/${organization.id}/select`, {
         method: 'POST',
+        headers: useCsrfHeaders(),
         body: { roomId },
       })
       state.value = { ...context, loading: false }

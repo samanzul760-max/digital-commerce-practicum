@@ -1,5 +1,5 @@
 import { createError, defineEventHandler, readBody, setCookie } from 'h3'
-import { AUTH_COOKIE, bootstrapOwner, createSession, type BootstrapOwnerInput } from '../../utils/auth-store'
+import { AUTH_COOKIE, CSRF_COOKIE, bootstrapOwner, createSession, type BootstrapOwnerInput } from '../../utils/auth-store'
 
 export default defineEventHandler(async (event) => {
   const result = bootstrapOwner(await readBody<BootstrapOwnerInput>(event))
@@ -12,6 +12,13 @@ export default defineEventHandler(async (event) => {
   const session = createSession(result.user)
   setCookie(event, AUTH_COOKIE, session.token, {
     httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    maxAge: Math.floor((session.expiresAt - Date.now()) / 1000),
+  })
+  setCookie(event, CSRF_COOKIE, session.csrfToken, {
+    httpOnly: false,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
     path: '/',

@@ -51,6 +51,18 @@ npx.cmd playwright test tests/e2e/practicum/shell.spec.ts tests/e2e/practicum/ac
 
 ## 结论规则
 
+## 2026-07-29 CSRF foundation slice
+
+| Scenario | Expected | Actual | Status | Evidence |
+|---|---|---|---|---|
+| `BDD-FOUNDATION-001` missing CSRF token | A logged-in write returns `403 CSRF_INVALID` and changes no data. | RED returned `201`; GREEN returns `403 CSRF_INVALID`. | PASS | `tests/e2e/practicum/plans-api.spec.ts` |
+| Valid CSRF token | Authorized writes retain idempotency and version rules. | 21 related API scenarios pass. | PASS | Playwright focused regression |
+| First-party client writes | Existing resource, submission, and workspace writes carry the session token. | All current `/api/practicum/*` frontend writes use `useCsrfHeaders`. | PASS | Composables and resource page |
+
+TDD RED: `npx.cmd playwright test tests/e2e/practicum/plans-api.spec.ts --reporter=list` failed because the protected write returned `201`. GREEN: the same suite passed 5/5. Regression: six related API suites passed 21/21.
+
+Browser acceptance: `npx.cmd playwright test tests/e2e/practicum/administration.spec.ts --reporter=list` passed 3/3, including the resource-library write path. The separate existing `auth-session.spec.ts` suite is not counted as passed: after its setup clears cookies, the page shows first-owner bootstrap while those tests expect a login form. This is a pre-existing bootstrap/seed-account test-state mismatch, not a CSRF failure.
+
 只有命令退出码为 0 且输出明确显示无失败用例，才能将对应行标记为 PASS。任何命令因端口占用、超时、启动失败或浏览器错误结束，都标记为 FAIL/未完成并记录原因。
 
 ## 本轮提交审核来源验收

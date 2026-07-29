@@ -1,17 +1,18 @@
 import { expect, test } from '@playwright/test'
+import { csrfHeaders } from './csrf'
 
 test.describe('curriculum API contract', () => {
   test('owner creates a top-level curriculum node and receives the updated server snapshot', async ({ page }) => {
     const key = `curriculum-${Date.now()}`
     const created = await page.request.post('/api/practicum/plans', {
-      headers: { 'Idempotency-Key': key },
+      headers: await csrfHeaders(page, { 'Idempotency-Key': key }),
       data: { roomId: 'room-001', title: `目录 API ${key}`, description: '用于验证服务端目录树写入' },
     })
     expect(created.status()).toBe(201)
     const plan = (await created.json()).plan
 
     const response = await page.request.post(`/api/practicum/plans/${plan.id}/nodes`, {
-      headers: { 'Idempotency-Key': `${key}-module` },
+      headers: await csrfHeaders(page, { 'Idempotency-Key': `${key}-module` }),
       data: { title: '第一模块', level: 1, parentId: null, version: plan.version },
     })
 
@@ -26,17 +27,19 @@ test.describe('curriculum API contract', () => {
   test('owner renames a curriculum node with version protection', async ({ page }) => {
     const key = `curriculum-rename-${Date.now()}`
     const created = await page.request.post('/api/practicum/plans', {
-      headers: { 'Idempotency-Key': key },
+      headers: await csrfHeaders(page, { 'Idempotency-Key': key }),
       data: { roomId: 'room-001', title: `目录重命名 ${key}`, description: '用于验证服务端目录更新' },
     })
     const plan = (await created.json()).plan
     const nodeResponse = await page.request.post(`/api/practicum/plans/${plan.id}/nodes`, {
+      headers: await csrfHeaders(page),
       data: { title: '待重命名目录', level: 1, parentId: null, version: plan.version },
     })
     const nodeSnapshot = await nodeResponse.json()
     const node = nodeSnapshot.nodes.find((item: { title: string }) => item.title === '待重命名目录')
 
     const renamed = await page.request.patch(`/api/practicum/plans/${plan.id}/nodes/${node.id}`, {
+      headers: await csrfHeaders(page),
       data: { title: '已重命名目录', version: nodeSnapshot.plan.version },
     })
     expect(renamed.status()).toBe(200)
@@ -45,6 +48,7 @@ test.describe('curriculum API contract', () => {
     ]))
 
     const stale = await page.request.patch(`/api/practicum/plans/${plan.id}/nodes/${node.id}`, {
+      headers: await csrfHeaders(page),
       data: { title: '不应保存', version: nodeSnapshot.plan.version },
     })
     expect(stale.status()).toBe(409)
@@ -53,13 +57,13 @@ test.describe('curriculum API contract', () => {
 
   test('owner deletes an empty curriculum node and receives the updated snapshot', async ({ page }) => {
     const key = `curriculum-delete-${Date.now()}`
-    const created = await page.request.post('/api/practicum/plans', { headers: { 'Idempotency-Key': key }, data: { roomId: 'room-001', title: `目录删除 ${key}`, description: '用于验证服务端目录删除' } })
+    const created = await page.request.post('/api/practicum/plans', { headers: await csrfHeaders(page, { 'Idempotency-Key': key }), data: { roomId: 'room-001', title: `目录删除 ${key}`, description: '用于验证服务端目录删除' } })
     const plan = (await created.json()).plan
-    const nodeResponse = await page.request.post(`/api/practicum/plans/${plan.id}/nodes`, { data: { title: '待删除目录', level: 1, parentId: null, version: plan.version } })
+    const nodeResponse = await page.request.post(`/api/practicum/plans/${plan.id}/nodes`, { headers: await csrfHeaders(page), data: { title: '待删除目录', level: 1, parentId: null, version: plan.version } })
     const snapshot = await nodeResponse.json()
     const node = snapshot.nodes.find((item: { title: string }) => item.title === '待删除目录')
 
-    const removed = await page.request.delete(`/api/practicum/plans/${plan.id}/nodes/${node.id}`, { data: { version: snapshot.plan.version } })
+    const removed = await page.request.delete(`/api/practicum/plans/${plan.id}/nodes/${node.id}`, { headers: await csrfHeaders(page), data: { version: snapshot.plan.version } })
     expect(removed.status()).toBe(200)
     expect((await removed.json()).nodes).not.toEqual(expect.arrayContaining([expect.objectContaining({ id: node.id })]))
   })

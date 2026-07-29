@@ -24,4 +24,10 @@
 
 ## 缺失交付文档
 
+## 2026-07-29 CSRF foundation slice
+
+`SB-Q-10` CSRF protection is now implemented with RED/GREEN evidence. Login and first OWNER bootstrap create a session-scoped random token, and all `/api/practicum/*` write requests require `x-csrf-token`. The original red test showed an unauthenticated-header write returned `201`; after implementation, it returns `403 CSRF_INVALID`. The 21 related Playwright API scenarios for plans, curriculum, assignments, submissions, resources, members, uploads, and workspace context pass with real session tokens.
+
+The security-audit module remains `PARTIAL`: audit events and multi-instance session storage are still missing.
+
 本轮审计前 `reference-page-inventory.md`、`user-journeys.md`、`data-model.md`、`permission-matrix.md` 不存在，已按当前项目事实补齐，作为矩阵的引用依据。

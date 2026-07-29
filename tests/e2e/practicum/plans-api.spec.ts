@@ -1,6 +1,17 @@
 import { test, expect } from '@playwright/test'
+import { csrfHeaders } from './csrf'
 
 test.describe('plan API contract', () => {
+  test('[BDD-FOUNDATION-001] authenticated writes without a CSRF token are rejected', async ({ page }) => {
+    const response = await page.request.post('/api/practicum/plans', {
+      headers: { 'Idempotency-Key': `csrf-${Date.now()}` },
+      data: { title: 'CSRF guard', description: 'This request must not create a plan.', roomId: 'room-001' },
+    })
+
+    expect(response.status()).toBe(403)
+    expect((await response.json()).data.code).toBe('CSRF_INVALID')
+  })
+
   test('owner list supports query, pagination and stable response shape', async ({ page }) => {
     const response = await page.request.get('/api/practicum/plans?page=1&pageSize=1&sort=updatedAt&direction=desc')
     expect(response.ok()).toBeTruthy()
@@ -13,8 +24,9 @@ test.describe('plan API contract', () => {
   test('owner create is idempotent and returns a draft', async ({ page }) => {
     const key = `bdd-${Date.now()}`
     const input = { title: `API 计划 ${key}`, description: '用于验证服务端计划写入', roomId: 'room-001' }
-    const first = await page.request.post('/api/practicum/plans', { headers: { 'Idempotency-Key': key }, data: input })
-    const second = await page.request.post('/api/practicum/plans', { headers: { 'Idempotency-Key': key }, data: input })
+    const headers = await csrfHeaders(page, { 'Idempotency-Key': key })
+    const first = await page.request.post('/api/practicum/plans', { headers, data: input })
+    const second = await page.request.post('/api/practicum/plans', { headers, data: input })
     expect(first.status()).toBe(201)
     expect(second.status()).toBe(200)
     const firstBody = await first.json()
@@ -39,11 +51,11 @@ test.describe('plan API contract', () => {
 
   test('owner updates and publishes a plan with version check', async ({ page }) => {
     const key = `publish-${Date.now()}`
-    const created = await page.request.post('/api/practicum/plans', { headers: { 'Idempotency-Key': key }, data: { title: `待发布 ${key}`, description: '完整描述', roomId: 'room-001' } })
+    const created = await page.request.post('/api/practicum/plans', { headers: await csrfHeaders(page, { 'Idempotency-Key': key }), data: { title: `待发布 ${key}`, description: '完整描述', roomId: 'room-001' } })
     const plan = (await created.json()).plan
-    const updated = await page.request.patch(`/api/practicum/plans/${plan.id}`, { data: { description: '更新后的描述', version: plan.version } })
+    const updated = await page.request.patch(`/api/practicum/plans/${plan.id}`, { headers: await csrfHeaders(page), data: { description: '更新后的描述', version: plan.version } })
     expect(updated.ok()).toBeTruthy()
-    const published = await page.request.post(`/api/practicum/plans/${plan.id}/publish`)
+    const published = await page.request.post(`/api/practicum/plans/${plan.id}/publish`, { headers: await csrfHeaders(page) })
     expect(published.ok()).toBeTruthy()
     expect((await published.json()).plan.status).toBe('PUBLISHED')
   })
