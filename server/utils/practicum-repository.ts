@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { seedActivities } from '../../data/practicum/activity-seed'
 import { commerceCaseActivities, commerceCaseNodes } from '../../data/practicum/commerce-case-seed'
 import { seedNodes, seedOrganizations, seedPlans, seedRooms } from '../../data/practicum/seed'
-import type { Activity, CurriculumNode, Organization, Plan, PlanStatus, PrototypeMember, PracticumNotification, ResourceKind, SupportingResource, PracticeSubmissionState, SubmissionVersion, ReviewQueueItem, FeedbackEntry } from '../../domain/practicum/types'
+import type { Activity, ClassroomAssignment, CurriculumNode, Organization, Plan, PlanStatus, PrototypeMember, PracticumNotification, ResourceKind, SupportingResource, PracticeSubmissionState, SubmissionVersion, ReviewQueueItem, FeedbackEntry } from '../../domain/practicum/types'
 import type { AuthUser } from './auth-store'
 
 export interface PersistedPlan extends Plan {
@@ -19,6 +19,7 @@ interface RepositoryState {
   nodes: CurriculumNode[]
   activities: Activity[]
   resources: SupportingResource[]
+  assignments: ClassroomAssignment[]
   members: PrototypeMember[]
   notifications: PracticumNotification[]
   assets: StoredAsset[]
@@ -51,6 +52,7 @@ function initialState(): RepositoryState {
     nodes: [...clone(seedNodes), ...clone(commerceCaseNodes)],
     activities: [...clone(seedActivities), ...clone(commerceCaseActivities)],
     resources: [],
+    assignments: [],
     members: [{ id: 'member-001', label: '学生 001', role: 'STUDENT', group: '未分组' }],
     notifications: [],
     assets: [],
@@ -74,6 +76,7 @@ function readState(): RepositoryState {
         members: parsed.members ?? defaults.members,
         notifications: parsed.notifications ?? defaults.notifications,
         assets: parsed.assets ?? defaults.assets,
+        assignments: parsed.assignments ?? defaults.assignments,
         submissions: parsed.submissions ?? defaults.submissions,
         idempotency: parsed.idempotency ?? defaults.idempotency,
       }
@@ -267,6 +270,41 @@ export function deleteCurriculumNode(user: AuthUser, planId: string, nodeId: str
 
 function ownerOnly(user: AuthUser) {
   return user.role === 'OWNER'
+}
+
+function teachingStaffOnly(user: AuthUser) {
+  return user.role === 'OWNER' || user.role === 'TEACHER' || user.role === 'MENTOR'
+}
+
+export function createAssignment(user: AuthUser, input: { planId: string; title: string; instructions: string; audience: 'ALL_STUDENTS' | 'GROUP'; groupId?: string }, idempotencyKey?: string) {
+  const state = readState()
+  const plan = state.plans.find(item => item.id === input.planId)
+  if (!teachingStaffOnly(user)) return { kind: 'FORBIDDEN' as const }
+  if (!plan || !canAccessRoom(user, plan.roomId)) return { kind: 'NOT_FOUND' as const }
+  const title = input.title.trim()
+  const instructions = input.instructions.trim()
+  if (!title || !instructions || (input.audience === 'GROUP' && !input.groupId?.trim())) return { kind: 'VALIDATION' as const }
+  if (idempotencyKey) {
+    const existing = state.idempotency[`${user.id}:${idempotencyKey}`]
+    if (existing) return { kind: 'OK' as const, replayed: true, assignment: clone(state.assignments.find(item => item.id === existing.entityId)!) }
+  }
+  const assignment: ClassroomAssignment = { id: `assignment-${randomUUID()}`, roomId: plan.roomId, planId: plan.id, title, instructions, audience: input.audience, groupId: input.groupId?.trim(), status: 'DRAFT', authorId: user.id, createdAt: new Date().toISOString() }
+  state.assignments.push(assignment)
+  if (idempotencyKey) state.idempotency[`${user.id}:${idempotencyKey}`] = { userId: user.id, method: 'POST', path: '/assignments', entityId: assignment.id }
+  writeState(state)
+  return { kind: 'CREATED' as const, replayed: false, assignment: clone(assignment) }
+}
+
+export function publishAssignment(user: AuthUser, assignmentId: string) {
+  const state = readState()
+  const assignment = state.assignments.find(item => item.id === assignmentId)
+  if (!teachingStaffOnly(user)) return { kind: 'FORBIDDEN' as const }
+  if (!assignment || !canAccessRoom(user, assignment.roomId)) return { kind: 'NOT_FOUND' as const }
+  if (assignment.status !== 'DRAFT') return { kind: 'STATE' as const }
+  assignment.status = 'PUBLISHED'
+  assignment.publishedAt = new Date().toISOString()
+  writeState(state)
+  return { kind: 'OK' as const, assignment: clone(assignment) }
 }
 
 export function listResources(user: AuthUser, input: { page: number; pageSize: number; keyword: string; kind?: ResourceKind }) {

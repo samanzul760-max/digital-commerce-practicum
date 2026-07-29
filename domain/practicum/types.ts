@@ -8,6 +8,22 @@ export type SubmissionStatus =
   | 'RETURNED'
   | 'GRADED'
 export type ReviewScope = 'PLAN' | 'CLASSROOM'
+export type ClassroomContentStatus = 'DRAFT' | 'PUBLISHED' | 'CLOSED' | 'ARCHIVED'
+export type AssignmentAudience = 'ALL_STUDENTS' | 'GROUP'
+
+export interface ClassroomAssignment {
+  id: string
+  roomId: string
+  planId: string
+  title: string
+  instructions: string
+  audience: AssignmentAudience
+  groupId?: string
+  status: ClassroomContentStatus
+  authorId: string
+  createdAt: string
+  publishedAt?: string
+}
 
 export interface TrainingRoom {
   id: string
