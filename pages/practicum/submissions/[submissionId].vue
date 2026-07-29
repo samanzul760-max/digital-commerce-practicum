@@ -10,6 +10,7 @@
         <div class="plan-header">
           <div>
             <NuxtLink to="/practicum/reviews" class="text-link">返回审核队列</NuxtLink>
+            <NuxtLink v-if="nextReviewId" :to="`/practicum/submissions/${nextReviewId}`" data-next-review class="text-link">批改下一个</NuxtLink>
             <p class="eyebrow">{{ submission.studentLabel ?? '学生 001' }}</p>
             <h1>{{ activityNode.title }}</h1>
           </div>
@@ -132,11 +133,13 @@ const server = usePracticumServer()
 const isLoading = ref(true)
 const loadError = ref(false)
 const serverDetail = ref<Awaited<ReturnType<typeof server.getSubmission>> | null>(null)
+const nextReviewId = ref<string | null>(null)
 async function loadSubmission() {
   isLoading.value = true
   loadError.value = false
   try {
     serverDetail.value = await server.getSubmission(route.params.submissionId as string)
+    await loadNextReview()
   } catch (error: unknown) {
     const status = (error as { status?: number }).status
     if (status && status >= 500) loadError.value = true
@@ -145,6 +148,14 @@ async function loadSubmission() {
   }
 }
 onMounted(loadSubmission)
+async function loadNextReview() {
+  try {
+    const queue = await server.listSubmissions({ status: 'SUBMITTED', sort: 'oldest' })
+    nextReviewId.value = queue.items.find(item => item.submissionId !== submissionId.value)?.submissionId ?? null
+  } catch {
+    nextReviewId.value = null
+  }
+}
 const submissionId = computed(() => route.params.submissionId as string)
 const submission = computed(() => serverDetail.value?.submission ?? null)
 const activityNode = computed(() => serverDetail.value?.node ?? null)

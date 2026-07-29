@@ -88,6 +88,13 @@ test.describe('submission API contract', () => {
     expect(activityResponse.status()).toBe(201)
     const activitySnapshot = await activityResponse.json()
     const activityId = activitySnapshot.nodes.find((node: { level: number }) => node.level === 3).id
+    const nextActivityResponse = await owner.request.post(`/api/practicum/plans/${plan.id}/activities`, {
+      headers: await csrfHeaders(owner),
+      data: { parentId: unit.id, title: 'Next audit practice', type: 'PRACTICE_ACTIVITY', version: activitySnapshot.plan.version },
+    })
+    expect(nextActivityResponse.status()).toBe(201)
+    const nextActivitySnapshot = await nextActivityResponse.json()
+    const nextActivityId = nextActivitySnapshot.nodes.find((node: { id: string; level: number }) => node.level === 3 && node.id !== activityId).id
     expect((await owner.request.post(`/api/practicum/plans/${plan.id}/publish`, { headers: await csrfHeaders(owner) })).status()).toBe(200)
 
     expect((await student.request.post('/api/practicum/submissions', {
@@ -106,6 +113,10 @@ test.describe('submission API contract', () => {
       headers: await csrfHeaders(owner),
       data: { rubricScores: {}, feedback: 'Audit history final grade.' },
     })).status()).toBe(200)
+    expect((await student.request.post('/api/practicum/submissions', {
+      headers: await csrfHeaders(student, { 'Idempotency-Key': `${key}-next-submission` }),
+      data: { activityId: nextActivityId, text: 'Next audit practice submission' },
+    })).status()).toBe(201)
 
     await owner.goto(`/practicum/submissions/${activityId}`)
     const history = owner.locator('[data-audit-history]')
@@ -113,6 +124,7 @@ test.describe('submission API contract', () => {
     await expect(history.locator('[data-audit-event]')).toHaveCount(2)
     await expect(history).toContainText('已退回')
     await expect(history).toContainText('已评分')
+    await expect(owner.locator('[data-next-review]')).toHaveAttribute('href', `/practicum/submissions/${nextActivityId}`)
     await owner.reload()
     await expect(owner.locator('[data-audit-history]')).toContainText('已评分')
 
