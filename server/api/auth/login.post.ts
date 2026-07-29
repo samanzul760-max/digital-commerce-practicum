@@ -1,5 +1,6 @@
-import { createError, defineEventHandler, readBody, setCookie } from 'h3'
+import { createError, defineEventHandler, getRequestProtocol, readBody, setCookie } from 'h3'
 import { AUTH_COOKIE, CSRF_COOKIE, createSession, verifyCredentials } from '../../utils/auth-store'
+import { shouldUseSecureCookies } from '../../utils/auth-cookie'
 
 const attempts = new Map<string, { count: number; resetAt: number }>()
 const WINDOW_MS = 60_000
@@ -26,17 +27,18 @@ export default defineEventHandler(async (event) => {
   }
   attempts.delete(address)
   const session = createSession(user)
+  const secure = shouldUseSecureCookies(getRequestProtocol(event, { xForwardedProto: true }))
   setCookie(event, AUTH_COOKIE, session.token, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure,
     path: '/',
     maxAge: Math.floor((session.expiresAt - Date.now()) / 1000),
   })
   setCookie(event, CSRF_COOKIE, session.csrfToken, {
     httpOnly: false,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure,
     path: '/',
     maxAge: Math.floor((session.expiresAt - Date.now()) / 1000),
   })

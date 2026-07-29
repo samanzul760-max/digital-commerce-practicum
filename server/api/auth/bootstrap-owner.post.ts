@@ -1,5 +1,6 @@
-import { createError, defineEventHandler, readBody, setCookie } from 'h3'
+import { createError, defineEventHandler, getRequestProtocol, readBody, setCookie } from 'h3'
 import { AUTH_COOKIE, CSRF_COOKIE, bootstrapOwner, createSession, type BootstrapOwnerInput } from '../../utils/auth-store'
+import { shouldUseSecureCookies } from '../../utils/auth-cookie'
 
 export default defineEventHandler(async (event) => {
   const result = bootstrapOwner(await readBody<BootstrapOwnerInput>(event))
@@ -10,17 +11,18 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 422, statusMessage: 'BOOTSTRAP_INVALID_INPUT', data: { code: 'BOOTSTRAP_INVALID_INPUT' } })
   }
   const session = createSession(result.user)
+  const secure = shouldUseSecureCookies(getRequestProtocol(event, { xForwardedProto: true }))
   setCookie(event, AUTH_COOKIE, session.token, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure,
     path: '/',
     maxAge: Math.floor((session.expiresAt - Date.now()) / 1000),
   })
   setCookie(event, CSRF_COOKIE, session.csrfToken, {
     httpOnly: false,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure,
     path: '/',
     maxAge: Math.floor((session.expiresAt - Date.now()) / 1000),
   })
