@@ -3,8 +3,8 @@ import { dirname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { seedActivities } from '../../data/practicum/activity-seed'
 import { commerceCaseActivities, commerceCaseNodes } from '../../data/practicum/commerce-case-seed'
-import { seedNodes, seedPlans, seedRoom } from '../../data/practicum/seed'
-import type { Activity, CurriculumNode, Plan, PlanStatus, PrototypeMember, PracticumNotification, ResourceKind, SupportingResource, PracticeSubmissionState, SubmissionVersion, ReviewQueueItem, FeedbackEntry } from '../../domain/practicum/types'
+import { seedNodes, seedOrganizations, seedPlans, seedRooms } from '../../data/practicum/seed'
+import type { Activity, CurriculumNode, Organization, Plan, PlanStatus, PrototypeMember, PracticumNotification, ResourceKind, SupportingResource, PracticeSubmissionState, SubmissionVersion, ReviewQueueItem, FeedbackEntry } from '../../domain/practicum/types'
 import type { AuthUser } from './auth-store'
 
 export interface PersistedPlan extends Plan {
@@ -13,7 +13,8 @@ export interface PersistedPlan extends Plan {
 
 interface RepositoryState {
   schemaVersion: 1
-  rooms: typeof seedRoom[]
+  organizations: Organization[]
+  rooms: typeof seedRooms
   plans: PersistedPlan[]
   nodes: CurriculumNode[]
   activities: Activity[]
@@ -44,7 +45,8 @@ function initialState(): RepositoryState {
   const plans = [...clone(seedPlans), { id: 'case-plan', roomId: 'room-001', title: '实践案例', description: '用于案例实践和审核的公开计划。', status: 'PUBLISHED' as const, sort: 99, moduleIds: [], createdAt: '2026-07-01T08:00:00Z', updatedAt: '2026-07-01T08:00:00Z' }].map(plan => ({ ...plan, version: 1 }))
   return {
     schemaVersion: 1,
-    rooms: [clone(seedRoom)],
+    organizations: clone(seedOrganizations),
+    rooms: clone(seedRooms),
     plans,
     nodes: [...clone(seedNodes), ...clone(commerceCaseNodes)],
     activities: [...clone(seedActivities), ...clone(commerceCaseActivities)],
@@ -65,6 +67,7 @@ function readState(): RepositoryState {
       return {
         ...defaults,
         ...parsed,
+        organizations: parsed.organizations ?? defaults.organizations,
         plans: [...defaults.plans.filter(plan => !parsed.plans.some(item => item.id === plan.id)), ...parsed.plans],
         nodes: [...defaults.nodes.filter(node => !parsed.nodes.some(item => item.id === node.id)), ...parsed.nodes],
         activities: [...defaults.activities.filter(activity => !parsed.activities.some(item => item.id === activity.id)), ...parsed.activities],
@@ -90,6 +93,24 @@ function writeState(state: RepositoryState) {
 
 function canAccessRoom(user: AuthUser, roomId: string) {
   return user.roomIds.includes(roomId)
+}
+
+export function getWorkspaceContext(user: AuthUser, selection?: { organizationId?: string; roomId?: string }) {
+  const state = readState()
+  const rooms = state.rooms.filter(room => canAccessRoom(user, room.id))
+  const organizations = state.organizations
+    .map(organization => ({ ...organization, roomIds: organization.roomIds.filter(roomId => rooms.some(room => room.id === roomId)) }))
+    .filter(organization => organization.roomIds.length > 0)
+  const organization = organizations.find(item => item.id === selection?.organizationId) ?? organizations[0]
+  const room = rooms.find(item => item.id === selection?.roomId && organization?.roomIds.includes(item.id))
+    ?? rooms.find(item => organization?.roomIds.includes(item.id))
+  if (!organization || !room) return null
+  return { organizations: clone(organizations), organization: clone(organization), room: clone(room) }
+}
+
+export function canSelectWorkspaceContext(user: AuthUser, input: { organizationId: string; roomId: string }) {
+  const context = getWorkspaceContext(user, input)
+  return Boolean(context && context.organization.id === input.organizationId && context.room.id === input.roomId)
 }
 
 export function listPlans(user: AuthUser, input: {

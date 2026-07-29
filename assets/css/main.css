@@ -191,6 +191,9 @@ button:disabled, [aria-disabled="true"] { cursor: not-allowed; }
 .context-title { min-width: 0; }
 .context-title strong { display: block; overflow: hidden; font-size: 20px; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
 .context-title span { display: block; overflow: hidden; color: var(--practicum-muted); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-context { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.workspace-context strong, .workspace-context span, .workspace-context small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-context select { min-width: 0; max-width: 100%; }
 .topbar-actions { display: flex; align-items: center; gap: 8px; position: relative; z-index: 30; }
 .notification-wrapper, .profile-wrapper { position: relative; }
 .icon-button {
@@ -616,7 +619,9 @@ tr:last-child td { border-bottom: 0; }
   .workspace-nav { grid-template-columns: repeat(5, minmax(0, 1fr)); padding: 10px 0 0; gap: 6px; overflow-x: auto; }
   .nav-item { justify-content: center; min-width: 72px; min-height: 42px; padding: 0 8px; font-size: 12px; }
   .nav-symbol { display: none; }
-  .workspace-topbar { position: static; padding: 10px 14px; }
+  .workspace-topbar { position: static; height: auto; flex-wrap: wrap; gap: 8px; padding: 10px 14px; }
+  .context-title, .workspace-context { flex: 1 1 150px; }
+  .topbar-actions { margin-left: auto; }
   .workspace-content { min-height: 0; padding: 16px; }
   .page-heading, .section-heading { align-items: start; }
   .side-column { grid-template-columns: 1fr; }

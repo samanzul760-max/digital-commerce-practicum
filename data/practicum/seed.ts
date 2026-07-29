@@ -1,4 +1,4 @@
-import type { CurriculumNode, Plan, TrainingRoom } from '../../domain/practicum/types'
+import type { CurriculumNode, Organization, Plan, TrainingRoom } from '../../domain/practicum/types'
 import { seedModules, seedUnits, seedActivities } from './curriculum-seed'
 import { seedActivityTypes } from './activity-type-seed'
 
@@ -9,7 +9,28 @@ export const seedRoom: TrainingRoom = {
   organizationId: 'org-demo',
   planIds: ['plan-wdds', 'plan-wdsj'],
   status: 'ONLINE',
+  teachingMode: 'TEACHING',
 }
+
+export const seedRooms: TrainingRoom[] = [seedRoom, {
+  id: 'room-002',
+  title: '数据运营实训室',
+  description: '面向数据分析与运营决策的综合实训空间',
+  organizationId: 'org-data',
+  planIds: [],
+  status: 'ONLINE',
+  teachingMode: 'SELF_DIRECTED',
+}]
+
+export const seedOrganizations: Organization[] = [{
+  id: 'org-demo',
+  name: '演示职业学院',
+  roomIds: ['room-001'],
+}, {
+  id: 'org-data',
+  name: '演示职业学院数据中心',
+  roomIds: ['room-002'],
+}]
 
 export const seedPlans: Plan[] = [
   {

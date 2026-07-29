@@ -139,7 +139,23 @@
           </section>
         </section>
 
-        <section v-else data-owner-home>
+        <section v-else-if="store.state.activeRole === 'TEACHER' || store.state.activeRole === 'MENTOR'" data-teacher-home class="profile-page">
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow">教学工作区</p>
+              <h1>教师工作台</h1>
+              <p>课堂作业、公告和授课模式会在教学模块启用后出现在这里。</p>
+            </div>
+          </div>
+          <div class="next-task">
+            <div class="task-meta"><span class="status-pill">已授权</span></div>
+            <h2>查看教学计划</h2>
+            <p>你可以查看当前实训室的已发布计划；管理、发布和批阅权限不会从管理员账号继承。</p>
+            <NuxtLink to="/practicum/cases" class="primary-button">查看可用案例</NuxtLink>
+          </div>
+        </section>
+
+        <section v-else-if="store.state.activeRole === 'OWNER'" data-owner-home>
           <div class="metric-strip">
             <div class="metric"><span>全部计划</span><strong>{{ visiblePlans.length }}</strong><small>{{ publishedPlanCount }} 个已发布</small></div>
             <div class="metric"><span>进行中案例</span><strong>{{ caseCount }}</strong><small>来自案例库与课程活动</small></div>
@@ -252,11 +268,13 @@ const deadlineLabel = computed(() => {
 
 const contextTitle = computed(() => {
   if (store.state.activeRole === 'OWNER') return '总览'
+  if (store.state.activeRole === 'TEACHER' || store.state.activeRole === 'MENTOR') return '教师工作台'
   if (store.state.activeRole === 'STUDENT') return '总览'
   return '实训工作台'
 })
 const contextMeta = computed(() => {
   if (store.state.activeRole === 'OWNER') return '管理教学计划、审核提交与查看数据'
+  if (store.state.activeRole === 'TEACHER' || store.state.activeRole === 'MENTOR') return '查看已授权的实训内容与教学任务'
   if (store.state.activeRole === 'STUDENT') return '数字商贸实训室 · 课程学习与任务提交'
   return '数字商贸实训室 01'
 })

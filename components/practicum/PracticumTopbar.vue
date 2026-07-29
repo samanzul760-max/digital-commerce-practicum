@@ -5,6 +5,22 @@
       <span>{{ contextMeta }}</span>
     </div>
 
+    <div v-if="workspace.state.value.organization && workspace.state.value.room" class="workspace-context" aria-label="当前工作空间">
+      <strong data-current-organization>{{ workspace.state.value.organization.name }}</strong>
+      <span data-current-room>{{ workspace.state.value.room.title }}</span>
+      <small data-current-teaching-mode>{{ workspace.state.value.room.teachingMode === 'TEACHING' ? '教学模式' : '自主学习模式' }}</small>
+      <select
+        v-if="workspace.state.value.organizations.length > 1"
+        data-workspace-context-select
+        :value="workspace.state.value.room.id"
+        aria-label="切换实训室"
+        :disabled="workspace.state.value.loading"
+        @change="handleRoomChange"
+      >
+        <option v-for="option in roomOptions" :key="option.roomId" :value="option.roomId">{{ option.organizationName }} · {{ option.roomTitle }}</option>
+      </select>
+    </div>
+
     <div class="topbar-actions">
       <div class="notification-wrapper">
         <button
@@ -111,7 +127,7 @@
                 <span>班级配置、开放范围和权限边界</span>
               </span>
             </NuxtLink>
-            <button v-if="store.state.activeRole" type="button" data-role-switch class="dropdown-link dropdown-button" role="menuitem" @click="switchRole">
+            <button v-if="store.state.activeRole === 'OWNER' || store.state.activeRole === 'STUDENT'" type="button" data-role-switch class="dropdown-link dropdown-button" role="menuitem" @click="switchRole">
               <span class="dropdown-icon"><PracticumIcon name="switch" /></span>
               <span class="dropdown-copy">
                 <strong>{{ store.state.activeRole === 'OWNER' ? '切换为学生视角' : '切换为管理员视角' }}</strong>
@@ -132,6 +148,7 @@ import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePracticumStore } from '../../composables/usePracticumStore'
 import { useAuthSession } from '../../composables/useAuthSession'
+import { useWorkspaceContext } from '../../composables/useWorkspaceContext'
 
 defineProps<{
   contextTitle: string
@@ -141,12 +158,15 @@ defineProps<{
 const router = useRouter()
 const store = usePracticumStore()
 const auth = useAuthSession()
+const workspace = useWorkspaceContext()
 const notificationOpen = ref(false)
 const profileOpen = ref(false)
 const unreadCount = computed(() => store.notificationsUnread())
 
 const roleLabels = {
   OWNER: '管理员',
+  TEACHER: '教师',
+  MENTOR: '导师',
   STUDENT: '学生',
 } as const
 
@@ -159,6 +179,12 @@ const recentNotifications = computed(() => {
   if (!store.state.activeRole) return []
   return store.notificationsForRole(store.state.activeRole).slice(0, 5)
 })
+
+const roomOptions = computed(() => workspace.state.value.organizations.flatMap(organization => organization.roomIds.map(roomId => ({
+  roomId,
+  organizationName: organization.name,
+  roomTitle: roomId === workspace.state.value.room?.id ? workspace.state.value.room.title : roomId,
+}))))
 
 function closeMenus() {
   notificationOpen.value = false
@@ -186,6 +212,11 @@ function switchRole() {
   router.push('/practicum')
 }
 
+function handleRoomChange(event: Event) {
+  const roomId = (event.target as HTMLSelectElement).value
+  void workspace.selectRoom(roomId)
+}
+
 async function handleLogout() {
   await auth.logout()
   store.resetDemo()
@@ -210,6 +241,9 @@ function onKeydown(e: KeyboardEvent) {
   }
 }
 
-onMounted(() => document.addEventListener('keydown', onKeydown))
+onMounted(() => {
+  document.addEventListener('keydown', onKeydown)
+  void workspace.load()
+})
 onUnmounted(() => document.removeEventListener('keydown', onKeydown))
 </script>

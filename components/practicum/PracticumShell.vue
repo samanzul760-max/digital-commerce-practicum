@@ -45,6 +45,8 @@ const storageError = computed(() => store.storageError.value)
 onMounted(() => store.syncStorageError())
 const roleLabels = {
   OWNER: '管理员',
+  TEACHER: '教师',
+  MENTOR: '导师',
   STUDENT: '学生',
 } as const
 

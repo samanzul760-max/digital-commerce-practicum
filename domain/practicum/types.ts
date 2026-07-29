@@ -1,4 +1,4 @@
-export type PracticumRole = 'OWNER' | 'STUDENT'
+export type PracticumRole = 'OWNER' | 'TEACHER' | 'MENTOR' | 'STUDENT'
 export type PlanStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
 export type ActivityType = 'SOFTWARE_ACTION' | 'TRAINING' | 'PRACTICE_ACTIVITY'
 export type SubmissionStatus =
@@ -16,7 +16,14 @@ export interface TrainingRoom {
   organizationId: string
   planIds: string[]
   status: 'ONLINE' | 'OFFLINE' | 'ENDED'
+  teachingMode: 'TEACHING' | 'SELF_DIRECTED'
   promotionalMediaUrl?: string
+}
+
+export interface Organization {
+  id: string
+  name: string
+  roomIds: string[]
 }
 
 export interface Plan {

@@ -19,6 +19,8 @@ interface StoredUser extends AuthUser {
 interface StoredSession {
   userId: string
   expiresAt: number
+  organizationId?: string
+  roomId?: string
 }
 
 export interface BootstrapOwnerInput {
@@ -39,9 +41,18 @@ const seedUsers: StoredUser[] = [
     identifier: 'owner@example.test',
     displayName: '实训室管理员',
     role: 'OWNER',
-    roomIds: ['room-001'],
+    roomIds: ['room-001', 'room-002'],
     passwordSalt: '43a89244653ebbdf3789eaf29bf58cdc',
     passwordHash: 'f399d8cf9ab72864f3667805c2a28ab84069de9bfac54d9becc5b1071be2ac47',
+  },
+  {
+    id: 'user-teacher-001',
+    identifier: 'teacher@example.test',
+    displayName: '实训教师',
+    role: 'TEACHER',
+    roomIds: ['room-001'],
+    passwordSalt: '7c599df8cb2c1f7f7c575a53cecc6d3f',
+    passwordHash: '6990510e84b79fa3db7a55fa5098c057059040c39c685d6b148b10488c875b10',
   },
   {
     id: 'user-student-001',
@@ -151,6 +162,24 @@ export function getSessionUser(token: string | undefined): AuthUser | null {
   }
   const user = allUsers().find(item => item.id === session.userId)
   return user ? publicUser(user) : null
+}
+
+export function getSessionContext(token: string | undefined) {
+  if (!token) return null
+  const session = readSessions()[token]
+  if (!session || session.expiresAt <= Date.now()) return null
+  return { organizationId: session.organizationId, roomId: session.roomId }
+}
+
+export function setSessionContext(token: string | undefined, context: { organizationId: string; roomId: string }) {
+  if (!token) return false
+  const sessions = readSessions()
+  const session = sessions[token]
+  if (!session || session.expiresAt <= Date.now()) return false
+  session.organizationId = context.organizationId
+  session.roomId = context.roomId
+  writeSessions(sessions)
+  return true
 }
 
 export function revokeSession(token: string | undefined) {

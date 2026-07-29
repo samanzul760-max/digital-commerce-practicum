@@ -15,12 +15,14 @@ import type { PracticumRole } from './types'
 
 // ── 角色定义 ──────────────────────────────────────────────
 
-/** 当前可用的运行时角色。TEACHER 和 MENTOR 标记为待开放。 */
-export const AVAILABLE_ROLES: PracticumRole[] = ['OWNER', 'STUDENT']
+/** 当前可用的运行时角色。 */
+export const AVAILABLE_ROLES: PracticumRole[] = ['OWNER', 'TEACHER', 'MENTOR', 'STUDENT']
 
 /** 角色中文标签 */
 export const ROLE_LABELS: Record<PracticumRole, string> = {
   OWNER: '管理员',
+  TEACHER: '教师',
+  MENTOR: '导师',
   STUDENT: '学生',
 }
 
@@ -60,6 +62,10 @@ export function canAccessRoute(role: PracticumRole | null, routePath: string): b
     // 不能访问编辑页面
     if (EDIT_ROUTE_PATTERN.test(routePath)) return false
     return true
+  }
+
+  if (role === 'TEACHER' || role === 'MENTOR') {
+    return routePath === '/practicum' || routePath.startsWith('/practicum/profile') || routePath.startsWith('/practicum/cases')
   }
 
   return false
@@ -155,7 +161,7 @@ export const NAV_ITEMS: NavItemDef[] = [
     label: '总览',
     icon: 'dashboard',
     to: '/practicum',
-    roles: ['OWNER', 'STUDENT'],
+    roles: ['OWNER', 'TEACHER', 'MENTOR', 'STUDENT'],
     activeMatch: (path) => path === '/practicum',
   },
   {
@@ -175,7 +181,7 @@ export const NAV_ITEMS: NavItemDef[] = [
     label: '案例',
     icon: 'layers',
     to: '/practicum/cases',
-    roles: ['OWNER', 'STUDENT'],
+    roles: ['OWNER', 'TEACHER', 'MENTOR', 'STUDENT'],
     activeMatch: (path) => path.startsWith('/practicum/cases'),
   },
   {

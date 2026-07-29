@@ -85,7 +85,8 @@ const router = useRouter()
 const identifier = ref('')
 const password = ref('')
 
-const roleLabel = computed(() => auth.state.value.user?.role === 'OWNER' ? '管理员' : '学生')
+const roleLabels = { OWNER: '管理员', TEACHER: '教师', MENTOR: '导师', STUDENT: '学生' } as const
+const roleLabel = computed(() => auth.state.value.user ? roleLabels[auth.state.value.user.role] : '')
 
 onMounted(() => auth.load())
 
