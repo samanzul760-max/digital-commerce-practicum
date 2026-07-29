@@ -41,3 +41,11 @@ When OWNER 撤回发布该计划
 Then 计划返回 `DRAFT`
 And STUDENT 的计划列表不再包含该计划
 And STUDENT 直达该计划详情返回 `PLAN_FORBIDDEN`
+
+## BDD-PLAN-019 计划详情从服务端快照加载
+
+Given OWNER 已在服务端创建一个草稿计划且当前浏览器本地没有该计划
+When OWNER 打开该计划详情页
+Then 页面显示服务端返回的计划标题和目录快照
+
+And 页面不依赖浏览器本地计划列表来判定计划是否存在

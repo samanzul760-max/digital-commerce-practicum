@@ -3,9 +3,7 @@
     <PracticumShell :context-title="plan?.title ?? '教学计划'" :context-meta="planMeta">
       <p v-if="isLoading" data-loading class="empty-state">正在加载计划详情...</p>
 
-      <div v-else-if="plan && !canViewPlan(store.state.activeRole, plan.status)" data-forbidden class="empty-state">
-        该计划暂未发布，无法查看。
-      </div>
+      <p v-else-if="!plan || loadError" data-empty class="empty-state">计划未找到或无权查看。</p>
 
       <div v-else data-plan-detail>
         <div class="plan-header">
@@ -16,7 +14,6 @@
           <span v-if="plan" class="status-pill" :class="plan.status === 'DRAFT' ? 'status-pill-orange' : ''">
             {{ planStatusLabel }}
           </span>
-          <NuxtLink v-if="canReview(store.state.activeRole) && planReview" data-plan-review-link :to="`/practicum/submissions/${planReview.submissionId}`" class="primary-button">打开计划审核</NuxtLink>
         </div>
 
         <div v-if="plan && plan.description === '内容待授权导入'" data-plan-pending class="empty-state">
@@ -76,23 +73,25 @@
 
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
-import type { ActivityType } from '../../../../domain/practicum/types'
-import { usePracticumStore } from '../../../../composables/usePracticumStore'
-import { canReview, canViewPlan } from '../../../../domain/practicum/permissions'
+import type { ActivityType, CurriculumNode, Plan } from '../../../../domain/practicum/types'
 
 const route = useRoute()
-const store = usePracticumStore()
 const isLoading = ref(true)
-onMounted(() => { isLoading.value = false })
+const loadError = ref(false)
 const planId = computed(() => route.params.planId as string)
-const plan = computed(() => store.state.plans.find(item => item.id === planId.value) ?? null)
-const planNodes = computed(() => store.getPlanNodes(planId.value))
+type ServerPlan = Plan & { version: number }
+interface PlanSnapshot {
+  plan: ServerPlan
+  nodes: CurriculumNode[]
+}
+const snapshot = ref<PlanSnapshot | null>(null)
+const plan = computed(() => snapshot.value?.plan ?? null)
+const planNodes = computed(() => snapshot.value?.nodes ?? [])
 const modules = computed(() => planNodes.value.filter(node => node.level === 1).sort((a, b) => a.sort - b.sort))
 const unitCount = computed(() => planNodes.value.filter(node => node.level === 2).length)
 const activityCount = computed(() => planNodes.value.filter(node => node.level === 3).length)
 const planStatusLabel = computed(() => plan.value?.status === 'PUBLISHED' ? '已发布' : plan.value?.status === 'ARCHIVED' ? '已归档' : '草稿')
 const planMeta = computed(() => `${planStatusLabel.value} · ${modules.value.length} 模块 · ${unitCount.value} 单元 · ${activityCount.value} 活动`)
-const planReview = computed(() => store.getReviewQueue().find(item => item.planId === planId.value && item.status === 'SUBMITTED') ?? null)
 const expanded = ref<Set<string>>(new Set())
 const showModuleForm = ref(false)
 const createUnitFor = ref<string | null>(null)
@@ -119,9 +118,40 @@ function activityTypeLabel(type?: ActivityType) {
   return '实践活动'
 }
 
-function handleCreateModule() {
+async function loadPlan() {
+  isLoading.value = true
+  loadError.value = false
+  try {
+    snapshot.value = await $fetch<PlanSnapshot>(`/api/practicum/plans/${encodeURIComponent(planId.value)}`, {
+      headers: import.meta.server ? useRequestHeaders(['cookie']) : undefined,
+    })
+  } catch {
+    snapshot.value = null
+    loadError.value = true
+  } finally {
+    isLoading.value = false
+  }
+}
+
+async function createNode(parentId: string | null, level: 1 | 2) {
+  if (!plan.value || !newNodeTitle.value.trim()) return false
+  try {
+    const result = await $fetch<PlanSnapshot>(`/api/practicum/plans/${encodeURIComponent(plan.value.id)}/nodes`, {
+      method: 'POST',
+      headers: useCsrfHeaders({ 'Idempotency-Key': `plan-node-${Date.now()}` }),
+      body: { parentId, level, title: newNodeTitle.value.trim(), version: plan.value.version },
+    })
+    snapshot.value = result
+    return true
+  } catch {
+    loadError.value = true
+    return false
+  }
+}
+
+async function handleCreateModule() {
   if (!newNodeTitle.value.trim() || !plan.value) return
-  store.addNode({ planId: plan.value.id, parentId: null, level: 1, title: newNodeTitle.value.trim() })
+  if (!await createNode(null, 1)) return
   newNodeTitle.value = ''
   showModuleForm.value = false
 }
@@ -131,10 +161,12 @@ function openCreateUnit(moduleId: string) {
   newNodeTitle.value = ''
 }
 
-function handleCreateUnit(moduleId: string) {
+async function handleCreateUnit(moduleId: string) {
   if (!newNodeTitle.value.trim() || !plan.value) return
-  store.addNode({ planId: plan.value.id, parentId: moduleId, level: 2, title: newNodeTitle.value.trim() })
+  if (!await createNode(moduleId, 2)) return
   newNodeTitle.value = ''
   createUnitFor.value = null
 }
+
+onMounted(loadPlan)
 </script>

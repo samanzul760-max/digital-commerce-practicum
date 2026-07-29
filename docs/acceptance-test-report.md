@@ -67,6 +67,8 @@ Plan withdrawal TDD: `BDD-PLAN-018` first failed with `404` because `/withdraw` 
 
 Custom activity TDD: `BDD-CURRICULUM-003` first failed with `404` because the activities route did not exist. After implementation and an idempotency-order correction, `curriculum-api.spec.ts` passed 4/4. This verifies the server contract only; the editor still creates activities through the local store.
 
+Plan detail server-source TDD: `BDD-PLAN-019` first displayed `计划未找到` for a plan created through the API. After replacing the detail page's local plan lookup with the server snapshot, `plan-server-source.spec.ts` passed 1/1. The page now also writes first- and second-level directories through the server API.
+
 只有命令退出码为 0 且输出明确显示无失败用例，才能将对应行标记为 PASS。任何命令因端口占用、超时、启动失败或浏览器错误结束，都标记为 FAIL/未完成并记录原因。
 
 ## 本轮提交审核来源验收
