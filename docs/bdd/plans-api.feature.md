@@ -33,3 +33,11 @@ And 发布成功后状态变为 `PUBLISHED`
 Given 计划已经归档
 When 任意用户尝试再次编辑或发布
 Then 服务端返回 `PLAN_STATE_INVALID`
+
+## BDD-PLAN-018 撤回发布后学生不能读取计划
+
+Given OWNER 已发布一个计划且 STUDENT 可以读取该计划
+When OWNER 撤回发布该计划
+Then 计划返回 `DRAFT`
+And STUDENT 的计划列表不再包含该计划
+And STUDENT 直达该计划详情返回 `PLAN_FORBIDDEN`

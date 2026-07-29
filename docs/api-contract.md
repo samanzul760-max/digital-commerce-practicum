@@ -47,6 +47,7 @@ Missing, expired, or mismatched tokens return `403 CSRF_INVALID` with `{ data: {
 | GET | `/api/practicum/plans/:planId` | 计划详情及目录 | 所属实训室；学生只读已发布 |
 | PATCH | `/api/practicum/plans/:planId` | 带 `version` 的乐观锁更新 | OWNER、仅草稿 |
 | POST | `/api/practicum/plans/:planId/publish` | 草稿发布 | OWNER |
+| POST | `/api/practicum/plans/:planId/withdraw` | 撤回已发布计划，恢复为草稿 | OWNER |
 | POST | `/api/practicum/plans/:planId/archive` | 已发布计划归档 | OWNER |
 
 ## 资源、成员和辅助能力

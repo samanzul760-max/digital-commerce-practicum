@@ -562,15 +562,16 @@ export function updatePlan(user: AuthUser, planId: string, input: { title?: stri
   return { kind: 'OK' as const, plan: clone(plan) }
 }
 
-export function transitionPlan(user: AuthUser, planId: string, action: 'publish' | 'archive') {
+export function transitionPlan(user: AuthUser, planId: string, action: 'publish' | 'withdraw' | 'archive') {
   const state = readState()
   const plan = state.plans.find(item => item.id === planId)
   if (!plan || !canAccessRoom(user, plan.roomId)) return { kind: 'NOT_FOUND' as const }
   if (user.role !== 'OWNER') return { kind: 'FORBIDDEN' as const }
   if (action === 'publish' && plan.status !== 'DRAFT') return { kind: 'STATE' as const }
+  if (action === 'withdraw' && plan.status !== 'PUBLISHED') return { kind: 'STATE' as const }
   if (action === 'archive' && plan.status !== 'PUBLISHED') return { kind: 'STATE' as const }
   if (action === 'publish' && (!plan.title || !plan.description)) return { kind: 'VALIDATION' as const }
-  plan.status = action === 'publish' ? 'PUBLISHED' : 'ARCHIVED'
+  plan.status = action === 'publish' ? 'PUBLISHED' : action === 'withdraw' ? 'DRAFT' : 'ARCHIVED'
   plan.version += 1
   plan.updatedAt = new Date().toISOString()
   writeState(state)

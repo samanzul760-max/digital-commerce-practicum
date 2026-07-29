@@ -59,4 +59,32 @@ test.describe('plan API contract', () => {
     expect(published.ok()).toBeTruthy()
     expect((await published.json()).plan.status).toBe('PUBLISHED')
   })
+
+  test('[BDD-PLAN-018] withdrawing a published plan removes student visibility', async ({ page, browser }) => {
+    const key = `withdraw-${Date.now()}`
+    const created = await page.request.post('/api/practicum/plans', {
+      headers: await csrfHeaders(page, { 'Idempotency-Key': key }),
+      data: { title: `Withdraw ${key}`, description: 'Verify student visibility is revoked.', roomId: 'room-001' },
+    })
+    const plan = (await created.json()).plan
+    const published = await page.request.post(`/api/practicum/plans/${plan.id}/publish`, { headers: await csrfHeaders(page) })
+    expect(published.status()).toBe(200)
+
+    const studentContext = await browser.newContext()
+    const student = await studentContext.newPage()
+    const login = await student.request.post('/api/auth/login', { data: { identifier: 'student@example.test', password: 'StudentPass123!' } })
+    expect(login.status()).toBe(200)
+    expect((await student.request.get(`/api/practicum/plans/${plan.id}`)).status()).toBe(200)
+
+    const withdrawn = await page.request.post(`/api/practicum/plans/${plan.id}/withdraw`, { headers: await csrfHeaders(page) })
+    expect(withdrawn.status()).toBe(200)
+    expect((await withdrawn.json()).plan.status).toBe('DRAFT')
+    const studentList = await student.request.get('/api/practicum/plans?status=PUBLISHED')
+    expect(studentList.status()).toBe(200)
+    await expect(studentList.json()).resolves.toEqual(expect.objectContaining({ items: expect.not.arrayContaining([expect.objectContaining({ id: plan.id })]) }))
+    const detail = await student.request.get(`/api/practicum/plans/${plan.id}`)
+    expect(detail.status()).toBe(403)
+    expect((await detail.json()).data.code).toBe('PLAN_FORBIDDEN')
+    await studentContext.close()
+  })
 })
