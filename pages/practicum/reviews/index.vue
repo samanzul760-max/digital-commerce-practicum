@@ -86,7 +86,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import type { SubmissionStatus } from '~/domain/practicum/types'
 import { usePracticumStore } from '~/composables/usePracticumStore'
 import { canReview } from '~/domain/practicum/permissions'
@@ -97,22 +97,38 @@ const server = usePracticumServer()
 const isLoading = ref(true)
 const loadError = ref(false)
 const serverQueue = ref<Awaited<ReturnType<typeof server.listSubmissions>>['items']>([])
-onMounted(async () => {
-  try {
-    serverQueue.value = (await server.listSubmissions()).items
-  } catch {
-    loadError.value = true
-  } finally {
-    isLoading.value = false
-  }
-})
-// An empty server response is authoritative; never expose stale browser-only submissions.
-const queue = computed(() => serverQueue.value)
 const planFilter = ref('')
 const unitFilter = ref('')
 const statusFilter = ref('')
 const studentFilter = ref('')
 const sortOrder = ref<'oldest' | 'newest'>('oldest')
+
+async function loadQueue() {
+  try {
+    loadError.value = false
+    serverQueue.value = (await server.listSubmissions({
+      planId: planFilter.value || undefined,
+      unitId: unitFilter.value || undefined,
+      status: statusFilter.value || undefined,
+      student: studentFilter.value.trim() || undefined,
+      sort: sortOrder.value,
+    })).items
+  } catch {
+    loadError.value = true
+  } finally {
+    isLoading.value = false
+  }
+}
+
+onMounted(() => {
+  void loadQueue()
+})
+
+watch([planFilter, unitFilter, statusFilter, studentFilter, sortOrder], () => {
+  void loadQueue()
+})
+// An empty server response is authoritative; never expose stale browser-only submissions.
+const queue = computed(() => serverQueue.value)
 const reviewScope = ref<'PLAN' | 'CLASSROOM'>('PLAN')
 const processingState = ref<'ALL' | 'PENDING' | 'REVIEWED'>('ALL')
 const planOptions = computed(() => uniqueOptions(queue.value.map(item => ({ id: item.planId, label: item.planTitle }))))

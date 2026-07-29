@@ -6,10 +6,20 @@ export interface SubmissionDetail {
   activity: Activity
 }
 
+export interface SubmissionQuery {
+  status?: string
+  planId?: string
+  unitId?: string
+  student?: string
+  sort?: 'oldest' | 'newest'
+}
+
 export function usePracticumServer() {
-  async function listSubmissions(status?: string) {
-    const query = status ? `?status=${encodeURIComponent(status)}` : ''
-    return await $fetch<{ items: ReviewQueueItem[]; total: number }>(`/api/practicum/submissions${query}`)
+  async function listSubmissions(input: SubmissionQuery = {}) {
+    const query = new URLSearchParams(Object.entries(input)
+      .filter(([, value]) => value)
+      .map(([key, value]) => [key, String(value)])).toString()
+    return await $fetch<{ items: ReviewQueueItem[]; total: number }>(`/api/practicum/submissions${query ? `?${query}` : ''}`)
   }
 
   async function getSubmission(activityId: string) {
