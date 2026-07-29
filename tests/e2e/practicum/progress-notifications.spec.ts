@@ -154,7 +154,7 @@ test('[ASSUME-S5-001] student progress shows rubric-dimension results', async ({
 
   // Navigate to progress page
   await page.goto('/practicum/progress')
-  await page.waitForSelector('[data-student-progress]')
+  await page.waitForSelector('[data-student-growth]')
 
   // Rubric results section must be visible (may show empty state if no graded submissions)
   await expect(page.locator('[data-rubric-results]')).toBeVisible()
@@ -294,6 +294,77 @@ test('[ASSUME-S5-001] CSV export requires two-step confirmation', async ({ page 
 
   // Cancel button should be visible
   await expect(page.locator('[data-export-cancel]')).toBeVisible()
+})
+
+/**
+ * Given a student opens the progress page
+ * When the page loads
+ * Then the growth radar chart and six-dimension cards are visible
+ */
+test('[ASSUME-S5-001] student progress page shows growth data with radar chart and dimension cards', async ({ page }) => {
+  await page.goto('/practicum/profile')
+  await page.locator('[data-role-option="STUDENT"]').click()
+  await page.waitForURL('**/practicum')
+
+  await page.goto('/practicum/progress')
+  await page.waitForSelector('[data-student-growth]')
+
+  // Growth overview section with radar chart must be visible
+  await expect(page.locator('[data-growth-overview]')).toBeVisible()
+
+  // The SVG radar chart must be present
+  await expect(page.locator('[data-radar-chart]')).toBeVisible()
+
+  // Growth dimension cards grid must be present
+  await expect(page.locator('[data-growth-dimensions]')).toBeVisible()
+
+  // At least 6 dimension cards (one per skill area)
+  const dimCards = page.locator('[data-growth-dim]')
+  const count = await dimCards.count()
+  expect(count).toBeGreaterThanOrEqual(6)
+})
+
+/**
+ * Given an owner views the progress page
+ * When the page loads
+ * Then the owner sees OWNER-specific content, not student growth data
+ */
+test('[ASSUME-S5-001] owner progress page does not show student growth data', async ({ page }) => {
+  await page.goto('/practicum/profile')
+  await page.locator('[data-role-option="OWNER"]').click()
+  await page.waitForURL('**/practicum')
+
+  await page.goto('/practicum/progress')
+  await page.waitForSelector('[data-owner-progress]')
+
+  // Owner view must NOT contain student growth data
+  await expect(page.locator('[data-student-growth]')).toHaveCount(0)
+  await expect(page.locator('[data-radar-chart]')).toHaveCount(0)
+
+  // Owner sees their own sections
+  await expect(page.locator('[data-class-completion]')).toBeVisible()
+})
+
+/**
+ * Given a student opens the progress page with no graded submissions
+ * When growth data loads
+ * Then the radar chart and dimension cards are still rendered (with zero scores from seed data)
+ */
+test('[ASSUME-S5-001] student progress shows growth dimensions even with no graded submissions', async ({ page }) => {
+  await page.goto('/practicum/profile')
+  await page.locator('[data-role-option="STUDENT"]').click()
+  await page.waitForURL('**/practicum')
+
+  await page.goto('/practicum/progress')
+  await page.waitForSelector('[data-student-growth]')
+
+  // Growth overview and dimensions must be visible
+  await expect(page.locator('[data-growth-overview]')).toBeVisible()
+  await expect(page.locator('[data-radar-chart]')).toBeVisible()
+
+  // All 6 dimension cards must be present
+  const dimCards = page.locator('[data-growth-dim]')
+  await expect(dimCards).toHaveCount(6)
 })
 
 /**

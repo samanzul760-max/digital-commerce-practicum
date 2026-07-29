@@ -5,6 +5,13 @@ import { seedActivities } from '../data/practicum/activity-seed'
 import { commerceCaseActivities, commerceCaseNodes, commerceCases } from '../data/practicum/commerce-case-seed'
 import { canEditPlan, canManageMembers, canManageResources, canManageRoomSettings, canReview, canSubmitWork, canViewPlan } from '../domain/practicum/permissions'
 
+export interface GrowthDimension {
+  key: string
+  label: string
+  score: number
+  maxScore: number
+}
+
 interface PracticumState {
   schemaVersion: 1
   activeRole: PracticumRole | null
@@ -813,6 +820,72 @@ export function usePracticumStore() {
     return rows.sort((a, b) => a.avgPercent - b.avgPercent)
   }
 
+  const GROWTH_DIMENSION_DEFS = [
+    { key: 'product-analysis', label: '商品分析', moduleId: 'mod-02' },
+    { key: 'store-ops', label: '店铺运营', moduleId: 'mod-01' },
+    { key: 'marketing', label: '营销策划', moduleId: 'mod-04' },
+    { key: 'data-analysis', label: '数据分析', moduleId: 'mod-06' },
+    { key: 'customer-service', label: '客户服务', moduleId: 'mod-05' },
+    { key: 'logistics', label: '物流管理', moduleId: 'mod-03' },
+  ] as const
+
+  function getGrowthData(studentId: string): { dimensions: GrowthDimension[]; hasData: boolean; loading: boolean } {
+    const plan = state.plans.find(p => p.status === 'PUBLISHED')
+    if (!plan) return { dimensions: [], hasData: false, loading: false }
+
+    const results: GrowthDimension[] = []
+    let totalHasData = false
+
+    for (const def of GROWTH_DIMENSION_DEFS) {
+      const unitIds = new Set(
+        state.nodes
+          .filter(n => n.planId === plan.id && n.parentId === def.moduleId && n.level === 2)
+          .map(n => n.id)
+      )
+      const moduleActivityIds = state.nodes
+        .filter(n => n.planId === plan.id && n.level === 3 && n.parentId && unitIds.has(n.parentId))
+        .map(n => n.id)
+
+      // Rubric-based score (70% weight): average percentage from graded PRACTICE_ACTIVITY submissions
+      let rubricPct = 0
+      let rubricCount = 0
+      for (const [nodeId, submission] of Object.entries(state.practiceSubmissions)) {
+        if (submission.studentId !== studentId || submission.status !== 'GRADED' || !submission.grade) continue
+        if (!moduleActivityIds.includes(nodeId)) continue
+        const activity = getActivityByNodeId(nodeId)
+        if (activity?.config.type !== 'PRACTICE_ACTIVITY') continue
+        const rubric = activity.config.rubric
+        if (!rubric.length) continue
+        const dimScores = rubric.map(d => {
+          const score = submission.grade!.rubricScores[d.id] ?? 0
+          return d.maxScore > 0 ? (score / d.maxScore) * 100 : 0
+        })
+        rubricPct += dimScores.reduce((a, b) => a + b, 0) / dimScores.length
+        rubricCount++
+        totalHasData = true
+      }
+      const rubricAvg = rubricCount > 0 ? rubricPct / rubricCount : 0
+
+      // Completion-based score (30% weight): percentage of activities completed
+      const totalActivities = moduleActivityIds.length
+      const completed = moduleActivityIds.filter(id => isActivityComplete(id)).length
+      const completionPct = totalActivities > 0 ? (completed / totalActivities) * 100 : 0
+
+      let score: number
+      if (rubricCount > 0) {
+        score = Math.round(rubricAvg * 0.7 + completionPct * 0.3)
+      } else if (totalActivities > 0) {
+        score = Math.round(completionPct)
+      } else {
+        score = 0
+      }
+
+      results.push({ key: def.key, label: def.label, score, maxScore: 100 })
+    }
+
+    return { dimensions: results, hasData: totalHasData, loading: false }
+  }
+
   function archivePlan(planId: string) {
     const plan = state.plans.find(item => item.id === planId)
     if (plan) {
@@ -879,6 +952,7 @@ export function usePracticumStore() {
     isActivityComplete,
     getStudentRubricResults,
     getWeakRubricDimensions,
+    getGrowthData,
     notificationsUnread,
     addNotification,
     checkDeadlines,
