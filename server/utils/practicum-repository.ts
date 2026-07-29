@@ -398,6 +398,16 @@ export function publishAssignment(user: AuthUser, assignmentId: string) {
   return { kind: 'OK' as const, assignment: clone(assignment) }
 }
 
+export function listAssignments(user: AuthUser) {
+  const state = readState()
+  const items = state.assignments
+    .filter(assignment => canAccessRoom(user, assignment.roomId))
+    .filter(assignment => user.role !== 'STUDENT' || assignment.status === 'PUBLISHED')
+    .filter(assignment => user.role !== 'STUDENT' || assignment.audience === 'ALL_STUDENTS')
+    .sort((left, right) => (right.publishedAt ?? right.createdAt).localeCompare(left.publishedAt ?? left.createdAt))
+  return { items: clone(items) }
+}
+
 export function listResources(user: AuthUser, input: { page: number; pageSize: number; keyword: string; kind?: ResourceKind }) {
   const state = readState()
   if (!ownerOnly(user)) return { forbidden: true as const }

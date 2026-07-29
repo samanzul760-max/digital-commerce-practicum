@@ -24,4 +24,27 @@ test.describe('classroom assignment API contract', () => {
     expect((await replayed.json()).assignment.id).toBe(assignment.id)
     await context.close()
   })
+
+  test('[BDD-TEACHER-004] published classroom assignments are visible to an authorized student after refresh', async ({ browser }) => {
+    const teacherContext = await browser.newContext()
+    const teacher = await teacherContext.newPage()
+    expect((await teacher.request.post('/api/auth/login', { data: { identifier: 'teacher@example.test', password: 'TeacherPass123!' } })).status()).toBe(200)
+
+    const created = await teacher.request.post('/api/practicum/assignments', {
+      headers: await csrfHeaders(teacher, { 'Idempotency-Key': `student-todo-${Date.now()}` }),
+      data: { planId: 'plan-wdds', title: 'Server assignment for student', instructions: 'Complete the server-backed classroom assignment.', audience: 'ALL_STUDENTS' },
+    })
+    expect(created.status()).toBe(201)
+    const assignment = (await created.json()).assignment
+    expect((await teacher.request.post(`/api/practicum/assignments/${assignment.id}/publish`, { headers: await csrfHeaders(teacher) })).status()).toBe(200)
+
+    const studentContext = await browser.newContext()
+    const student = await studentContext.newPage()
+    expect((await student.request.post('/api/auth/login', { data: { identifier: 'student@example.test', password: 'StudentPass123!' } })).status()).toBe(200)
+    const list = await student.request.get('/api/practicum/assignments')
+    expect(list.status()).toBe(200)
+    expect((await list.json()).items).toEqual(expect.arrayContaining([expect.objectContaining({ id: assignment.id, status: 'PUBLISHED' })]))
+    await studentContext.close()
+    await teacherContext.close()
+  })
 })
