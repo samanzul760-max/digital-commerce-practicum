@@ -142,6 +142,10 @@ test.describe('submission API contract', () => {
     expect(unitBody.items).toEqual(expect.arrayContaining([expect.objectContaining({ unitId: first.unit.id, activityId: first.activity.id })]))
     expect(unitBody.items).not.toEqual(expect.arrayContaining([expect.objectContaining({ unitId: second.unit.id, activityId: second.activity.id })]))
 
+    const newestFirst = await owner.request.get('/api/practicum/submissions?sort=newest')
+    expect(newestFirst.status()).toBe(200)
+    expect((await newestFirst.json()).items.slice(0, 2).map((item: { activityId: string }) => item.activityId)).toEqual([second.activity.id, first.activity.id])
+
     await owner.goto('/practicum/reviews')
     await expect(owner.locator('[data-review-queue]')).toBeVisible()
     await owner.locator('[data-plan-filter]').selectOption(first.plan.id)

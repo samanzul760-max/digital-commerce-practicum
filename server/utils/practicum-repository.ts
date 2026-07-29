@@ -532,7 +532,7 @@ function appendNotification(state: RepositoryState, notification: PracticumNotif
   state.notifications.unshift(notification)
 }
 
-export function listSubmissions(user: AuthUser, input: { status?: string; planId?: string; unitId?: string; page: number; pageSize: number }) {
+export function listSubmissions(user: AuthUser, input: { status?: string; planId?: string; unitId?: string; sort?: 'oldest' | 'newest'; page: number; pageSize: number }) {
   const state = readState()
   if (user.role !== 'OWNER') return { forbidden: true as const }
   const items: ReviewQueueItem[] = Object.entries(state.submissions).flatMap(([activityId, submission]) => {
@@ -558,6 +558,10 @@ export function listSubmissions(user: AuthUser, input: { status?: string; planId
       status: submission.status,
       reviewScope: submission.reviewScope ?? 'PLAN',
     }]
+  })
+  items.sort((left, right) => {
+    const difference = new Date(left.submittedAt).getTime() - new Date(right.submittedAt).getTime()
+    return input.sort === 'newest' ? -difference : difference
   })
   const total = items.length
   const totalPages = Math.max(1, Math.ceil(total / input.pageSize))
