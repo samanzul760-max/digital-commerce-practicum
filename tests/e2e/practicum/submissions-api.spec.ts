@@ -51,6 +51,75 @@ test.describe('submission API contract', () => {
     await ownerContext.close()
   })
 
+  test('[BDD-REVIEW-011] owner sees server audit history after return and final grading', async ({ browser }) => {
+    const studentContext = await browser.newContext()
+    const student = await studentContext.newPage()
+    expect((await student.request.post('/api/auth/login', { data: { identifier: 'student@example.test', password: 'StudentPass123!' } })).status()).toBe(200)
+
+    const ownerContext = await browser.newContext()
+    const owner = await ownerContext.newPage()
+    expect((await owner.request.post('/api/auth/login', { data: { identifier: 'owner@example.test', password: 'OwnerPass123!' } })).status()).toBe(200)
+
+    const key = `audit-history-${Date.now()}`
+    const planResponse = await owner.request.post('/api/practicum/plans', {
+      headers: await csrfHeaders(owner, { 'Idempotency-Key': key }),
+      data: { roomId: 'room-001', title: `Audit history ${key}`, description: 'Isolated review audit evidence.' },
+    })
+    expect(planResponse.status()).toBe(201)
+    const plan = (await planResponse.json()).plan
+    const moduleResponse = await owner.request.post(`/api/practicum/plans/${plan.id}/nodes`, {
+      headers: await csrfHeaders(owner),
+      data: { title: 'Audit module', level: 1, parentId: null, version: plan.version },
+    })
+    expect(moduleResponse.status()).toBe(201)
+    const moduleSnapshot = await moduleResponse.json()
+    const module = moduleSnapshot.nodes.find((node: { level: number }) => node.level === 1)
+    const unitResponse = await owner.request.post(`/api/practicum/plans/${plan.id}/nodes`, {
+      headers: await csrfHeaders(owner),
+      data: { title: 'Audit unit', level: 2, parentId: module.id, version: moduleSnapshot.plan.version },
+    })
+    expect(unitResponse.status()).toBe(201)
+    const unitSnapshot = await unitResponse.json()
+    const unit = unitSnapshot.nodes.find((node: { level: number }) => node.level === 2)
+    const activityResponse = await owner.request.post(`/api/practicum/plans/${plan.id}/activities`, {
+      headers: await csrfHeaders(owner),
+      data: { parentId: unit.id, title: 'Audit practice', type: 'PRACTICE_ACTIVITY', version: unitSnapshot.plan.version },
+    })
+    expect(activityResponse.status()).toBe(201)
+    const activitySnapshot = await activityResponse.json()
+    const activityId = activitySnapshot.nodes.find((node: { level: number }) => node.level === 3).id
+    expect((await owner.request.post(`/api/practicum/plans/${plan.id}/publish`, { headers: await csrfHeaders(owner) })).status()).toBe(200)
+
+    expect((await student.request.post('/api/practicum/submissions', {
+      headers: await csrfHeaders(student, { 'Idempotency-Key': `${key}-submission` }),
+      data: { activityId, text: 'Audit history first version' },
+    })).status()).toBe(201)
+    expect((await owner.request.post(`/api/practicum/submissions/${activityId}/return`, {
+      headers: await csrfHeaders(owner),
+      data: { feedback: 'Please add evidence for the audit history.' },
+    })).status()).toBe(200)
+    expect((await student.request.post('/api/practicum/submissions', {
+      headers: await csrfHeaders(student),
+      data: { activityId, text: 'Audit history revised version' },
+    })).status()).toBe(201)
+    expect((await owner.request.post(`/api/practicum/submissions/${activityId}/grade`, {
+      headers: await csrfHeaders(owner),
+      data: { rubricScores: {}, feedback: 'Audit history final grade.' },
+    })).status()).toBe(200)
+
+    await owner.goto(`/practicum/submissions/${activityId}`)
+    const history = owner.locator('[data-audit-history]')
+    await expect(history).toBeVisible()
+    await expect(history.locator('[data-audit-event]')).toHaveCount(2)
+    await expect(history).toContainText('已退回')
+    await expect(history).toContainText('已评分')
+    await owner.reload()
+    await expect(owner.locator('[data-audit-history]')).toContainText('已评分')
+
+    await studentContext.close()
+    await ownerContext.close()
+  })
+
   test('student cannot read the manager review queue', async ({ browser }) => {
     const context = await browser.newContext()
     const page = await context.newPage()

@@ -49,6 +49,17 @@
           <time data-grade-time>{{ formatTime(submission.grade.createdAt) }}</time>
         </section>
 
+        <section data-audit-history class="form-panel">
+          <h2>批阅审计记录</h2>
+          <div v-if="auditEvents.length" class="plan-list">
+            <article v-for="event in auditEvents" :key="event.id" data-audit-event class="plan-row">
+              <div><strong>{{ auditLabel(event.action) }}</strong><span>审核者：{{ event.actorId }}</span></div>
+              <time>{{ formatTime(event.createdAt) }}</time>
+            </article>
+          </div>
+          <p v-else class="empty-state">暂无批阅审计记录。</p>
+        </section>
+
         <section v-if="submission.status === 'GRADED'" data-graded-indicator class="form-panel" style="background: var(--practicum-teal-soft); border-color: var(--practicum-teal);">
           <p><strong>此提交已定稿。</strong>评分和反馈为最终结果，不可修改。</p>
         </section>
@@ -121,7 +132,9 @@ const server = usePracticumServer()
 const isLoading = ref(true)
 const loadError = ref(false)
 const serverDetail = ref<Awaited<ReturnType<typeof server.getSubmission>> | null>(null)
-onMounted(async () => {
+async function loadSubmission() {
+  isLoading.value = true
+  loadError.value = false
   try {
     serverDetail.value = await server.getSubmission(route.params.submissionId as string)
   } catch (error: unknown) {
@@ -130,11 +143,13 @@ onMounted(async () => {
   } finally {
     isLoading.value = false
   }
-})
+}
+onMounted(loadSubmission)
 const submissionId = computed(() => route.params.submissionId as string)
 const submission = computed(() => serverDetail.value?.submission ?? null)
 const activityNode = computed(() => serverDetail.value?.node ?? null)
 const activity = computed(() => serverDetail.value?.activity ?? null)
+const auditEvents = computed(() => serverDetail.value?.auditEvents ?? [])
 const canView = computed(() => canReview(store.state.activeRole) && Boolean(submission.value && activityNode.value))
 const latestVersion = computed(() => submission.value?.versions.at(-1))
 const rubricDimensions = computed(() => activity.value?.config.type === 'PRACTICE_ACTIVITY' ? activity.value.config.rubric : [])
@@ -174,8 +189,8 @@ async function confirmReturn() {
   returnPending.value = true
   try {
     if (!serverDetail.value) throw new Error('submission is not loaded')
-    const result = await server.returnSubmission(submissionId.value, returnFeedback.value)
-    serverDetail.value = { ...serverDetail.value, submission: result.submission }
+    await server.returnSubmission(submissionId.value, returnFeedback.value)
+    await loadSubmission()
     showReturnConfirmation.value = false
     returnFeedback.value = ''
   } catch {
@@ -198,8 +213,8 @@ async function confirmGrade() {
   const scores = Object.fromEntries(scoredDimensions.value.map(dimension => [dimension.id, dimension.score]))
   try {
     if (!serverDetail.value) throw new Error('submission is not loaded')
-    const result = await server.gradeSubmission(submissionId.value, scores, gradeFeedback.value)
-    serverDetail.value = { ...serverDetail.value, submission: result.submission }
+    await server.gradeSubmission(submissionId.value, scores, gradeFeedback.value)
+    await loadSubmission()
     showGradeConfirmation.value = false
   } catch {
     gradeError.value = '评分失败，请检查评分项和网络后重试。'
@@ -209,6 +224,10 @@ async function confirmGrade() {
 
 function formatTime(value: string) {
   return new Intl.DateTimeFormat('zh-CN', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value))
+}
+
+function auditLabel(action: 'RETURNED' | 'GRADED') {
+  return action === 'RETURNED' ? '已退回' : '已评分'
 }
 </script>
 
