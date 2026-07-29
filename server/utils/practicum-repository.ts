@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { seedActivities } from '../../data/practicum/activity-seed'
 import { commerceCaseActivities, commerceCaseNodes } from '../../data/practicum/commerce-case-seed'
 import { seedNodes, seedOrganizations, seedPlans, seedRooms } from '../../data/practicum/seed'
-import type { Activity, ActivityType, ClassroomAssignment, CurriculumNode, Organization, Plan, PlanStatus, PrototypeMember, PracticumNotification, ResourceKind, SupportingResource, PracticeSubmissionState, SubmissionVersion, ReviewQueueItem, FeedbackEntry } from '../../domain/practicum/types'
+import type { Activity, ActivityType, AuditEvent, ClassroomAssignment, CurriculumNode, Organization, Plan, PlanStatus, PrototypeMember, PracticumNotification, ResourceKind, SupportingResource, PracticeSubmissionState, SubmissionVersion, ReviewQueueItem, FeedbackEntry } from '../../domain/practicum/types'
 import type { AuthUser } from './auth-store'
 
 export interface PersistedPlan extends Plan {
@@ -24,6 +24,7 @@ interface RepositoryState {
   notifications: PracticumNotification[]
   assets: StoredAsset[]
   submissions: Record<string, PracticeSubmissionState>
+  auditEvents: AuditEvent[]
   idempotency: Record<string, { userId: string; method: string; path: string; entityId: string }>
 }
 
@@ -57,6 +58,7 @@ function initialState(): RepositoryState {
     notifications: [],
     assets: [],
     submissions: {},
+    auditEvents: [],
     idempotency: {},
   }
 }
@@ -78,6 +80,7 @@ function readState(): RepositoryState {
         assets: parsed.assets ?? defaults.assets,
         assignments: parsed.assignments ?? defaults.assignments,
         submissions: parsed.submissions ?? defaults.submissions,
+        auditEvents: parsed.auditEvents ?? defaults.auditEvents,
         idempotency: parsed.idempotency ?? defaults.idempotency,
       }
     }
@@ -576,7 +579,7 @@ export function getSubmission(user: AuthUser, activityId: string) {
   const context = activityContext(state, activityId)
   if (!submission || !context.node || !context.plan || !canAccessRoom(user, context.plan.roomId)) return { kind: 'NOT_FOUND' as const }
   if (user.role !== 'OWNER' && submission.studentId !== user.id) return { kind: 'FORBIDDEN' as const }
-  return { kind: 'OK' as const, submission: clone(submission), node: clone(context.node), activity: clone(context.activity) }
+  return { kind: 'OK' as const, submission: clone(submission), node: clone(context.node), activity: clone(context.activity), auditEvents: clone(state.auditEvents.filter(event => event.submissionId === activityId)) }
 }
 
 export function submitPractice(user: AuthUser, input: { activityId: string; text: string }, idempotencyKey?: string) {
@@ -630,6 +633,7 @@ export function returnSubmission(user: AuthUser, activityId: string, feedback: s
   submission.status = 'RETURNED'
   submission.feedback = text
   submission.feedbackEntries = [...(submission.feedbackEntries ?? []), entry]
+  state.auditEvents.push({ id: `audit-${randomUUID()}`, submissionId: activityId, action: 'RETURNED', actorId: user.id, createdAt: entry.createdAt })
   appendNotification(state, { id: `notification-${randomUUID()}`, type: 'WORK_RETURNED', title: '实践提交已退回', message: `你的“${context.node.title}”提交需要补充后再提交。`, targetRole: 'STUDENT', targetRoute: `/practicum/activities/${activityId}`, read: false, createdAt: entry.createdAt })
   writeState(state)
   return { kind: 'OK' as const, submission: clone(submission) }
@@ -649,6 +653,7 @@ export function gradeSubmission(user: AuthUser, activityId: string, input: { rub
   const now = new Date().toISOString()
   submission.status = 'GRADED'
   submission.grade = { reviewerId: user.id, rubricScores: input.rubricScores, feedback: input.feedback.trim(), createdAt: now }
+  state.auditEvents.push({ id: `audit-${randomUUID()}`, submissionId: activityId, action: 'GRADED', actorId: user.id, createdAt: now })
   appendNotification(state, { id: `notification-${randomUUID()}`, type: 'WORK_GRADED', title: '实践提交已评分', message: `你的“${context.node.title}”提交已完成评分。`, targetRole: 'STUDENT', targetRoute: `/practicum/activities/${activityId}`, read: false, createdAt: now })
   writeState(state)
   return { kind: 'OK' as const, submission: clone(submission) }

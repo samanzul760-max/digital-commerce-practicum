@@ -205,6 +205,14 @@ export interface Grade {
   createdAt: string
 }
 
+export interface AuditEvent {
+  id: string
+  submissionId: string
+  action: 'RETURNED' | 'GRADED'
+  actorId: string
+  createdAt: string
+}
+
 export interface Submission {
   id: string
   activityId: string

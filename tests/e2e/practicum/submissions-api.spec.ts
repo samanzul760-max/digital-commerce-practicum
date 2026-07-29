@@ -43,6 +43,10 @@ test.describe('submission API contract', () => {
     expect(graded.ok()).toBeTruthy()
     expect((await graded.json()).submission).toEqual(expect.objectContaining({ status: 'GRADED', grade: expect.objectContaining({ feedback: '已完成审核' }) }))
 
+    const audited = await owner.request.get('/api/practicum/submissions/case-node-review-reply')
+    expect(audited.ok()).toBeTruthy()
+    expect((await audited.json()).auditEvents.map((event: { action: string }) => event.action)).toEqual(['RETURNED', 'GRADED'])
+
     await studentContext.close()
     await ownerContext.close()
   })

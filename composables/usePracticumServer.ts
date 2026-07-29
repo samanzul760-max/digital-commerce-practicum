@@ -1,9 +1,10 @@
-import type { PracticeSubmissionState, ReviewQueueItem, CurriculumNode, Activity } from '~/domain/practicum/types'
+import type { PracticeSubmissionState, ReviewQueueItem, CurriculumNode, Activity, AuditEvent } from '~/domain/practicum/types'
 
 export interface SubmissionDetail {
   submission: PracticeSubmissionState
   node: CurriculumNode
   activity: Activity
+  auditEvents: AuditEvent[]
 }
 
 export interface SubmissionQuery {
