@@ -119,7 +119,7 @@ test.describe('submission API contract', () => {
       const activitySnapshot = await activityResponse.json()
       const activity = activitySnapshot.nodes.find((node: { level: number }) => node.level === 3)
       expect((await owner.request.post(`/api/practicum/plans/${plan.id}/publish`, { headers: await csrfHeaders(owner) })).status()).toBe(200)
-      return { plan, activity }
+      return { plan, unit, activity }
     }
 
     const first = await createReviewablePlan('first')
@@ -135,6 +135,12 @@ test.describe('submission API contract', () => {
     const body = await response.json()
     expect(body.items).toEqual(expect.arrayContaining([expect.objectContaining({ planId: first.plan.id, activityId: first.activity.id })]))
     expect(body.items).not.toEqual(expect.arrayContaining([expect.objectContaining({ planId: second.plan.id, activityId: second.activity.id })]))
+
+    const unitResponse = await owner.request.get(`/api/practicum/submissions?unitId=${first.unit.id}`)
+    expect(unitResponse.status()).toBe(200)
+    const unitBody = await unitResponse.json()
+    expect(unitBody.items).toEqual(expect.arrayContaining([expect.objectContaining({ unitId: first.unit.id, activityId: first.activity.id })]))
+    expect(unitBody.items).not.toEqual(expect.arrayContaining([expect.objectContaining({ unitId: second.unit.id, activityId: second.activity.id })]))
 
     await owner.goto('/practicum/reviews')
     await expect(owner.locator('[data-review-queue]')).toBeVisible()

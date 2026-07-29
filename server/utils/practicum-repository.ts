@@ -532,7 +532,7 @@ function appendNotification(state: RepositoryState, notification: PracticumNotif
   state.notifications.unshift(notification)
 }
 
-export function listSubmissions(user: AuthUser, input: { status?: string; planId?: string; page: number; pageSize: number }) {
+export function listSubmissions(user: AuthUser, input: { status?: string; planId?: string; unitId?: string; page: number; pageSize: number }) {
   const state = readState()
   if (user.role !== 'OWNER') return { forbidden: true as const }
   const items: ReviewQueueItem[] = Object.entries(state.submissions).flatMap(([activityId, submission]) => {
@@ -542,6 +542,7 @@ export function listSubmissions(user: AuthUser, input: { status?: string; planId
     if (!context.node || !context.plan || !version || !unit || !canAccessRoom(user, context.plan.roomId)) return []
     if (input.status && submission.status !== input.status) return []
     if (input.planId && context.plan.id !== input.planId) return []
+    if (input.unitId && unit.id !== input.unitId) return []
     return [{
       submissionId: activityId,
       studentId: submission.studentId ?? 'student-001',
