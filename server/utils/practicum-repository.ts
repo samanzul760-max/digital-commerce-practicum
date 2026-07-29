@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { seedActivities } from '../../data/practicum/activity-seed'
 import { commerceCaseActivities, commerceCaseNodes } from '../../data/practicum/commerce-case-seed'
 import { seedNodes, seedOrganizations, seedPlans, seedRooms } from '../../data/practicum/seed'
-import type { Activity, ClassroomAssignment, CurriculumNode, Organization, Plan, PlanStatus, PrototypeMember, PracticumNotification, ResourceKind, SupportingResource, PracticeSubmissionState, SubmissionVersion, ReviewQueueItem, FeedbackEntry } from '../../domain/practicum/types'
+import type { Activity, ActivityType, ClassroomAssignment, CurriculumNode, Organization, Plan, PlanStatus, PrototypeMember, PracticumNotification, ResourceKind, SupportingResource, PracticeSubmissionState, SubmissionVersion, ReviewQueueItem, FeedbackEntry } from '../../domain/practicum/types'
 import type { AuthUser } from './auth-store'
 
 export interface PersistedPlan extends Plan {
@@ -192,6 +192,9 @@ export function createCurriculumNode(user: AuthUser, planId: string, input: {
   if (!plan || !canAccessRoom(user, plan.roomId)) return { kind: 'NOT_FOUND' as const }
   if (!ownerOnly(user)) return { kind: 'FORBIDDEN' as const }
   if (plan.status !== 'DRAFT') return { kind: 'STATE' as const }
+  if (idempotencyKey && state.idempotency[`${user.id}:${idempotencyKey}`]) {
+    return { kind: 'OK' as const, replayed: true, ...getPlan(user, planId)! }
+  }
   if (!Number.isInteger(input.version)) return { kind: 'VALIDATION' as const }
   if (input.version !== plan.version) return { kind: 'CONFLICT' as const, currentVersion: plan.version }
 
@@ -224,6 +227,57 @@ export function createCurriculumNode(user: AuthUser, planId: string, input: {
   plan.version += 1
   plan.updatedAt = new Date().toISOString()
   if (idempotencyKey) state.idempotency[`${user.id}:${idempotencyKey}`] = { userId: user.id, method: 'POST', path: `/plans/${planId}/nodes`, entityId: node.id }
+  writeState(state)
+  return { kind: 'OK' as const, replayed: false, ...getPlan(user, planId)! }
+}
+
+export function createCustomActivity(user: AuthUser, planId: string, input: {
+  parentId?: string
+  title?: string
+  type?: ActivityType
+  version?: number
+}, idempotencyKey?: string) {
+  const state = readState()
+  const plan = state.plans.find(item => item.id === planId)
+  if (!plan || !canAccessRoom(user, plan.roomId)) return { kind: 'NOT_FOUND' as const }
+  if (!ownerOnly(user)) return { kind: 'FORBIDDEN' as const }
+  if (plan.status !== 'DRAFT') return { kind: 'STATE' as const }
+  if (idempotencyKey && state.idempotency[`${user.id}:${idempotencyKey}`]) {
+    return { kind: 'OK' as const, replayed: true, ...getPlan(user, planId)! }
+  }
+  if (!Number.isInteger(input.version)) return { kind: 'VALIDATION' as const }
+  if (input.version !== plan.version) return { kind: 'CONFLICT' as const, currentVersion: plan.version }
+
+  const title = input.title?.trim() ?? ''
+  const type = input.type
+  const parent = state.nodes.find(node => node.id === input.parentId && node.planId === planId)
+  if (!title || !parent || parent.level !== 2 || !type || !['SOFTWARE_ACTION', 'TRAINING', 'PRACTICE_ACTIVITY'].includes(type)) {
+    return { kind: 'VALIDATION' as const }
+  }
+
+  const activityId = `activity-${randomUUID()}`
+  const base = { id: activityId, type, title, objective: '', instructions: [], required: true, resourceIds: [] }
+  const activity: Activity = type === 'SOFTWARE_ACTION'
+    ? { ...base, config: { type: 'SOFTWARE_ACTION', steps: [] } }
+    : type === 'TRAINING'
+      ? { ...base, config: { type: 'TRAINING', maxAttempts: 3 } }
+      : { ...base, config: { type: 'PRACTICE_ACTIVITY', deliverables: [], rubric: [] } }
+  const node: CurriculumNode = {
+    id: `node-${randomUUID()}`,
+    planId,
+    parentId: parent.id,
+    level: 3,
+    title,
+    description: '',
+    sort: state.nodes.filter(item => item.planId === planId && item.parentId === parent.id).length + 1,
+    activityId,
+    activityType: type,
+  }
+  state.activities.push(activity)
+  state.nodes.push(node)
+  plan.version += 1
+  plan.updatedAt = new Date().toISOString()
+  if (idempotencyKey) state.idempotency[`${user.id}:${idempotencyKey}`] = { userId: user.id, method: 'POST', path: `/plans/${planId}/activities`, entityId: node.id }
   writeState(state)
   return { kind: 'OK' as const, replayed: false, ...getPlan(user, planId)! }
 }

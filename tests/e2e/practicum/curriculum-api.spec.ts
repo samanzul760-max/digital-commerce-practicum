@@ -67,4 +67,44 @@ test.describe('curriculum API contract', () => {
     expect(removed.status()).toBe(200)
     expect((await removed.json()).nodes).not.toEqual(expect.arrayContaining([expect.objectContaining({ id: node.id })]))
   })
+
+  test('[BDD-CURRICULUM-003] owner creates an idempotent custom activity below a unit', async ({ page }) => {
+    const key = `custom-activity-${Date.now()}`
+    const created = await page.request.post('/api/practicum/plans', {
+      headers: await csrfHeaders(page, { 'Idempotency-Key': key }),
+      data: { roomId: 'room-001', title: `Custom activity ${key}`, description: 'Verify a server-owned activity.' },
+    })
+    const plan = (await created.json()).plan
+    const moduleResponse = await page.request.post(`/api/practicum/plans/${plan.id}/nodes`, {
+      headers: await csrfHeaders(page),
+      data: { title: 'Module', level: 1, parentId: null, version: plan.version },
+    })
+    const moduleSnapshot = await moduleResponse.json()
+    const module = moduleSnapshot.nodes.find((item: { level: number }) => item.level === 1)
+    const unitResponse = await page.request.post(`/api/practicum/plans/${plan.id}/nodes`, {
+      headers: await csrfHeaders(page),
+      data: { title: 'Unit', level: 2, parentId: module.id, version: moduleSnapshot.plan.version },
+    })
+    const unitSnapshot = await unitResponse.json()
+    const unit = unitSnapshot.nodes.find((item: { level: number }) => item.level === 2)
+    const input = { parentId: unit.id, title: 'Custom training', type: 'TRAINING', version: unitSnapshot.plan.version }
+
+    const first = await page.request.post(`/api/practicum/plans/${plan.id}/activities`, {
+      headers: await csrfHeaders(page, { 'Idempotency-Key': `${key}-write` }),
+      data: input,
+    })
+    const replay = await page.request.post(`/api/practicum/plans/${plan.id}/activities`, {
+      headers: await csrfHeaders(page, { 'Idempotency-Key': `${key}-write` }),
+      data: input,
+    })
+
+    expect(first.status()).toBe(201)
+    expect(replay.status()).toBe(200)
+    const firstBody = await first.json()
+    const replayBody = await replay.json()
+    const node = firstBody.nodes.find((item: { title: string }) => item.title === 'Custom training')
+    expect(node).toEqual(expect.objectContaining({ level: 3, parentId: unit.id, activityType: 'TRAINING' }))
+    expect(firstBody.activities).toEqual(expect.arrayContaining([expect.objectContaining({ id: node.activityId, type: 'TRAINING', config: { type: 'TRAINING', maxAttempts: 3 } })]))
+    expect(replayBody.nodes.filter((item: { title: string }) => item.title === 'Custom training')).toHaveLength(1)
+  })
 })

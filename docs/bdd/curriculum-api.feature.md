@@ -23,3 +23,11 @@ Then 服务端返回更新后的完整快照和递增版本
 And 使用旧版本的写请求被 `PLAN_VERSION_CONFLICT` 拒绝
 
 And STUDENT 的目录写请求被 `PLAN_FORBIDDEN` 拒绝
+
+## BDD-CURRICULUM-003 创建自定义活动
+
+Given OWNER 正在编辑有二级目录的草稿计划且持有当前版本
+When OWNER 在该二级目录下创建一个自定义活动并携带幂等键
+Then 服务端创建一个三级活动节点和与类型匹配的默认活动配置
+
+And 计划版本递增且重复相同幂等键不会创建第二个活动

@@ -65,6 +65,8 @@ Browser acceptance: `npx.cmd playwright test tests/e2e/practicum/administration.
 
 Plan withdrawal TDD: `BDD-PLAN-018` first failed with `404` because `/withdraw` did not exist; after adding the `PUBLISHED -> DRAFT` state transition, `plans-api.spec.ts` passed 6/6. The plan-editor page remains local-store based, so this proves the API contract only, not the complete plan UI workflow.
 
+Custom activity TDD: `BDD-CURRICULUM-003` first failed with `404` because the activities route did not exist. After implementation and an idempotency-order correction, `curriculum-api.spec.ts` passed 4/4. This verifies the server contract only; the editor still creates activities through the local store.
+
 只有命令退出码为 0 且输出明确显示无失败用例，才能将对应行标记为 PASS。任何命令因端口占用、超时、启动失败或浏览器错误结束，都标记为 FAIL/未完成并记录原因。
 
 ## 本轮提交审核来源验收

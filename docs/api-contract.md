@@ -49,6 +49,7 @@ Missing, expired, or mismatched tokens return `403 CSRF_INVALID` with `{ data: {
 | POST | `/api/practicum/plans/:planId/publish` | 草稿发布 | OWNER |
 | POST | `/api/practicum/plans/:planId/withdraw` | 撤回已发布计划，恢复为草稿 | OWNER |
 | POST | `/api/practicum/plans/:planId/archive` | 已发布计划归档 | OWNER |
+| POST | `/api/practicum/plans/:planId/activities` | 在二级目录下创建自定义三级活动，需 `version` 与幂等键 | OWNER |
 
 ## 资源、成员和辅助能力
 
