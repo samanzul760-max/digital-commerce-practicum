@@ -47,4 +47,29 @@ test.describe('classroom assignment API contract', () => {
     await studentContext.close()
     await teacherContext.close()
   })
+
+  test('[BDD-STUDENT-006] student task page renders a published server assignment after refresh', async ({ browser }) => {
+    const teacherContext = await browser.newContext()
+    const teacher = await teacherContext.newPage()
+    expect((await teacher.request.post('/api/auth/login', { data: { identifier: 'teacher@example.test', password: 'TeacherPass123!' } })).status()).toBe(200)
+    const title = `Student task ${Date.now()}`
+    const created = await teacher.request.post('/api/practicum/assignments', {
+      headers: await csrfHeaders(teacher, { 'Idempotency-Key': `student-task-page-${Date.now()}` }),
+      data: { planId: 'plan-wdds', title, instructions: 'Visible in the student task page after a refresh.', audience: 'ALL_STUDENTS' },
+    })
+    const assignment = (await created.json()).assignment
+    expect((await teacher.request.post(`/api/practicum/assignments/${assignment.id}/publish`, { headers: await csrfHeaders(teacher) })).status()).toBe(200)
+
+    const studentContext = await browser.newContext()
+    const student = await studentContext.newPage()
+    expect((await student.request.post('/api/auth/login', { data: { identifier: 'student@example.test', password: 'StudentPass123!' } })).status()).toBe(200)
+    await student.goto('/practicum/profile')
+    await student.locator('[data-role-option="STUDENT"]').click()
+    await student.goto('/practicum/tasks')
+    await expect(student.locator('[data-student-tasks]')).toContainText(title)
+    await student.reload()
+    await expect(student.locator('[data-student-tasks]')).toContainText(title)
+    await studentContext.close()
+    await teacherContext.close()
+  })
 })

@@ -57,11 +57,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { usePracticumStore } from '../../composables/usePracticumStore'
 import { canSubmitWork } from '../../domain/practicum/permissions'
+import type { ClassroomAssignment } from '../../domain/practicum/types'
 
 const store = usePracticumStore()
+const serverAssignments = ref<ClassroomAssignment[]>([])
+onMounted(async () => {
+  if (!canSubmitWork(store.state.activeRole)) return
+  try { serverAssignments.value = (await $fetch<{ items: ClassroomAssignment[] }>('/api/practicum/assignments')).items } catch { serverAssignments.value = [] }
+})
 const primaryPlan = computed(() => store.visiblePlansFor('STUDENT')[0] ?? null)
 const nodes = computed(() => primaryPlan.value ? store.getPlanNodes(primaryPlan.value.id) : [])
 const activityNodes = computed(() => nodes.value.filter(node => node.level === 3))
@@ -78,7 +84,7 @@ const deadlineLabel = computed(() => {
   return `${d.getMonth() + 1}月${d.getDate()}日`
 })
 
-const taskRows = computed(() => activityNodes.value.slice(0, 8).map(node => {
+const activityTaskRows = computed(() => activityNodes.value.slice(0, 8).map(node => {
   const submission = store.state.practiceSubmissions[node.id]
   const activity = store.getActivityByNodeId(node.id)
   const isComplete = store.isActivityComplete(node.id)
@@ -93,6 +99,10 @@ const taskRows = computed(() => activityNodes.value.slice(0, 8).map(node => {
     action: isReturned ? '修改' : isComplete ? '查看' : '进入',
   }
 }))
+const taskRows = computed(() => [
+  ...serverAssignments.value.map(assignment => ({ id: assignment.id, title: assignment.title, type: '课堂作业', status: '待完成', statusClass: 'status-pill-red', feedback: assignment.instructions, action: '查看' })),
+  ...activityTaskRows.value,
+])
 
 function activityTypeLabel(type?: string) {
   if (type === 'SOFTWARE_ACTION') return '软件操作'
