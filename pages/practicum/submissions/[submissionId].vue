@@ -132,9 +132,9 @@ onMounted(async () => {
   }
 })
 const submissionId = computed(() => route.params.submissionId as string)
-const submission = computed(() => serverDetail.value?.submission ?? store.state.practiceSubmissions[submissionId.value] ?? null)
-const activityNode = computed(() => serverDetail.value?.node ?? store.state.nodes.find(node => node.id === submissionId.value) ?? null)
-const activity = computed(() => serverDetail.value?.activity ?? (activityNode.value ? store.getActivityByNodeId(activityNode.value.id) : null))
+const submission = computed(() => serverDetail.value?.submission ?? null)
+const activityNode = computed(() => serverDetail.value?.node ?? null)
+const activity = computed(() => serverDetail.value?.activity ?? null)
 const canView = computed(() => canReview(store.state.activeRole) && Boolean(submission.value && activityNode.value))
 const latestVersion = computed(() => submission.value?.versions.at(-1))
 const rubricDimensions = computed(() => activity.value?.config.type === 'PRACTICE_ACTIVITY' ? activity.value.config.rubric : [])
@@ -173,12 +173,9 @@ async function confirmReturn() {
   if (returnPending.value) return
   returnPending.value = true
   try {
-    if (serverDetail.value) {
-      const result = await server.returnSubmission(submissionId.value, returnFeedback.value)
-      serverDetail.value = { ...serverDetail.value, submission: result.submission }
-    } else if (!store.returnPracticeWork(submissionId.value, returnFeedback.value)) {
-      throw new Error('local return failed')
-    }
+    if (!serverDetail.value) throw new Error('submission is not loaded')
+    const result = await server.returnSubmission(submissionId.value, returnFeedback.value)
+    serverDetail.value = { ...serverDetail.value, submission: result.submission }
     showReturnConfirmation.value = false
     returnFeedback.value = ''
   } catch {
@@ -200,12 +197,9 @@ async function confirmGrade() {
   gradePending.value = true
   const scores = Object.fromEntries(scoredDimensions.value.map(dimension => [dimension.id, dimension.score]))
   try {
-    if (serverDetail.value) {
-      const result = await server.gradeSubmission(submissionId.value, scores, gradeFeedback.value)
-      serverDetail.value = { ...serverDetail.value, submission: result.submission }
-    } else if (!store.gradePracticeWork(submissionId.value, scores, gradeFeedback.value)) {
-      throw new Error('local grade failed')
-    }
+    if (!serverDetail.value) throw new Error('submission is not loaded')
+    const result = await server.gradeSubmission(submissionId.value, scores, gradeFeedback.value)
+    serverDetail.value = { ...serverDetail.value, submission: result.submission }
     showGradeConfirmation.value = false
   } catch {
     gradeError.value = '评分失败，请检查评分项和网络后重试。'

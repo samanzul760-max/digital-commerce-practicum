@@ -57,6 +57,34 @@ test.describe('submission API contract', () => {
     await context.close()
   })
 
+  test('[BDD-SUBMISSION-005] submission detail never renders browser-only stale evidence', async ({ browser }) => {
+    const context = await browser.newContext()
+    const owner = await context.newPage()
+    expect((await owner.request.post('/api/auth/login', { data: { identifier: 'owner@example.test', password: 'OwnerPass123!' } })).status()).toBe(200)
+    await owner.goto('/practicum/submissions/local-only-submission')
+    await owner.evaluate(() => {
+      localStorage.setItem('digital-commerce-practicum.v1', JSON.stringify({
+        schemaVersion: 1,
+        activeRole: 'OWNER',
+        practiceSubmissions: {
+          'local-only-submission': {
+            status: 'SUBMITTED',
+            studentId: 'local-student',
+            studentLabel: 'Local-only student',
+            versions: [{ id: 'local-version', submissionId: 'local-only-submission', version: 1, text: 'Stale browser-only evidence', links: [], attachments: [], submittedAt: '2026-07-29T00:00:00.000Z' }],
+          },
+        },
+        nodes: [{ id: 'local-only-submission', planId: 'local-only-plan', parentId: 'local-unit', level: 3, title: 'Local-only activity', description: '', sort: 1, activityId: 'activity-local-only', activityType: 'PRACTICE_ACTIVITY' }],
+        activities: [{ id: 'activity-local-only', type: 'PRACTICE_ACTIVITY', title: 'Local-only activity', objective: '', instructions: [], required: true, resourceIds: [], config: { type: 'PRACTICE_ACTIVITY', deliverables: [], rubric: [] } }],
+      }))
+    })
+    await owner.reload()
+    await expect(owner.locator('[data-submission-detail]')).toHaveCount(0)
+    await expect(owner.locator('[data-empty]')).toBeVisible()
+    await expect(owner.locator('[data-practicum-content]')).not.toContainText('Stale browser-only evidence')
+    await context.close()
+  })
+
   test('[BDD-REVIEW-010] owner filters the server review queue by plan', async ({ browser }) => {
     const ownerContext = await browser.newContext()
     const owner = await ownerContext.newPage()
