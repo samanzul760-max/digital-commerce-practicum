@@ -188,51 +188,102 @@
         </section>
       </div>
 
-      <!-- Owner view (unchanged) -->
+      <!-- Owner view -->
       <div v-else-if="store.state.activeRole === 'OWNER'" data-owner-progress>
-        <section data-class-completion class="progress-band" aria-labelledby="class-comp-title">
-          <h2 id="class-comp-title">班级完成情况</h2>
-          <div class="progress-track" role="progressbar" :aria-label="`班级完成 ${classCompletion.percent}%`" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="classCompletion.percent">
-            <span :style="{ width: `${classCompletion.percent}%` }" />
+        <!-- Metrics overview -->
+        <div class="metric-strip">
+          <div class="metric">
+            <span>班级完成率</span>
+            <strong>{{ classCompletion.percent }}%</strong>
+            <small>{{ classCompletion.completed }} / {{ classCompletion.total }} 人次</small>
           </div>
-          <div class="progress-number">{{ classCompletion.percent }}%<small>{{ classCompletion.completed }} / {{ classCompletion.total }} 人次</small></div>
-        </section>
+          <div class="metric">
+            <span>待审核</span>
+            <strong>{{ pendingReviewCount }}</strong>
+            <small>份提交等待处理</small>
+          </div>
+          <div class="metric">
+            <span>已提交</span>
+            <strong>{{ statusDistribution.find(r => r.label === '已提交')?.count ?? 0 }}</strong>
+            <small>学生已上交</small>
+          </div>
+          <div class="metric">
+            <span>已评分</span>
+            <strong>{{ statusDistribution.find(r => r.label === '已评分')?.count ?? 0 }}</strong>
+            <small>已完成批阅</small>
+          </div>
+        </div>
 
-        <section data-pending-reviews aria-labelledby="pending-title">
-          <h2 id="pending-title" class="section-heading">待审核</h2>
-          <div class="form-panel">
-            <p><strong>{{ pendingReviewCount }}</strong> 份提交待审核</p>
-            <NuxtLink v-if="pendingReviewCount > 0" to="/practicum/reviews" class="text-link">前往审核中心</NuxtLink>
-          </div>
-        </section>
+        <!-- Two-column dashboard -->
+        <div class="student-grid">
+          <div class="main-column">
+            <div class="panel">
+              <div class="panel-head">
+                <strong>班级完成趋势</strong>
+                <NuxtLink v-if="pendingReviewCount > 0" to="/practicum/reviews" class="text-link compact-link">前往审核中心 →</NuxtLink>
+              </div>
+              <div class="progress-band" style="border:0;border-radius:0;margin:0">
+                <div class="progress-track" role="progressbar" :aria-label="`班级完成 ${classCompletion.percent}%`" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="classCompletion.percent">
+                  <span :style="{ width: `${classCompletion.percent}%` }" />
+                </div>
+                <div class="progress-number">{{ classCompletion.percent }}%<small>{{ classCompletion.completed }} / {{ classCompletion.total }} 人次</small></div>
+              </div>
+            </div>
 
-        <section data-status-distribution aria-labelledby="dist-title">
-          <h2 id="dist-title" class="section-heading">提交状态分布</h2>
-          <div class="form-panel">
-            <table class="data-table" aria-label="提交状态分布">
-              <thead><tr><th>状态</th><th>数量</th></tr></thead>
-              <tbody>
-                <tr v-for="row in statusDistribution" :key="row.label"><td>{{ row.label }}</td><td>{{ row.count }}</td></tr>
-              </tbody>
-            </table>
+            <!-- Weak rubric dimensions -->
+            <div class="panel">
+              <div class="panel-head">
+                <strong>薄弱量规维度</strong>
+                <span>{{ weakRubricDimensions.length }} 项待关注</span>
+              </div>
+              <div v-if="weakRubricDimensions.length" class="table-wrap">
+                <table aria-label="薄弱量规维度">
+                  <thead><tr><th>评分维度</th><th>平均得分率</th><th>评分次数</th><th>所属活动</th></tr></thead>
+                  <tbody>
+                    <tr v-for="row in weakRubricDimensions" :key="row.label">
+                      <td>{{ row.label }}</td>
+                      <td>
+                        <span :class="row.avgPercent < 50 ? 'status-pill-red' : 'status-pill-orange'" class="status-pill">{{ row.avgPercent }}%</span>
+                      </td>
+                      <td>{{ row.submissionCount }}</td>
+                      <td>{{ row.activityTitle }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p v-else data-empty-weak class="empty-state" style="border:0;margin:14px 16px">暂无评分数据可供分析。</p>
+            </div>
           </div>
-          <p v-if="!statusDistribution.length" data-empty class="empty-state">暂无提交数据。</p>
-        </section>
 
-        <section data-weak-rubric aria-labelledby="weak-title">
-          <h2 id="weak-title" class="section-heading">薄弱量规维度</h2>
-          <div v-if="weakRubricDimensions.length" class="form-panel">
-            <table class="data-table" aria-label="薄弱量规维度">
-              <thead><tr><th>评分维度</th><th>平均得分率</th><th>评分次数</th><th>所属活动</th></tr></thead>
-              <tbody>
-                <tr v-for="row in weakRubricDimensions" :key="row.label">
-                  <td>{{ row.label }}</td><td>{{ row.avgPercent }}%</td><td>{{ row.submissionCount }}</td><td>{{ row.activityTitle }}</td>
-                </tr>
-              </tbody>
-            </table>
+          <div class="side-column">
+            <!-- Status distribution -->
+            <div class="panel">
+              <div class="panel-head">
+                <strong>提交状态分布</strong>
+              </div>
+              <div v-if="statusDistribution.length" class="route-list">
+                <div v-for="row in statusDistribution" :key="row.label" class="route-item">
+                  <span class="route-number">{{ row.count }}</span>
+                  <span class="route-copy">
+                    <strong>{{ row.label }}</strong>
+                    <span>当前状态</span>
+                  </span>
+                </div>
+              </div>
+              <p v-else data-empty class="empty-state" style="border:0;margin:14px 16px">暂无提交数据。</p>
+            </div>
+
+            <!-- Quick actions -->
+            <div class="side-section">
+              <h2>快捷操作</h2>
+              <p v-if="pendingReviewCount > 0">有 {{ pendingReviewCount }} 份提交等待审核。前往审核中心处理学生作业。</p>
+              <p v-else>暂无待处理事项。学生提交作业后这里会显示提醒。</p>
+              <NuxtLink v-if="pendingReviewCount > 0" to="/practicum/reviews">
+                <button type="button" class="primary-button" style="margin-top:10px;width:100%">进入审核中心</button>
+              </NuxtLink>
+            </div>
           </div>
-          <p v-else data-empty-weak class="empty-state">暂无评分数据可供分析。</p>
-        </section>
+        </div>
       </div>
     </PracticumShell>
   </ClientOnly>

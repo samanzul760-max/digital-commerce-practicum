@@ -79,7 +79,6 @@
       </div>
 
       <div class="profile-wrapper">
-        <button data-logout class="text-link compact-link" type="button" :disabled="auth.state.value.loading" @click="handleLogout">退出登录</button>
         <button
           data-personal-entry
           class="profile-button"
@@ -92,9 +91,8 @@
           <span class="profile-avatar" aria-hidden="true">陈</span>
           <span class="profile-copy">
             <strong>陈老师</strong>
-            <small>{{ activeRoleLabel }}</small>
+            <span class="role-chip">{{ activeRoleLabel }}</span>
           </span>
-          <span class="role-chip">{{ activeRoleLabel }}</span>
           <span class="profile-arrow" aria-hidden="true">⌄</span>
         </button>
         <div v-if="profileOpen" data-profile-dropdown class="topbar-dropdown profile-dropdown" role="menu">
