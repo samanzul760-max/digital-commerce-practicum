@@ -42,7 +42,11 @@ withDefaults(defineProps<{
 const store = usePracticumStore()
 const auth = useAuthSession()
 const storageError = computed(() => store.storageError.value)
-onMounted(() => store.syncStorageError())
+onMounted(async () => {
+  store.syncStorageError()
+  const user = await auth.load()
+  if (user) store.switchRole(user.role)
+})
 const roleLabels = {
   OWNER: '管理员',
   TEACHER: '教师',
