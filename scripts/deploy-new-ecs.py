@@ -27,6 +27,7 @@ DEFAULT_REMOTE_DIR = "/opt/digital-commerce-practicum"
 DEFAULT_PM2_NAME = "digital-commerce-practicum"
 
 EXCLUDE_DIRS = {
+    ".data",
     ".git",
     "node_modules",
     ".nuxt",
