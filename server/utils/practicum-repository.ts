@@ -516,6 +516,129 @@ export function getStats(user: AuthUser, roomId: string) {
   }
 }
 
+export function getAnalytics(user: AuthUser, roomId: string) {
+  const state = readState()
+  if (!ownerOnly(user) || !canAccessRoom(user, roomId)) return null
+
+  const plans = state.plans.filter(plan => plan.roomId === roomId)
+  const planIds = new Set(plans.map(plan => plan.id))
+  const activityNodes = state.nodes.filter(node => node.level === 3 && planIds.has(node.planId))
+  const activityNodeIds = new Set(activityNodes.map(node => node.id))
+  const submissions = Object.entries(state.submissions)
+    .filter(([activityId]) => activityNodeIds.has(activityId))
+    .map(([activityId, submission]) => ({ activityId, submission, context: activityContext(state, activityId) }))
+    .filter((item): item is typeof item & { context: { node: CurriculumNode; plan: PersistedPlan; activity: Activity | undefined } } => Boolean(item.context.node && item.context.plan))
+  const totalLearners = state.members.filter(member => member.role === 'STUDENT').length
+  const completedLearners = new Set(submissions
+    .filter(item => item.submission.status === 'GRADED')
+    .map(item => item.submission.studentId)
+    .filter((studentId): studentId is string => Boolean(studentId))).size
+  const gradedSubmissionCount = submissions.filter(item => item.submission.status === 'GRADED').length
+  const totalPossible = activityNodes.length * totalLearners
+
+  const planRows = plans.map(plan => {
+    const planActivityIds = new Set(activityNodes.filter(node => node.planId === plan.id).map(node => node.id))
+    const graded = submissions.filter(item => planActivityIds.has(item.activityId) && item.submission.status === 'GRADED').length
+    const possible = planActivityIds.size * totalLearners
+    return {
+      planId: plan.id,
+      title: plan.title,
+      status: plan.status,
+      learnerCount: totalLearners,
+      percent: possible ? Math.round((graded / possible) * 100) : 0,
+    }
+  })
+
+  const activityFeed = submissions.flatMap(({ activityId, submission, context }) => {
+    const learnerLabel = submission.studentLabel ?? '匿名学员'
+    const events = submission.versions.map(version => ({ learnerLabel, activityId, activityTitle: context.node.title, eventType: 'SUBMITTED', timestamp: version.submittedAt }))
+    for (const event of state.auditEvents.filter(event => event.submissionId === activityId)) {
+      events.push({ learnerLabel, activityId, activityTitle: context.node.title, eventType: event.action, timestamp: event.createdAt })
+    }
+    return events
+  }).sort((left, right) => right.timestamp.localeCompare(left.timestamp)).slice(0, 20)
+
+  const scoreTotals = new Map<string, { learnerLabel: string; gradedCount: number; total: number }>()
+  for (const { submission, context } of submissions) {
+    if (submission.status !== 'GRADED' || !submission.grade || !submission.studentId || context.activity?.config.type !== 'PRACTICE_ACTIVITY') continue
+    const maxScore = context.activity.config.rubric.reduce((total, item) => total + item.maxScore, 0)
+    const score = Object.values(submission.grade.rubricScores).reduce((total, value) => total + value, 0)
+    const current = scoreTotals.get(submission.studentId) ?? { learnerLabel: submission.studentLabel ?? '匿名学员', gradedCount: 0, total: 0 }
+    current.gradedCount += 1
+    current.total += maxScore ? Math.round((score / maxScore) * 100) : 0
+    scoreTotals.set(submission.studentId, current)
+  }
+  const ranking = [...scoreTotals.entries()]
+    .map(([studentId, item]) => ({ studentId, learnerLabel: item.learnerLabel, gradedCount: item.gradedCount, avgScore: Math.round(item.total / item.gradedCount) }))
+    .sort((left, right) => right.avgScore - left.avgScore || left.learnerLabel.localeCompare(right.learnerLabel, 'zh-CN'))
+
+  return clone({
+    overview: {
+      totalLearners,
+      completedLearners,
+      inactiveLearners: Math.max(0, totalLearners - new Set(submissions.map(item => item.submission.studentId).filter(Boolean)).size),
+      overallCompletionPercent: totalPossible ? Math.round((gradedSubmissionCount / totalPossible) * 100) : 0,
+    },
+    plans: planRows,
+    activityFeed,
+    ranking,
+  })
+}
+
+export function getMemberAnalytics(user: AuthUser, roomId: string) {
+  const state = readState()
+  if (!ownerOnly(user) || !canAccessRoom(user, roomId)) return null
+
+  const planIds = new Set(state.plans.filter(plan => plan.roomId === roomId).map(plan => plan.id))
+  const activityIds = new Set(state.nodes.filter(node => node.level === 3 && planIds.has(node.planId)).map(node => node.id))
+  const activityCount = activityIds.size
+  const rows = state.members
+    .filter(member => member.role === 'STUDENT')
+    .map(member => {
+      const submissions = Object.entries(state.submissions)
+        .filter(([activityId, submission]) => activityIds.has(activityId) && submission.studentId === member.id)
+        .map(([, submission]) => submission)
+      const graded = submissions.filter(submission => submission.status === 'GRADED' && submission.grade)
+      const scores = graded.flatMap(submission => Object.values(submission.grade!.rubricScores))
+      return {
+        memberId: member.id,
+        learnerLabel: member.label,
+        completionPercent: activityCount ? Math.round((graded.length / activityCount) * 100) : 0,
+        gradedCount: graded.length,
+        avgScore: scores.length ? Math.round(scores.reduce((total, score) => total + score, 0) / scores.length) : 0,
+      }
+    })
+    .sort((left, right) => right.completionPercent - left.completionPercent || left.learnerLabel.localeCompare(right.learnerLabel, 'zh-CN'))
+
+  return clone({ items: rows })
+}
+
+export function getMemberAnalyticsDetail(user: AuthUser, roomId: string, memberId: string) {
+  const summary = getMemberAnalytics(user, roomId)
+  if (!summary) return null
+  const member = summary.items.find(item => item.memberId === memberId)
+  if (!member) return { kind: 'NOT_FOUND' as const }
+
+  const state = readState()
+  const plans = state.plans
+    .filter(plan => plan.roomId === roomId)
+    .map(plan => {
+      const activityIds = new Set(state.nodes.filter(node => node.planId === plan.id && node.level === 3).map(node => node.id))
+      const gradedCount = Object.entries(state.submissions)
+        .filter(([activityId, submission]) => activityIds.has(activityId) && submission.studentId === memberId && submission.status === 'GRADED')
+        .length
+      return {
+        planId: plan.id,
+        title: plan.title,
+        activityCount: activityIds.size,
+        gradedCount,
+        completionPercent: activityIds.size ? Math.round((gradedCount / activityIds.size) * 100) : 0,
+      }
+    })
+
+  return clone({ kind: 'OK' as const, member, plans })
+}
+
 export function saveAsset(user: AuthUser, asset: StoredAsset) {
   const state = readState()
   if (!ownerOnly(user)) return false

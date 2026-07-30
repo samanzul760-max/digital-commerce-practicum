@@ -16,9 +16,13 @@ export default defineConfig({
     viewport: { width: 1366, height: 768 },
   },
   webServer: {
-    command: 'set NUXT_IGNORE_LOCK=1&& set PRACTICUM_DATA_DIR=.data-e2e&& npm.cmd run dev -- --host 127.0.0.1 --port 4175',
+    command: 'node node_modules/nuxt/bin/nuxt.mjs dev --host 127.0.0.1 --port 4175',
+    env: {
+      NUXT_IGNORE_LOCK: '1',
+      PRACTICUM_DATA_DIR: '.data-e2e',
+    },
     url: 'http://127.0.0.1:4175/practicum',
-    reuseExistingServer: false,
+    reuseExistingServer: true,
     timeout: 120_000,
   },
 })

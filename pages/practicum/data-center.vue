@@ -14,22 +14,22 @@
           <div class="metric-strip">
             <div class="metric">
               <span>总体完成率</span>
-              <strong>{{ overallCompletion.percent }}%</strong>
+              <strong>{{ analytics?.overview.overallCompletionPercent ?? overallCompletion.percent }}%</strong>
               <small>所有学员</small>
             </div>
             <div class="metric">
               <span>已完成学员</span>
-              <strong>{{ completedLearners }}</strong>
+              <strong>{{ analytics?.overview.completedLearners ?? completedLearners }}</strong>
               <small>达到全部要求</small>
             </div>
             <div class="metric">
               <span>总学员数</span>
-              <strong>{{ totalLearners }}</strong>
+              <strong>{{ analytics?.overview.totalLearners ?? totalLearners }}</strong>
               <small>当前实训室</small>
             </div>
             <div class="metric">
               <span>未活跃学员</span>
-              <strong>{{ inactiveLearners }}</strong>
+              <strong>{{ analytics?.overview.inactiveLearners ?? inactiveLearners }}</strong>
               <small>近期无提交记录</small>
             </div>
           </div>
@@ -48,7 +48,7 @@
                 <tr><th>计划名称</th><th>状态</th><th>完成率</th><th>学员数</th></tr>
               </thead>
               <tbody>
-                <tr v-for="row in planComparison" :key="row.planId">
+                <tr v-for="row in (analytics?.plans ?? planComparison)" :key="row.planId">
                   <td>{{ row.title }}</td>
                   <td><span class="status-pill" :class="row.status === 'PUBLISHED' ? '' : 'status-pill-orange'">{{ row.status === 'PUBLISHED' ? '已发布' : row.status === 'DRAFT' ? '草稿' : '已归档' }}</span></td>
                   <td>{{ row.percent }}%</td>
@@ -69,7 +69,7 @@
                 <tr><th>学员</th><th>活动</th><th>类型</th><th>时间</th></tr>
               </thead>
               <tbody>
-                <tr v-for="(event, i) in activityFeed" :key="i">
+                <tr v-for="(event, i) in (analytics?.activityFeed ?? activityFeed)" :key="i">
                   <td>{{ event.learnerLabel }}</td>
                   <td>{{ event.activityTitle }}</td>
                   <td>{{ event.eventType }}</td>
@@ -166,13 +166,14 @@
 import { computed, ref, onMounted } from 'vue'
 import { usePracticumStore } from '../../composables/usePracticumStore'
 import { canAccessDataCenter } from '../../domain/practicum/permissions'
-import { usePracticumServer } from '../../composables/usePracticumServer'
+import { usePracticumServer, type PracticumAnalytics } from '../../composables/usePracticumServer'
 
 const store = usePracticumStore()
 const server = usePracticumServer()
 const isLoading = ref(true)
 const loadError = ref(false)
 const serverStats = ref<Record<string, number> | null>(null)
+const analytics = ref<PracticumAnalytics | null>(null)
 const exportStep = ref<'confirm' | null>(null)
 const exportPending = ref(false)
 const exportSuccess = ref(false)
@@ -204,6 +205,7 @@ const sortLabel = computed(() => {
 onMounted(async () => {
   try {
     serverStats.value = (await server.getStats('room-001')).stats
+    analytics.value = await server.getAnalytics('room-001')
   } catch {
     loadError.value = true
   } finally {
@@ -322,7 +324,7 @@ const scoreRanking = computed(() => {
 })
 
 const sortedRanking = computed(() => {
-  const list = [...scoreRanking.value]
+  const list = [...(analytics.value?.ranking ?? scoreRanking.value)]
   if (!sortKey.value) return list
   const key = sortKey.value
   const dir = sortDir.value === 'asc' ? 1 : -1

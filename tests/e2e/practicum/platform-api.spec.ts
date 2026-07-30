@@ -42,6 +42,25 @@ test.describe('platform API contract', () => {
     expect((await stats.json()).stats).toEqual(expect.objectContaining({ planCount: expect.any(Number), memberCount: expect.any(Number), submissionCount: expect.any(Number), gradedSubmissionCount: expect.any(Number) }))
   })
 
+  test('owner analytics aggregates only the current room and students cannot read it', async ({ page, browser }) => {
+    const ownerResponse = await page.request.get('/api/practicum/analytics?roomId=room-001')
+    expect(ownerResponse.ok()).toBeTruthy()
+    expect(await ownerResponse.json()).toEqual(expect.objectContaining({
+      overview: expect.objectContaining({ totalLearners: expect.any(Number), overallCompletionPercent: expect.any(Number) }),
+      plans: expect.any(Array),
+      activityFeed: expect.any(Array),
+      ranking: expect.any(Array),
+    }))
+
+    const context = await browser.newContext()
+    const student = await context.newPage()
+    await student.request.post('/api/auth/login', { data: { identifier: 'student@example.test', password: 'StudentPass123!' } })
+    const forbidden = await student.request.get('/api/practicum/analytics?roomId=room-001')
+    expect(forbidden.status()).toBe(403)
+    expect((await forbidden.json()).data.code).toBe('ANALYTICS_FORBIDDEN')
+    await context.close()
+  })
+
   test('asset upload enforces type and size policy', async ({ page }) => {
     const good = await page.request.post('/api/practicum/assets', { headers: await csrfHeaders(page), multipart: { file: { name: 'guide.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 demo') } } })
     expect(good.status()).toBe(201)
