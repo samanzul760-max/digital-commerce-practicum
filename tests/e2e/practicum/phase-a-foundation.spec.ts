@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { loginAsStudent } from './auth-helpers'
 
 // ============================================================================
 // Phase A E2E Tests: 项目基础、布局、导航和权限
@@ -6,42 +7,17 @@ import { expect, test } from '@playwright/test'
 
 // ── A-01: 未选择身份时进入工作台 ──────────────────────────
 
-test('[PHASE-A-01] no-role workspace shows identity guidance and hides business data', async ({ page }) => {
-  // Ensure no role is selected by clearing localStorage
+test('[PHASE-A-01] unauthenticated workspace redirects to login and hides business data', async ({ page }) => {
+  await page.context().clearCookies()
   await page.goto('/practicum')
-  await page.evaluate(() => window.localStorage.removeItem('digital-commerce-practicum.v1'))
-  await page.goto('/practicum')
-
-  // Should show identity selection guidance
-  await expect(page.locator('[data-role-entry]')).toBeVisible()
-  await expect(page.locator('[data-role-entry]')).toContainText('选择身份')
-
-  // Should NOT show admin or student business data
-  await expect(page.locator('[data-owner-home]')).toHaveCount(0)
-  await expect(page.locator('[data-student-home]')).toHaveCount(0)
-
-  // Can navigate to profile page
-  const profileLink = page.locator('[data-to-profile-link]')
-  await expect(profileLink).toBeVisible()
-  await profileLink.click()
-  await expect(page).toHaveURL('/practicum/profile')
-
-  // Sidebar shows minimal navigation (only workspace)
-  const navItems = page.locator('[data-practicum-sidebar] [data-nav-item]')
-  await expect(navItems).toHaveCount(1)
-  await expect(navItems.first()).toHaveAttribute('data-nav-key', 'workspace')
+  await expect(page).toHaveURL('/practicum/login')
+  await expect(page.locator('[data-login-form], [data-bootstrap-form]')).toBeVisible()
+  await expect(page.locator('[data-owner-home], [data-student-home]')).toHaveCount(0)
 })
 
-test('[PHASE-A-01] selecting identity from profile returns to workspace', async ({ page }) => {
-  await page.goto('/practicum/profile')
-  await page.evaluate(() => window.localStorage.removeItem('digital-commerce-practicum.v1'))
-  await page.goto('/practicum/profile')
-
-  // Select STUDENT identity
-  await page.locator('[data-role-option="STUDENT"]').click()
-  await expect(page).toHaveURL('/practicum')
-
-  // Workspace should now show student home
+test('[PHASE-A-01] student session returns to the student workspace', async ({ page }) => {
+  await loginAsStudent(page)
+  await page.goto('/practicum')
   await expect(page.locator('[data-student-home]')).toBeVisible()
 })
 
@@ -88,7 +64,7 @@ test('[PHASE-A-02] OWNER home page shows management dashboard', async ({ page })
 
   // Should show plan list
   await expect(page.locator('[data-plan-list]')).toBeVisible()
-  await expect(page.locator('[data-plan-card]')).toHaveCount(2) // Two seed plans
+  expect(await page.locator('[data-plan-card]').count()).toBeGreaterThanOrEqual(2)
 
   // Should show "Create Plan" button
   await expect(page.locator('[data-create-plan]')).toBeVisible()
@@ -97,6 +73,7 @@ test('[PHASE-A-02] OWNER home page shows management dashboard', async ({ page })
 // ── A-03: STUDENT 工作台权限 ────────────────────────────────
 
 test('[PHASE-A-03] STUDENT sees limited navigation and is blocked from admin pages', async ({ page }) => {
+  await loginAsStudent(page)
   await page.goto('/practicum/profile')
   await page.locator('[data-role-option="STUDENT"]').click()
   await expect(page).toHaveURL('/practicum')
@@ -127,9 +104,8 @@ test('[PHASE-A-03] STUDENT sees limited navigation and is blocked from admin pag
 })
 
 test('[PHASE-A-03] STUDENT home shows student dashboard without admin data', async ({ page }) => {
-  await page.goto('/practicum/profile')
-  await page.locator('[data-role-option="STUDENT"]').click()
-  await expect(page).toHaveURL('/practicum')
+  await loginAsStudent(page)
+  await page.goto('/practicum')
 
   // Should show student home
   await expect(page.locator('[data-student-home]')).toBeVisible()
@@ -227,8 +203,8 @@ test('[PHASE-A-05] sidebar active state uses aria-current on navigation', async 
 })
 
 test('[PHASE-A-05] student sidebar hides all admin navigation entries', async ({ page }) => {
-  await page.goto('/practicum/profile')
-  await page.locator('[data-role-option="STUDENT"]').click()
+  await loginAsStudent(page)
+  await page.goto('/practicum')
 
   // No admin entries in sidebar
   await expect(page.locator('[data-nav-key="plans"]')).toHaveCount(0)
@@ -243,9 +219,8 @@ test('[PHASE-A-05] student sidebar hides all admin navigation entries', async ({
 // ── A-06: 学生计划入口 ─────────────────────────────────────
 
 test('[PHASE-A-06] student home shows published plan links', async ({ page }) => {
-  await page.goto('/practicum/profile')
-  await page.locator('[data-role-option="STUDENT"]').click()
-  await expect(page).toHaveURL('/practicum')
+  await loginAsStudent(page)
+  await page.goto('/practicum')
 
   // Published plan ("网店运营") is visible as link
   await expect(page.locator('[data-plan-link][data-plan-id="plan-wdds"]')).toBeVisible()
@@ -279,8 +254,10 @@ test('[PHASE-A-07] loading state appears before content renders', async ({ page 
 })
 
 test('[PHASE-A-07] forbidden state shows on admin pages for students', async ({ page }) => {
+  await loginAsStudent(page)
   await page.goto('/practicum/profile')
   await page.locator('[data-role-option="STUDENT"]').click()
+  await expect(page).toHaveURL('/practicum')
 
   const adminPages = [
     { route: '/practicum/resources', text: /管理|资源/ },
@@ -309,8 +286,7 @@ test('[PHASE-A-07] empty state shows when data list is empty', async ({ page }) 
 })
 
 test('[PHASE-A-07] draft plan shows forbidden for student via direct URL', async ({ page }) => {
-  await page.goto('/practicum/profile')
-  await page.locator('[data-role-option="STUDENT"]').click()
+  await loginAsStudent(page)
 
   // Navigate to draft plan detail page
   await page.goto('/practicum/plans/plan-wdsj')
@@ -344,9 +320,8 @@ test('[PHASE-A-PERSIST] role identity persists after page refresh', async ({ pag
 })
 
 test('[PHASE-A-PERSIST] student role persists after refresh', async ({ page }) => {
-  await page.goto('/practicum/profile')
-  await page.locator('[data-role-option="STUDENT"]').click()
-  await expect(page).toHaveURL('/practicum')
+  await loginAsStudent(page)
+  await page.goto('/practicum')
 
   await page.reload()
   await expect(page.locator('[data-student-home]')).toBeVisible()

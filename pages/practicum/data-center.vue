@@ -3,9 +3,9 @@
     <PracticumShell context-title="数据中心" context-meta="学习数据概览">
       <p v-if="isLoading" data-loading class="empty-state">正在加载数据...</p>
 
-      <p v-else-if="loadError" data-data-center-error class="empty-state" role="alert">数据加载失败，请刷新重试。</p>
+      <p v-else-if="!canAccessDataCenter(store.state.activeRole)" data-forbidden class="empty-state">只有管理员可以访问数据中心。</p>
 
-          <p v-else-if="!canAccessDataCenter(store.state.activeRole)" data-forbidden class="empty-state">只有管理员可以访问数据中心。</p>
+      <p v-else-if="loadError" data-data-center-error class="empty-state" role="alert">数据加载失败，请刷新重试。</p>
 
       <div v-else data-data-center>
         <!-- Overview metrics -->

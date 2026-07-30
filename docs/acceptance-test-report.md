@@ -139,3 +139,12 @@ Focused regression: `npx.cmd playwright test tests/e2e/practicum/access.spec.ts 
 | `SB-D-11`, `SB-D-12` mobile detail | The prior record had no executed 390px result. | `npx.cmd playwright test tests/e2e/practicum/analytics-member-skill-map-api.spec.ts tests/e2e/practicum/analytics-member-page.spec.ts --reporter=list` passed 3/3. | Member skill map supports direct URL, authorization, and 390px without horizontal overflow. |
 
 The full `tests/e2e/practicum` command still timed out at 600 seconds after 107/183 started scenarios. It is therefore `FAILED/UNVERIFIED`, not a passing full-suite result. The next RED/GREEN slice is server-derived curriculum deletion impact and submitted-evidence protection.
+
+## 2026-07-30 Foundation real-session and forbidden-state slice
+
+| Scenario | RED | GREEN | Result |
+|---|---|---|---|
+| `PHASE-A-01` to `PHASE-A-07` | The legacy phase-A file had 10 failures because it changed `localStorage` roles while retaining an OWNER server session. | `npx.cmd playwright test tests/e2e/practicum/phase-a-foundation.spec.ts --reporter=list` passed 19/19 after each student path established a real STUDENT session and selected the matching workspace view. | Login redirect, direct URLs, navigation, refresh, loading, and student/owner boundaries are exercised against server sessions. |
+| `SB-Q-04` student opens data center directly | The student received API `403`, but `/practicum/data-center` rendered only `data-data-center-error`. | The same 19/19 suite verifies `data-forbidden` for every management route after the page prioritizes authorization state over generic load error. | Unauthorized users see a clear restricted state and not a misleading data failure. |
+
+Quality gate: `npm.cmd run typecheck` passed. The complete Playwright suite and production build remain pending and are not reported as passed.
