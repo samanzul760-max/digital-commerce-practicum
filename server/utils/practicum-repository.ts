@@ -101,6 +101,11 @@ function canAccessRoom(user: AuthUser, roomId: string) {
   return user.roomIds.includes(roomId)
 }
 
+function isSubmissionOwnedByMember(member: PrototypeMember, submission: PracticeSubmissionState) {
+  const userId = member.userId ?? (member.id === 'member-001' ? 'user-student-001' : member.id)
+  return submission.studentId === member.id || submission.studentId === userId
+}
+
 export function getWorkspaceContext(user: AuthUser, selection?: { organizationId?: string; roomId?: string }) {
   const state = readState()
   const rooms = state.rooms.filter(room => canAccessRoom(user, room.id))
@@ -596,7 +601,7 @@ export function getMemberAnalytics(user: AuthUser, roomId: string) {
     .filter(member => member.role === 'STUDENT')
     .map(member => {
       const submissions = Object.entries(state.submissions)
-        .filter(([activityId, submission]) => activityIds.has(activityId) && submission.studentId === member.id)
+        .filter(([activityId, submission]) => activityIds.has(activityId) && isSubmissionOwnedByMember(member, submission))
         .map(([, submission]) => submission)
       const graded = submissions.filter(submission => submission.status === 'GRADED' && submission.grade)
       const scores = graded.flatMap(submission => Object.values(submission.grade!.rubricScores))
@@ -620,12 +625,14 @@ export function getMemberAnalyticsDetail(user: AuthUser, roomId: string, memberI
   if (!member) return { kind: 'NOT_FOUND' as const }
 
   const state = readState()
+  const memberRecord = state.members.find(item => item.id === memberId)
+  if (!memberRecord) return { kind: 'NOT_FOUND' as const }
   const plans = state.plans
     .filter(plan => plan.roomId === roomId)
     .map(plan => {
       const activityIds = new Set(state.nodes.filter(node => node.planId === plan.id && node.level === 3).map(node => node.id))
       const gradedCount = Object.entries(state.submissions)
-        .filter(([activityId, submission]) => activityIds.has(activityId) && submission.studentId === memberId && submission.status === 'GRADED')
+        .filter(([activityId, submission]) => activityIds.has(activityId) && isSubmissionOwnedByMember(memberRecord, submission) && submission.status === 'GRADED')
         .length
       return {
         planId: plan.id,
@@ -636,7 +643,39 @@ export function getMemberAnalyticsDetail(user: AuthUser, roomId: string, memberI
       }
     })
 
-  return clone({ kind: 'OK' as const, member, plans })
+  const skillTotals = new Map<string, { label: string; score: number; maxScore: number }>()
+  for (const [activityId, submission] of Object.entries(state.submissions)) {
+    if (!isSubmissionOwnedByMember(memberRecord, submission) || submission.status !== 'GRADED' || !submission.grade) continue
+    const context = activityContext(state, activityId)
+    if (context.plan?.roomId !== roomId || context.activity?.config.type !== 'PRACTICE_ACTIVITY') continue
+    for (const dimension of context.activity.config.rubric) {
+      const current = skillTotals.get(dimension.label) ?? { label: dimension.label, score: 0, maxScore: 0 }
+      current.score += submission.grade.rubricScores[dimension.id] ?? 0
+      current.maxScore += dimension.maxScore
+      skillTotals.set(dimension.label, current)
+    }
+  }
+  const skillMap = [...skillTotals.values()]
+    .map(item => {
+      const score = item.maxScore ? Math.round((item.score / item.maxScore) * 100) : 0
+      const mastery = score >= 80 ? 'MASTERED' : score >= 60 ? 'DEVELOPING' : 'NEEDS_SUPPORT'
+      return {
+        skill: item.label,
+        score,
+        mastery,
+        explanation: mastery === 'MASTERED' ? '评分表现稳定，可继续提升综合应用。' : mastery === 'DEVELOPING' ? '已具备基础能力，建议结合反馈继续练习。' : '建议根据评分反馈完成针对性练习。',
+      }
+    })
+    .sort((left, right) => right.score - left.score || left.skill.localeCompare(right.skill, 'zh-CN'))
+
+  return clone({
+    kind: 'OK' as const,
+    member,
+    plans,
+    skillMap,
+    strengths: skillMap.filter(item => item.mastery === 'MASTERED'),
+    improvements: skillMap.filter(item => item.mastery !== 'MASTERED'),
+  })
 }
 
 export function exportAnalyticsCsv(user: AuthUser, roomId: string) {

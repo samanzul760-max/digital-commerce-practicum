@@ -30,6 +30,24 @@
             </table>
           </div>
         </section>
+        <section data-member-skill-map>
+          <h2>能力图谱</h2>
+          <p v-if="!detail.skillMap.length" data-member-skill-map-empty class="empty-state">暂无已评分的实践活动，暂时无法生成能力图谱。</p>
+          <div v-else class="form-panel">
+            <table class="data-table">
+              <thead><tr><th>能力维度</th><th>得分</th><th>掌握程度</th><th>说明</th></tr></thead>
+              <tbody>
+                <tr v-for="item in detail.skillMap" :key="item.skill">
+                  <td>{{ item.skill }}</td><td>{{ item.score }}%</td><td>{{ masteryLabel(item.mastery) }}</td><td>{{ item.explanation }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div v-if="detail.skillMap.length" class="analytics-explanations">
+            <p data-member-strengths><strong>优势能力：</strong>{{ detail.strengths.length ? detail.strengths.map(item => item.skill).join('、') : '暂无达到熟练级别的能力维度' }}</p>
+            <p data-member-improvements><strong>待提升能力：</strong>{{ detail.improvements.length ? detail.improvements.map(item => item.skill).join('、') : '暂无待提升的能力维度' }}</p>
+          </div>
+        </section>
       </section>
     </PracticumShell>
   </ClientOnly>
@@ -57,4 +75,8 @@ onMounted(async () => {
     isLoading.value = false
   }
 })
+
+function masteryLabel(mastery: 'MASTERED' | 'DEVELOPING' | 'NEEDS_SUPPORT') {
+  return mastery === 'MASTERED' ? '已掌握' : mastery === 'DEVELOPING' ? '发展中' : '需加强'
+}
 </script>

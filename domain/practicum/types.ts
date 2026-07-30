@@ -67,6 +67,7 @@ export interface SupportingResource {
 
 export interface PrototypeMember {
   id: string
+  userId?: string
   label: string
   role: 'OWNER' | 'STUDENT'
   group: string

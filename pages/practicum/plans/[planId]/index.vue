@@ -3,6 +3,8 @@
     <PracticumShell :context-title="plan?.title ?? '教学计划'" :context-meta="planMeta">
       <p v-if="isLoading" data-loading class="empty-state">正在加载计划详情...</p>
 
+      <p v-else-if="forbidden" data-forbidden class="empty-state">该计划尚未发布，无法查看。</p>
+
       <p v-else-if="!plan || loadError" data-empty class="empty-state">计划未找到或无权查看。</p>
 
       <div v-else data-plan-detail>
@@ -78,6 +80,7 @@ import type { ActivityType, CurriculumNode, Plan } from '../../../../domain/prac
 const route = useRoute()
 const isLoading = ref(true)
 const loadError = ref(false)
+const forbidden = ref(false)
 const planId = computed(() => route.params.planId as string)
 type ServerPlan = Plan & { version: number }
 interface PlanSnapshot {
@@ -121,16 +124,24 @@ function activityTypeLabel(type?: ActivityType) {
 async function loadPlan() {
   isLoading.value = true
   loadError.value = false
+  forbidden.value = false
   try {
     snapshot.value = await $fetch<PlanSnapshot>(`/api/practicum/plans/${encodeURIComponent(planId.value)}`, {
       headers: import.meta.server ? useRequestHeaders(['cookie']) : undefined,
     })
-  } catch {
+  } catch (error: unknown) {
     snapshot.value = null
-    loadError.value = true
+    forbidden.value = isForbiddenError(error)
+    loadError.value = !forbidden.value
   } finally {
     isLoading.value = false
   }
+}
+
+function isForbiddenError(error: unknown) {
+  if (!error || typeof error !== 'object') return false
+  const candidate = error as { status?: unknown; statusCode?: unknown; response?: { status?: unknown } }
+  return candidate.status === 403 || candidate.statusCode === 403 || candidate.response?.status === 403
 }
 
 async function createNode(parentId: string | null, level: 1 | 2) {

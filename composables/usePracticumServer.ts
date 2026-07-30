@@ -33,6 +33,16 @@ export interface PracticumMemberAnalytics {
 export interface PracticumMemberAnalyticsDetail {
   member: PracticumMemberAnalytics
   plans: { planId: string; title: string; activityCount: number; gradedCount: number; completionPercent: number }[]
+  skillMap: PracticumSkillMapItem[]
+  strengths: PracticumSkillMapItem[]
+  improvements: PracticumSkillMapItem[]
+}
+
+export interface PracticumSkillMapItem {
+  skill: string
+  score: number
+  mastery: 'MASTERED' | 'DEVELOPING' | 'NEEDS_SUPPORT'
+  explanation: string
 }
 
 export function usePracticumServer() {

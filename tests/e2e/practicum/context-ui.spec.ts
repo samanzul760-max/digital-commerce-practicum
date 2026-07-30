@@ -19,6 +19,7 @@ test('[SB-Q-03] teacher login presents a teacher workspace instead of the admini
   await page.locator('[data-bootstrap-password]').fill('TeacherUiOwner123!')
   await page.locator('[data-bootstrap-submit]').click()
   await expect(page).toHaveURL(/\/practicum$/)
+  await page.goto('/practicum/profile')
   await page.locator('[data-logout]').first().click()
   await expect(page).toHaveURL(/\/practicum\/login$/)
 

@@ -100,6 +100,7 @@ async function handleLogin() {
 async function handleLogout() {
   await auth.logout()
   store.resetDemo()
+  await router.push('/practicum/login')
 }
 
 function selectRole(role: 'OWNER' | 'STUDENT') {

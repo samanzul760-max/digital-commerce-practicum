@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { loginAsStudent } from './auth-helpers'
 
 /**
  * Given a student selects the Student demo role
@@ -6,6 +7,7 @@ import { expect, test } from '@playwright/test'
  * Then draft plans and plan-management actions are unavailable
  */
 test('[CASE-S1-002] student cannot see draft plans or manage plans', async ({ page }) => {
+  await loginAsStudent(page)
   await page.goto('/practicum/profile')
   await page.locator('[data-role-option="STUDENT"]').click()
   await expect(page).toHaveURL('/practicum')
@@ -26,6 +28,7 @@ test('[CASE-S1-002] student cannot see draft plans or manage plans', async ({ pa
  * Then the page shows a clear forbidden message and does not expose editing controls
  */
 test('[ORIGINAL-S2-002] student is blocked from the plan editor with a clear forbidden message', async ({ page }) => {
+  await loginAsStudent(page)
   // Switch to Student identity
   await page.goto('/practicum/profile')
   await page.locator('[data-role-option="STUDENT"]').click()
@@ -53,6 +56,7 @@ test('[ORIGINAL-S2-002] student is blocked from the plan editor with a clear for
  * Then the page does not expose the draft plan title description modules activities or resources
  */
 test('[ORIGINAL-S2-002] student cannot read draft plan data via direct URL', async ({ page }) => {
+  await loginAsStudent(page)
   // Switch to Student identity
   await page.goto('/practicum/profile')
   await page.locator('[data-role-option="STUDENT"]').click()
@@ -76,6 +80,7 @@ test('[ORIGINAL-S2-002] student cannot read draft plan data via direct URL', asy
  * Then each page shows a clear forbidden message and does not expose management data or controls
  */
 test('[ORIGINAL-S2-002] student is blocked from resources members and room-settings pages', async ({ page }) => {
+  await loginAsStudent(page)
   // Switch to Student identity
   await page.goto('/practicum/profile')
   await page.locator('[data-role-option="STUDENT"]').click()

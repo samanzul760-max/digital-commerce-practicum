@@ -108,3 +108,23 @@ TDD 证据：`npx.cmd playwright test tests/e2e/practicum/auth-bootstrap.spec.ts
 
 - 完整 `npx.cmd playwright test tests/e2e/practicum --reporter=list` 在 243 秒后超时并出现 `EPIPE`，记为 `UNVERIFIED/FAILED`，旧报告的 128/128 不能作为本轮证据。
 - 相关回归套件 19 个用例中 15 个通过、4 个失败。失败均来自 `teacher-review.spec.ts` 使用 OWNER session 切换“学生视角”后仍把提交写入 localStorage；服务端队列按新契约为空。该身份预览与真实服务端角色尚未统一，提交/审核整体保持 `PARTIAL`。
+
+## 2026-07-30 Member skill map slice
+
+| BDD | RED | GREEN | Result |
+|---|---|---|---|
+| `SB-D-11`, `SB-D-12` | `npx.cmd playwright test tests/e2e/practicum/analytics-member-skill-map-api.spec.ts --reporter=list` failed because the member detail response had no skill-map fields. After the first implementation, the same test still failed because graded submissions used the authenticated user ID while analytics matched only the prototype member ID. | `npx.cmd playwright test tests/e2e/practicum/analytics-member-skill-map-api.spec.ts tests/e2e/practicum/analytics-member-page.spec.ts --reporter=list` passed 2/2 after adding the server-side membership mapping and skill aggregation. | Owner can grade a real student submission and read skill scores, mastery, strengths, and improvements. Student direct access returns `403 MEMBER_ANALYTICS_FORBIDDEN`. |
+
+This slice is `IMPLEMENTED_UNVERIFIED`, not `PASS`: mobile coverage and the full Playwright suite have not yet been rerun for this change.
+
+Build gate: `NUXT_IGNORE_LOCK=1 npm.cmd run build` compiled the client and server, then failed during Nitro node-externals output tracing with `EPERM: operation not permitted, readlink 'C:\\Users\\29053'`. A direct Node `fs.promises.readlink('C:\\Users\\29053')` reproduced the same `EPERM`; `C:\\Users\\29053` is a normal directory and neither `nuxt.config.ts` nor `package.json` has local changes. This is an environment permission blocker, so the build result is `FAILED` and no completion commit was created.
+
+## 2026-07-30 Access and workspace regression slice
+
+| Scenario | RED | GREEN | Result |
+|---|---|---|---|
+| `SB-Q-04` student opens a draft plan directly | The real student session received `403 PLAN_FORBIDDEN`, but the page rendered only `data-empty`. | `access.spec.ts` passed 4/4 after rendering the 403 as `data-forbidden`. | No plan data is exposed and the student sees a clear restricted-state message. |
+| `SB-Q-01` logout redirects to login | The logout request revoked the cookie but left the browser on `/practicum/profile`. | `context-ui.spec.ts` passed 4/4 after navigating to `/practicum/login`. | Logout is observable through both URL and access boundary. |
+| `SB-G-04` mobile workspace context | The teaching-mode field was hidden at 390px. | The mobile context scenario passed after retaining the text and confirming no horizontal overflow. | Organization, room, and teaching mode remain readable. |
+
+Focused regression: `npx.cmd playwright test tests/e2e/practicum/access.spec.ts tests/e2e/practicum/context-ui.spec.ts --reporter=list` passed 8/8. The full suite remains `FAILED/UNVERIFIED`: it timed out after 600 seconds after beginning 183 cases, and many legacy tests still model a student by changing only the client-side preview role while retaining the global OWNER session. Those tests must be migrated to real per-role login contexts; server authorization was not weakened to make them pass.
