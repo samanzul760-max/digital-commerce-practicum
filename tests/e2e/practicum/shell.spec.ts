@@ -173,7 +173,7 @@ test('[UI-CLEANUP-001] visible copy stays user-facing and avoids fake entries', 
   for (const copy of forbiddenCopy) {
     expect(bodyText).not.toContain(copy)
   }
-  await expect(page.getByText('常用教学与管理工具')).toBeVisible()
+  await expect(page.getByRole('heading', { name: '常用入口' }).first()).toBeVisible()
   await expect(page.getByText('配置实训室介绍与宣传信息')).toHaveCount(0)
 })
 

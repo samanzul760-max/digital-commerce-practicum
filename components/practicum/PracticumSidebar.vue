@@ -1,7 +1,7 @@
 <template>
   <aside data-practicum-sidebar class="workspace-sidebar" aria-label="主导航">
     <div class="product-mark">
-      <span class="product-sign" aria-hidden="true">DC</span>
+      <span class="product-glyph" aria-hidden="true"><PracticumIcon name="dashboard" /></span>
       <span>
         <strong>数字商贸实训工作台</strong>
         <small>教学与实训协同平台</small>

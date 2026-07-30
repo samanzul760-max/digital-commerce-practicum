@@ -45,7 +45,7 @@ const storageError = computed(() => store.storageError.value)
 onMounted(async () => {
   store.syncStorageError()
   const user = await auth.load()
-  if (user) store.switchRole(user.role)
+  if (user && !store.state.activeRole) store.switchRole(user.role)
 })
 const roleLabels = {
   OWNER: '管理员',

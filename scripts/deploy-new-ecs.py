@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -214,6 +215,30 @@ rm -f {remote_archive!r}
         print(err)
 
 
+def wait_for_remote_health(
+    client: paramiko.SSHClient,
+    remote_dir: str,
+    attempts: int = 15,
+    interval_seconds: int = 2,
+    sleep=time.sleep,
+) -> bool:
+    check_script = f"cd {remote_dir!r} && curl -fsS http://127.0.0.1:3000/practicum >/dev/null && echo OK"
+    last_error = ""
+    for attempt in range(attempts):
+        stdin, stdout, stderr = client.exec_command(check_script, timeout=60)
+        out = stdout.read().decode("utf-8", errors="replace")
+        err = stderr.read().decode("utf-8", errors="replace")
+        code = stdout.channel.recv_exit_status()
+        if code == 0:
+            if out.strip():
+                print(out)
+            return True
+        last_error = err.strip() or f"health check failed with exit code {code}"
+        if attempt < attempts - 1:
+            sleep(interval_seconds)
+    raise RuntimeError(last_error)
+
+
 def main() -> int:
     args = parse_args()
     if args.host == "112.124.63.206":
@@ -244,17 +269,7 @@ def main() -> int:
             except OSError:
                 pass
 
-        check_script = f"cd {args.remote_dir!r} && curl -fsS http://127.0.0.1:3000/practicum >/dev/null && echo OK"
-        stdin, stdout, stderr = client.exec_command(check_script, timeout=60)
-        out = stdout.read().decode("utf-8", errors="replace")
-        err = stderr.read().decode("utf-8", errors="replace")
-        code = stdout.channel.recv_exit_status()
-        if out.strip():
-            print(out)
-        if code != 0:
-            raise RuntimeError(err.strip() or f"post-deploy check failed with exit code {code}")
-        if err.strip():
-            print(err)
+        wait_for_remote_health(client, args.remote_dir)
         print(f"Deployed to http://{args.host}:3000/practicum")
     finally:
         client.close()

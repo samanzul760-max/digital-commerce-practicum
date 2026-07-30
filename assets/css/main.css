@@ -1,16 +1,16 @@
 :root {
-  --practicum-ink: #111827;
-  --practicum-ink-soft: #344054;
+  --practicum-ink: #1E293B;
+  --practicum-ink-soft: #334155;
   --practicum-muted: #667085;
   --practicum-muted-2: #98a2b3;
-  --practicum-accent: #2563eb;
-  --practicum-accent-soft: #eff6ff;
-  --practicum-accent-border: #dbeafe;
-  --practicum-teal: #2563eb;
-  --practicum-teal-soft: #eff6ff;
-  --practicum-orange: #b45309;
-  --practicum-orange-soft: #fffaeb;
-  --practicum-paper: #f6f7f9;
+  --practicum-accent: #1890ff;
+  --practicum-accent-soft: #eaf5ff;
+  --practicum-accent-border: #cfe9ff;
+  --practicum-teal: #18a57a;
+  --practicum-teal-soft: #e8f8f3;
+  --practicum-orange: #fa8c16;
+  --practicum-orange-soft: #fff3e8;
+  --practicum-paper: #f5f7fa;
   --practicum-surface: #ffffff;
   --practicum-border: #e5e7eb;
   --practicum-border-strong: #d0d5dd;
@@ -20,8 +20,8 @@
   --practicum-success-soft: #ecfdf3;
   --practicum-focus: rgba(37, 99, 235, 0.28);
   --practicum-shadow-1: 0 10px 28px rgba(15, 23, 42, 0.08);
-  --practicum-radius-sm: 6px;
-  --practicum-radius-md: 6px;
+  --practicum-radius-sm: 10px;
+  --practicum-radius-md: 14px;
   --practicum-motion: 180ms ease-out;
   color-scheme: light;
 }
@@ -652,6 +652,36 @@ tr:last-child td { border-bottom: 0; }
   .identity-card { grid-template-columns: 42px minmax(0, 1fr); }
   .identity-state { grid-column: 2; }
 }
+
+/* Digital Commerce Practicum visual refresh */
+.workspace-sidebar { color: #d5deea; background: var(--practicum-ink); border-right-color: #314055; }
+.workspace-sidebar .product-mark { border-bottom-color: #314055; }
+.workspace-sidebar .product-mark strong { color: #fff; }
+.workspace-sidebar .product-mark small { color: #9eb0c6; }
+.workspace-sidebar .product-glyph { display:grid; place-items:center; width:32px; height:32px; color:#7dd3fc; background:rgba(125,211,252,.12); border-radius:14px; }
+.workspace-sidebar .product-glyph .practicum-icon { width:18px; height:18px; }
+.workspace-sidebar .nav-item { color: #b9c7d8; border-radius: 14px; }
+.workspace-sidebar .nav-item:hover:not(:disabled) { color: #fff; background: #293b51; }
+.workspace-sidebar .nav-item-active { position:relative; color:#fff; background:rgba(99,179,237,.18); }
+.workspace-sidebar .nav-item-active::before { display:block; position:absolute; left:0; width:3px; height:24px; border-radius:999px; background:#7dd3fc; content:""; }
+.workspace-topbar { height: 64px; padding: 10px 28px; background: #fff; backdrop-filter: none; }
+.workspace-context { display: none; }
+.workspace-content { padding: 30px 32px 44px; }
+.metric-strip, .metric-row { gap: 14px; overflow: visible; background: transparent; border: 0; border-radius: 0; }
+.metric { min-height: 132px; padding: 18px; background: #fff; border: 1px solid var(--practicum-border); border-radius: 14px; box-shadow: 0 4px 16px rgba(30,41,59,.04); }
+.metric:not(:last-child) { border-right: 1px solid var(--practicum-border); }
+.metric strong { color: var(--practicum-ink); font-size: 29px; }
+.panel, .next-task, .form-panel, .table-panel, .side-section, .progress-band { border-radius: 14px; box-shadow: 0 4px 18px rgba(30,41,59,.04); }
+.panel-head { min-height: 62px; padding: 16px 20px; }
+.row-item { min-height: 74px; padding: 14px 20px; }
+.primary-button { min-height: 40px; border-radius: 14px; box-shadow: 0 6px 14px rgba(24,144,255,.16); }
+.secondary-button, .ghost-button { min-height: 40px; border-radius: 14px; }
+.tool-card { min-height: 144px; border-radius: 14px; box-shadow: 0 3px 12px rgba(30,41,59,.03); }
+.tool-card:hover { border-color: #b8dcfb; box-shadow: 0 8px 20px rgba(24,144,255,.1); transform: translateY(-2px); }
+.progress-band { padding: 22px; background: #eaf5ff; border-color: #cfe9ff; }
+.progress-track { background: #cfe9ff; }
+.page-heading h1, .section-heading h1 { font-size: 28px; font-weight: 750; }
+@media (max-width: 780px) { .workspace-sidebar { background: #fff; color: var(--practicum-ink); border-bottom-color: var(--practicum-border); } .workspace-sidebar .product-mark strong { color: var(--practicum-ink); } .workspace-sidebar .product-mark small { color: var(--practicum-muted); } .workspace-sidebar .nav-item { color: var(--practicum-muted); } .workspace-sidebar .nav-item-active { color: var(--practicum-accent); background: var(--practicum-accent-soft); } .workspace-content { padding: 20px 16px 36px; } }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }

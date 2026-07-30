@@ -27,6 +27,37 @@ class DeployNewEcsTests(unittest.TestCase):
         self.assertTrue(deploy.is_excluded((".data", "auth-users.json"), ".json"))
         self.assertIn('--exclude="./.data"', POWERSHELL_SCRIPT.read_text(encoding="utf-8"))
 
+    def test_wait_for_remote_health_retries_until_the_app_is_ready(self):
+        deploy = load_deploy_module()
+
+        class Channel:
+            def __init__(self, code):
+                self.code = code
+
+            def recv_exit_status(self):
+                return self.code
+
+        class Stream:
+            def __init__(self, code, content=b""):
+                self.channel = Channel(code)
+                self.content = content
+
+            def read(self):
+                return self.content
+
+        class Client:
+            def __init__(self):
+                self.calls = 0
+
+            def exec_command(self, script, timeout):
+                self.calls += 1
+                code = 0 if self.calls == 2 else 7
+                return None, Stream(code, b"OK" if code == 0 else b""), Stream(code, b"not ready" if code else b"")
+
+        client = Client()
+        self.assertTrue(deploy.wait_for_remote_health(client, "/opt/digital-commerce-practicum", attempts=2, interval_seconds=0, sleep=lambda _: None))
+        self.assertEqual(client.calls, 2)
+
 
 if __name__ == "__main__":
     unittest.main()
