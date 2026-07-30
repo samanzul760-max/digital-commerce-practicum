@@ -661,6 +661,25 @@ export function exportAnalyticsCsv(user: AuthUser, roomId: string) {
   return ['member_id,plan_title,activity_title,status,version,score', ...rows].join('\n')
 }
 
+export function getPlanAnalytics(user: AuthUser, roomId: string, planId: string) {
+  const state = readState()
+  if (!ownerOnly(user) || !canAccessRoom(user, roomId)) return null
+  const plan = state.plans.find(item => item.id === planId && item.roomId === roomId)
+  if (!plan) return { kind: 'NOT_FOUND' as const }
+  const activityNodes = state.nodes.filter(node => node.planId === plan.id && node.level === 3)
+  const activities = activityNodes.map(node => ({
+    activityId: node.id,
+    title: node.title,
+    status: state.submissions[node.id]?.status ?? 'NOT_STARTED',
+  }))
+  const gradedCount = activities.filter(activity => activity.status === 'GRADED').length
+  return clone({
+    kind: 'OK' as const,
+    plan: { id: plan.id, title: plan.title, activityCount: activities.length, gradedCount, completionPercent: activities.length ? Math.round((gradedCount / activities.length) * 100) : 0 },
+    activities,
+  })
+}
+
 export function saveAsset(user: AuthUser, asset: StoredAsset) {
   const state = readState()
   if (!ownerOnly(user)) return false
