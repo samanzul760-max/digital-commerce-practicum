@@ -10,3 +10,4 @@ playwright-report/
 output/playwright/auth-state.json
 __pycache__/
 *.py[cod]
+.worktrees/
