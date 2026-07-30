@@ -148,3 +148,7 @@ The full `tests/e2e/practicum` command still timed out at 600 seconds after 107/
 | `SB-Q-04` student opens data center directly | The student received API `403`, but `/practicum/data-center` rendered only `data-data-center-error`. | The same 19/19 suite verifies `data-forbidden` for every management route after the page prioritizes authorization state over generic load error. | Unauthorized users see a clear restricted state and not a misleading data failure. |
 
 Quality gate: `npm.cmd run typecheck` passed. The complete Playwright suite and production build remain pending and are not reported as passed.
+
+## 2026-07-30 Navigation real-session slice
+
+`npx.cmd playwright test tests/e2e/practicum/navigation-permissions.spec.ts --reporter=list` passed 4/4. The initial RED run had three failures because a fresh browser context retained the default OWNER storage state while the test expected a student navigation layout. Each affected path now establishes a STUDENT server session before selecting the matching workspace view. The 375px, 768px, 1024px, and 1440px case-page checks all pass without horizontal overflow for the student journey.

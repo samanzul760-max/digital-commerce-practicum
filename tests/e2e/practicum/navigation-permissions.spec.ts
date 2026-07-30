@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { loginAsStudent } from './auth-helpers'
 
 /**
  * Given a user is in the practicum workspace
@@ -36,6 +37,7 @@ test('[ORIGINAL-S7-001] sidebar active state follows the current route', async (
  */
 test('[ORIGINAL-S7-001] student mobile navigation highlights the current route and hides admin entries', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 })
+  await loginAsStudent(page)
   await page.goto('/practicum/profile')
   await page.locator('[data-role-option="STUDENT"]').click()
   await page.goto('/practicum/cases/case-coupon-plan')
@@ -56,6 +58,7 @@ test('[ORIGINAL-S7-001] student mobile navigation highlights the current route a
  * Then the existing forbidden pages still block management data
  */
 test('[ORIGINAL-S7-001] student direct URL guards still block administration pages', async ({ page }) => {
+  await loginAsStudent(page)
   await page.goto('/practicum/profile')
   await page.locator('[data-role-option="STUDENT"]').click()
 
@@ -74,6 +77,7 @@ test('[ORIGINAL-S7-001] commerce case pages fit four approved viewport widths', 
   for (const width of [375, 768, 1024, 1440]) {
     const context = await browser.newContext({ viewport: { width, height: 820 } })
     const page = await context.newPage()
+    await loginAsStudent(page)
     await page.goto('/practicum/profile')
     await page.locator('[data-role-option="STUDENT"]').click()
 
