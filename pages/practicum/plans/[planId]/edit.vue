@@ -356,7 +356,18 @@ async function handleAddResource() {
   if (!plan.value || !resourceName.value.trim() || !resourceUrl.value.trim()) return
   try { const response = await $fetch<{ resource: SupportingResource }>('/api/practicum/resources', { method: 'POST', headers: useCsrfHeaders({ 'Idempotency-Key': `editor-resource-${Date.now()}` }), body: { planId: plan.value.id, name: resourceName.value.trim(), kind: resourceKind.value, url: resourceUrl.value.trim() } }); planResources.value = [...planResources.value, response.resource]; resourceName.value = ''; resourceUrl.value = ''; showResourceForm.value = false } catch { errorMessage.value = '资源保存失败，请重试。' }
 }
-function openDeleteImpact(nodeId: string) { const ids = new Set<string>(); const visit = (id: string) => { ids.add(id); planNodes.value.filter(node => node.parentId === id).forEach(node => visit(node.id)) }; visit(nodeId); deleteTargetNodeId.value = nodeId; deleteImpact.value = { descendantCount: ids.size - 1, activityCount: [...ids].filter(id => planNodes.value.find(node => node.id === id)?.level === 3).length, evidenceCount: 0 } }
+async function openDeleteImpact(nodeId: string) {
+  if (!plan.value) return
+  deleteTargetNodeId.value = nodeId
+  try {
+    deleteImpact.value = await $fetch<{ descendantCount: number; activityCount: number; evidenceCount: number }>(
+      `/api/practicum/plans/${planId.value}/nodes/${nodeId}/delete-impact` as string,
+    )
+  } catch {
+    deleteTargetNodeId.value = null
+    errorMessage.value = '无法读取删除影响，请刷新后重试。'
+  }
+}
 async function handleDelete() { if (!deleteTargetNodeId.value || !plan.value) return; if (await write(`/api/practicum/plans/${planId.value}/nodes/${deleteTargetNodeId.value}`, 'DELETE', { version: plan.value.version })) { deleteImpact.value = null; deleteTargetNodeId.value = null } }
 function openPublishValidation() { publishValidation.value = !plan.value ? ['计划不存在'] : [ ...(plan.value.title.trim() ? [] : ['缺少计划标题']), ...(plan.value.description.trim() ? [] : ['缺少计划描述']), ...(modules.value.length ? [] : ['至少需要配置一个一级目录']), ...(activityCount.value ? [] : ['至少需要配置一个活动']) ] }
 async function handlePublish() { if (plan.value && await write(`/api/practicum/plans/${planId.value}/publish`, 'POST')) publishValidation.value = null }

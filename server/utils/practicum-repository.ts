@@ -359,12 +359,40 @@ export function deleteCurriculumNode(user: AuthUser, planId: string, nodeId: str
   const index = state.nodes.findIndex(item => item.id === nodeId && item.planId === planId)
   if (index < 0) return { kind: 'NOT_FOUND' as const }
   if (state.nodes.some(item => item.parentId === nodeId)) return { kind: 'STATE' as const }
+  if ((state.submissions[nodeId]?.versions.length ?? 0) > 0) return { kind: 'STATE' as const }
 
   state.nodes.splice(index, 1)
   plan.version += 1
   plan.updatedAt = new Date().toISOString()
   writeState(state)
   return { kind: 'OK' as const, ...getPlan(user, planId)! }
+}
+
+export function getCurriculumDeleteImpact(user: AuthUser, planId: string, nodeId: string) {
+  const state = readState()
+  const plan = state.plans.find(item => item.id === planId)
+  if (!plan || !canAccessRoom(user, plan.roomId)) return { kind: 'NOT_FOUND' as const }
+  if (!ownerOnly(user)) return { kind: 'FORBIDDEN' as const }
+  if (!state.nodes.some(item => item.id === nodeId && item.planId === planId)) return { kind: 'NOT_FOUND' as const }
+
+  const descendantIds = new Set([nodeId])
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const node of state.nodes) {
+      if (node.parentId && descendantIds.has(node.parentId) && !descendantIds.has(node.id)) {
+        descendantIds.add(node.id)
+        changed = true
+      }
+    }
+  }
+  const activityIds = [...descendantIds].filter(id => state.nodes.some(node => node.id === id && node.level === 3))
+  return {
+    kind: 'OK' as const,
+    descendantCount: descendantIds.size - 1,
+    activityCount: activityIds.length,
+    evidenceCount: activityIds.filter(id => (state.submissions[id]?.versions.length ?? 0) > 0).length,
+  }
 }
 
 function ownerOnly(user: AuthUser) {

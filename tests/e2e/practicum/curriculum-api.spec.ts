@@ -2,6 +2,13 @@ import { expect, test } from '@playwright/test'
 import { csrfHeaders } from './csrf'
 
 test.describe('curriculum API contract', () => {
+  test('[SB-P-11][SB-Q-06] owner reads server-derived curriculum deletion impact', async ({ page }) => {
+    const response = await page.request.get('/api/practicum/plans/plan-wdds/nodes/unit-01-01/delete-impact')
+
+    expect(response.status()).toBe(200)
+    expect(await response.json()).toEqual({ descendantCount: 12, activityCount: 12, evidenceCount: 0 })
+  })
+
   test('owner creates a top-level curriculum node and receives the updated server snapshot', async ({ page }) => {
     const key = `curriculum-${Date.now()}`
     const created = await page.request.post('/api/practicum/plans', {

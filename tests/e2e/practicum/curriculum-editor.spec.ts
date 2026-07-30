@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { csrfHeaders } from './csrf'
 
 /**
  * Given an administrator is managing teaching plans
@@ -139,9 +140,17 @@ test('[CASE-S2-007] administrator records a supporting resource and previews the
  * When the administrator requests deletion
  * Then the editor states the descendant impact and blocks submitted evidence
  */
-test('[CASE-S2-006] administrator sees protected deletion impact for a curriculum unit', async ({ page }) => {
-  await page.goto('/practicum/profile')
-  await page.locator('[data-role-option="OWNER"]').click()
+test('[CASE-S2-006] administrator sees protected deletion impact for a curriculum unit', async ({ page, browser }) => {
+  const studentContext = await browser.newContext()
+  const student = await studentContext.newPage()
+  expect((await student.request.post('/api/auth/login', { data: { identifier: 'student@example.test', password: 'StudentPass123!' } })).status()).toBe(200)
+  expect((await student.request.post('/api/practicum/submissions', {
+    headers: await csrfHeaders(student, { 'Idempotency-Key': `delete-impact-${Date.now()}` }),
+    data: { activityId: 'act-01-003', text: '用于目录删除保护的真实提交证据。' },
+  })).status()).toBe(201)
+  await studentContext.close()
+
+  await page.goto('/practicum')
   await page.locator('[data-plan-card]').first().locator('a').click()
 
   const module = page.locator('[data-module]').first()
