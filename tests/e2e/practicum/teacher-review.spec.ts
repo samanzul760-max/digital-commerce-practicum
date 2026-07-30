@@ -1,33 +1,36 @@
 import { expect, test } from '@playwright/test'
+import { csrfHeaders } from './csrf'
 
 /**
  * Given a Student has submitted a practice activity for review
  * When the Owner opens the assigned review queue
  * Then the queue shows the Student plan unit activity version time and status
  */
-test('[ASSUME-S4-001] owner sees complete submission fields in the review queue', async ({ page }) => {
-  await page.goto('/practicum/profile')
-  await page.locator('[data-role-option="STUDENT"]').click()
-  await page.goto('/practicum/activities/act-01-003')
-  await page.locator('[data-practice-draft]').fill('版本一：完成店铺基本设置并记录关键参数。')
-  await page.locator('[data-save-draft]').click()
-  await page.locator('[data-submit-practice]').click()
-  await page.locator('[data-confirm-submit]').click()
-  await expect(page.locator('[data-submission-status]')).toHaveText('已提交')
+test('[ASSUME-S4-001] owner sees complete submission fields in the review queue', async ({ browser }) => {
+  const studentContext = await browser.newContext()
+  const student = await studentContext.newPage()
+  expect((await student.request.post('/api/auth/login', { data: { identifier: 'student@example.test', password: 'StudentPass123!' } })).status()).toBe(200)
+  expect((await student.request.post('/api/practicum/submissions', {
+    headers: await csrfHeaders(student, { 'Idempotency-Key': `review-queue-${Date.now()}` }),
+    data: { activityId: 'act-01-003', text: '版本一：完成店铺基本设置并记录关键参数。' },
+  })).status()).toBe(201)
 
-  await page.goto('/practicum/profile')
-  await page.locator('[data-role-option="OWNER"]').click()
+  const ownerContext = await browser.newContext()
+  const page = await ownerContext.newPage()
+  expect((await page.request.post('/api/auth/login', { data: { identifier: 'owner@example.test', password: 'OwnerPass123!' } })).status()).toBe(200)
   await page.goto('/practicum/reviews')
 
-  const row = page.locator('[data-review-row]')
+  const row = page.locator('[data-review-row]').filter({ hasText: '店铺基本设置' })
   await expect(row).toHaveCount(1)
-  await expect(row).toContainText('学生 001')
+  await expect(row).toContainText('实训学生')
   await expect(row).toContainText('网店运营')
   await expect(row).toContainText('网店开设')
   await expect(row).toContainText('店铺基本设置')
   await expect(row).toContainText('版本 1')
   await expect(row.locator('[data-submitted-time]')).not.toBeEmpty()
   await expect(row.locator('[data-review-status]')).toHaveText('待审核')
+  await ownerContext.close()
+  await studentContext.close()
 })
 
 /**

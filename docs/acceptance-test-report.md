@@ -152,3 +152,7 @@ Quality gate: `npm.cmd run typecheck` passed. The complete Playwright suite and 
 ## 2026-07-30 Navigation real-session slice
 
 `npx.cmd playwright test tests/e2e/practicum/navigation-permissions.spec.ts --reporter=list` passed 4/4. The initial RED run had three failures because a fresh browser context retained the default OWNER storage state while the test expected a student navigation layout. Each affected path now establishes a STUDENT server session before selecting the matching workspace view. The 375px, 768px, 1024px, and 1440px case-page checks all pass without horizontal overflow for the student journey.
+
+## 2026-07-30 Review queue server-source slice
+
+`teacher-review.spec.ts` first timed out while an OWNER session attempted to render student-only local practice controls. The queue field scenario now creates an authenticated STUDENT submission through `/api/practicum/submissions`, then verifies the OWNER review queue from a separate authenticated context. `npx.cmd playwright test tests/e2e/practicum/teacher-review.spec.ts --grep "owner sees complete submission fields" --reporter=list` passed 1/1. The remaining review filter, return, revision, and grading legacy cases are still being migrated and are not marked as complete.
