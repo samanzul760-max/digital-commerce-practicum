@@ -88,7 +88,16 @@ model PlanAssignment {
   lateAllowed Boolean @default(false)
   class Class @relation(fields: [classId], references: [id], onDelete: Cascade)
   tasks StudentTask[]
+  dependencies TaskDependency[]
   @@index([classId, status])
+}
+model TaskDependency {
+  id String @id @default(cuid())
+  planAssignmentId String
+  activityId String
+  prerequisiteActivityId String
+  planAssignment PlanAssignment @relation(fields: [planAssignmentId], references: [id], onDelete: Cascade)
+  @@unique([planAssignmentId, activityId, prerequisiteActivityId])
 }
 model StudentTask {
   id String @id @default(cuid())
