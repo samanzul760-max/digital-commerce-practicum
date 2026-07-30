@@ -29,6 +29,8 @@ DEFAULT_PM2_NAME = "digital-commerce-practicum"
 
 EXCLUDE_DIRS = {
     ".data",
+    ".data-e2e",
+    ".worktrees",
     ".git",
     "node_modules",
     ".nuxt",
@@ -147,7 +149,7 @@ def print_diff(diff: ManifestDiff) -> None:
     print(json.dumps(summary, ensure_ascii=False, indent=2))
 
 
-def connect(host: str, user: str, password: str) -> paramiko.SSHClient:
+def connect(host: str, user: str, password: str | None = None) -> paramiko.SSHClient:
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     client.connect(
@@ -247,11 +249,14 @@ def main() -> int:
     root = project_root()
     os.chdir(root)
 
-    if not args.password:
-        args.password = getpass.getpass(f"SSH password for {args.user}@{args.host}: ")
-
     local_manifest = build_local_manifest(root)
-    client = connect(args.host, args.user, args.password)
+    try:
+        client = connect(args.host, args.user, args.password)
+    except paramiko.AuthenticationException:
+        if args.password:
+            raise
+        args.password = getpass.getpass(f"SSH password for {args.user}@{args.host}: ")
+        client = connect(args.host, args.user, args.password)
     try:
         remote_manifest = build_remote_manifest(client, args.remote_dir)
         diff = diff_manifests(local_manifest, remote_manifest)

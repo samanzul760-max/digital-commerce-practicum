@@ -25,7 +25,11 @@ class DeployNewEcsTests(unittest.TestCase):
         deploy = load_deploy_module()
 
         self.assertTrue(deploy.is_excluded((".data", "auth-users.json"), ".json"))
+        self.assertTrue(deploy.is_excluded((".data-e2e", "practicum-data.json"), ".json"))
+        self.assertTrue(deploy.is_excluded((".worktrees", "institutional-p0", "package.json"), ".json"))
         self.assertIn('--exclude="./.data"', POWERSHELL_SCRIPT.read_text(encoding="utf-8"))
+        self.assertIn('--exclude="./.data-e2e"', POWERSHELL_SCRIPT.read_text(encoding="utf-8"))
+        self.assertIn('--exclude="./.worktrees"', POWERSHELL_SCRIPT.read_text(encoding="utf-8"))
 
     def test_wait_for_remote_health_retries_until_the_app_is_ready(self):
         deploy = load_deploy_module()

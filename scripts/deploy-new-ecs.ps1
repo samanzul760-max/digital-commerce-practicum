@@ -37,6 +37,8 @@ if (Test-Path $archivePath) {
 Write-Host "[2/6] Creating deployment archive..."
 tar.exe `
   --exclude="./.data" `
+  --exclude="./.data-e2e" `
+  --exclude="./.worktrees" `
   --exclude="./node_modules" `
   --exclude="./.nuxt" `
   --exclude="./.output" `
