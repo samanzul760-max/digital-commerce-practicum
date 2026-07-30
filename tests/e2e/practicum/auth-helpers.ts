@@ -6,3 +6,17 @@ export async function loginAsStudent(page: Page) {
   })
   expect(response.status()).toBe(200)
 }
+
+export async function loginAsTeacher(page: Page) {
+  const response = await page.request.post('/api/auth/login', {
+    data: { identifier: 'teacher@example.test', password: 'TeacherPass123!' },
+  })
+  expect(response.status()).toBe(200)
+}
+
+export async function loginAsOwner(page: Page) {
+  const response = await page.request.post('/api/auth/login', {
+    data: { identifier: 'owner@example.test', password: 'OwnerPass123!' },
+  })
+  expect(response.status()).toBe(200)
+}

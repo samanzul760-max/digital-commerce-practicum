@@ -1,6 +1,17 @@
 import { expect, test } from '@playwright/test'
 
 test.beforeEach(async ({ page }) => {
+  const bootstrap = await page.request.get('/api/auth/bootstrap')
+  if ((await bootstrap.json()).available) {
+    const response = await page.request.post('/api/auth/bootstrap-owner', {
+      data: {
+        identifier: `auth-suite-owner-${Date.now()}`,
+        displayName: '认证测试管理员',
+        password: 'AuthSuiteOwner123!',
+      },
+    })
+    expect(response.status()).toBe(200)
+  }
   await page.context().clearCookies()
   await page.goto('/practicum/login')
   await page.evaluate(() => window.localStorage.clear())
@@ -57,6 +68,7 @@ test('[BDD-AUTH-005] logout revokes access to the protected workspace', async ({
   await page.locator('[data-login-submit]').click()
   await expect(page.locator('[data-workspace-authenticated]')).toBeVisible()
 
+  await page.goto('/practicum/profile')
   await page.locator('[data-logout]').first().click()
 
   await expect(page).toHaveURL(/\/practicum\/login$/)

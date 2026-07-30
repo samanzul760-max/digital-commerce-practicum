@@ -128,3 +128,14 @@ Build gate: `NUXT_IGNORE_LOCK=1 npm.cmd run build` compiled the client and serve
 | `SB-G-04` mobile workspace context | The teaching-mode field was hidden at 390px. | The mobile context scenario passed after retaining the text and confirming no horizontal overflow. | Organization, room, and teaching mode remain readable. |
 
 Focused regression: `npx.cmd playwright test tests/e2e/practicum/access.spec.ts tests/e2e/practicum/context-ui.spec.ts --reporter=list` passed 8/8. The full suite remains `FAILED/UNVERIFIED`: it timed out after 600 seconds after beginning 183 cases, and many legacy tests still model a student by changing only the client-side preview role while retaining the global OWNER session. Those tests must be migrated to real per-role login contexts; server authorization was not weakened to make them pass.
+
+## 2026-07-30 Real-session regression migration
+
+| Scenario | RED | GREEN | Result |
+|---|---|---|---|
+| `BDD-AUTH-001` to `BDD-AUTH-005` | The standalone authentication suite failed because it assumed a prior bootstrap test had already created an administrator, and the logout path tried to find an account-page button on the workspace page. | `npx.cmd playwright test tests/e2e/practicum/auth-session.spec.ts --reporter=list` passed 5/5 after making bootstrap completion explicit and following the visible account-page logout path. | Authentication scenarios are isolated and repeatable. |
+| `SB-Q-03` teacher workspace | The full suite timed out while creating and logging out an unrelated temporary owner before teacher login. | `npx.cmd playwright test tests/e2e/practicum/context-ui.spec.ts --reporter=list` passed 4/4 using a real teacher session. | Teacher workspace is verified against server identity. |
+| Case role boundaries | Case tests changed only the browser preview role while retaining the global OWNER session. | `npx.cmd playwright test tests/e2e/practicum/commerce-cases.spec.ts --reporter=list` passed 5/5 using real STUDENT and OWNER sessions. | No server authorization rule was weakened. |
+| `SB-D-11`, `SB-D-12` mobile detail | The prior record had no executed 390px result. | `npx.cmd playwright test tests/e2e/practicum/analytics-member-skill-map-api.spec.ts tests/e2e/practicum/analytics-member-page.spec.ts --reporter=list` passed 3/3. | Member skill map supports direct URL, authorization, and 390px without horizontal overflow. |
+
+The full `tests/e2e/practicum` command still timed out at 600 seconds after 107/183 started scenarios. It is therefore `FAILED/UNVERIFIED`, not a passing full-suite result. The next RED/GREEN slice is server-derived curriculum deletion impact and submitted-evidence protection.

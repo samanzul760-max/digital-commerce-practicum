@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { loginAsTeacher } from './auth-helpers'
 
 test('[SB-G-03][SB-G-04] authenticated users can see their server-backed organization and room context', async ({ page }) => {
   await page.goto('/practicum')
@@ -10,22 +11,9 @@ test('[SB-G-03][SB-G-04] authenticated users can see their server-backed organiz
 
 test('[SB-Q-03] teacher login presents a teacher workspace instead of the administrator workspace', async ({ browser }) => {
   const context = await browser.newContext()
-  await context.clearCookies()
   const page = await context.newPage()
-  await page.goto('/practicum/login')
-
-  await page.locator('[data-bootstrap-identifier]').fill(`teacher-ui-owner-${Date.now()}`)
-  await page.locator('[data-bootstrap-display-name]').fill('教师验收管理员')
-  await page.locator('[data-bootstrap-password]').fill('TeacherUiOwner123!')
-  await page.locator('[data-bootstrap-submit]').click()
-  await expect(page).toHaveURL(/\/practicum$/)
-  await page.goto('/practicum/profile')
-  await page.locator('[data-logout]').first().click()
-  await expect(page).toHaveURL(/\/practicum\/login$/)
-
-  await page.locator('[data-login-identifier]').fill('teacher@example.test')
-  await page.locator('[data-login-password]').fill('TeacherPass123!')
-  await page.locator('[data-login-submit]').click()
+  await loginAsTeacher(page)
+  await page.goto('/practicum')
 
   await expect(page.locator('[data-teacher-home]')).toBeVisible()
   await expect(page.locator('[data-owner-home]')).toHaveCount(0)

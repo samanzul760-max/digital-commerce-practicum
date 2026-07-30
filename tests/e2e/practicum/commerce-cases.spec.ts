@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { loginAsOwner, loginAsStudent } from './auth-helpers'
 
 /**
  * Given a student or owner has selected a practicum identity
@@ -6,15 +7,13 @@ import { expect, test } from '@playwright/test'
  * Then six original commerce teaching cases are visible
  */
 test('[ORIGINAL-S7-001] both roles can browse six commerce teaching cases', async ({ page }) => {
-  await page.goto('/practicum/profile')
-  await page.locator('[data-role-option="STUDENT"]').click()
+  await loginAsStudent(page)
   await page.goto('/practicum/cases')
   await expect(page.locator('[data-commerce-cases]')).toBeVisible()
   await expect(page.locator('[data-case-card]')).toHaveCount(6)
   await expect(page.locator('[data-case-card]')).toContainText(['商品卖点提炼'])
 
-  await page.goto('/practicum/profile')
-  await page.locator('[data-role-option="OWNER"]').click()
+  await loginAsOwner(page)
   await page.goto('/practicum/cases')
   await expect(page.locator('[data-commerce-cases]')).toBeVisible()
   await expect(page.locator('[data-case-card]')).toHaveCount(6)
@@ -27,8 +26,7 @@ test('[ORIGINAL-S7-001] both roles can browse six commerce teaching cases', asyn
  * Then the list shows a summary band and separates submittable cases from classroom reading
  */
 test('[ORIGINAL-S7-001] commerce case list presents a summary band and grouped sections', async ({ page }) => {
-  await page.goto('/practicum/profile')
-  await page.locator('[data-role-option="OWNER"]').click()
+  await loginAsOwner(page)
   await page.goto('/practicum/cases')
 
   await expect(page.locator('[data-case-summary-band]')).toBeVisible()
@@ -46,8 +44,7 @@ test('[ORIGINAL-S7-001] commerce case list presents a summary band and grouped s
  * Then the page shows student tasks self-check content and appropriate submission state
  */
 test('[ORIGINAL-S7-001] student sees case learning content and submission states', async ({ page }) => {
-  await page.goto('/practicum/profile')
-  await page.locator('[data-role-option="STUDENT"]').click()
+  await loginAsStudent(page)
   await page.goto('/practicum/cases/case-selling-points')
 
   await expect(page.locator('[data-case-detail]')).toBeVisible()
@@ -87,22 +84,19 @@ test('[ORIGINAL-S7-001] student sees case learning content and submission states
  * Then owner guidance rubric and submission overview are visible without leaking to students
  */
 test('[ORIGINAL-S7-001] owner sees teaching guidance and student does not', async ({ page }) => {
-  await page.goto('/practicum/profile')
-  await page.locator('[data-role-option="STUDENT"]').click()
+  await loginAsStudent(page)
   await page.goto('/practicum/cases/case-review-reply')
   await page.locator('[data-case-draft]').fill('公开回复：理解你的体验，我们会核查发货和包装环节。')
   await page.locator('[data-submit-case]').click()
   await page.locator('[data-confirm-submit-case]').click()
 
-  await page.goto('/practicum/profile')
-  await page.locator('[data-role-option="OWNER"]').click()
+  await loginAsOwner(page)
   await page.goto('/practicum/cases/case-review-reply')
   await expect(page.locator('[data-owner-case-guidance]')).toBeVisible()
   await expect(page.locator('[data-owner-case-rubric]')).toBeVisible()
   await expect(page.locator('[data-case-submission-overview]')).toContainText('1')
 
-  await page.goto('/practicum/profile')
-  await page.locator('[data-role-option="STUDENT"]').click()
+  await loginAsStudent(page)
   await page.goto('/practicum/cases/case-review-reply')
   await expect(page.locator('[data-owner-case-guidance]')).toHaveCount(0)
   await expect(page.locator('[data-owner-case-rubric]')).toHaveCount(0)
@@ -114,8 +108,7 @@ test('[ORIGINAL-S7-001] owner sees teaching guidance and student does not', asyn
  * Then the page shows a clear missing state
  */
 test('[ORIGINAL-S7-001] missing commerce case route shows an empty state', async ({ page }) => {
-  await page.goto('/practicum/profile')
-  await page.locator('[data-role-option="STUDENT"]').click()
+  await loginAsStudent(page)
   await page.goto('/practicum/cases/not-a-case')
   await expect(page.locator('[data-case-missing]')).toBeVisible()
   await expect(page.locator('[data-case-detail]')).toHaveCount(0)
