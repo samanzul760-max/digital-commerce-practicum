@@ -334,7 +334,7 @@ const sortedRanking = computed(() => {
   })
 })
 
-function handleExport() {
+async function handleExport() {
   exportPending.value = true
   exportSuccess.value = false
   exportError.value = false
@@ -355,7 +355,10 @@ function handleExport() {
     }
     const csv = [headers, ...rows].join('\n')
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
+    const response = await fetch('/api/practicum/analytics/export?roomId=room-001')
+    if (!response.ok) throw new Error('Analytics export failed')
+    const serverCsv = await response.text()
+    const url = URL.createObjectURL(new Blob(['\ufeff' + serverCsv], { type: 'text/csv;charset=utf-8' }))
     const a = document.createElement('a')
     a.href = url
     a.download = 'practicum-data-export.csv'

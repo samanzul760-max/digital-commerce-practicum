@@ -639,6 +639,28 @@ export function getMemberAnalyticsDetail(user: AuthUser, roomId: string, memberI
   return clone({ kind: 'OK' as const, member, plans })
 }
 
+export function exportAnalyticsCsv(user: AuthUser, roomId: string) {
+  const state = readState()
+  if (!ownerOnly(user) || !canAccessRoom(user, roomId)) return null
+  const planIds = new Set(state.plans.filter(plan => plan.roomId === roomId).map(plan => plan.id))
+  const escape = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`
+  const rows = Object.entries(state.submissions).flatMap(([activityId, submission]) => {
+    const context = activityContext(state, activityId)
+    const version = submission.versions.at(-1)
+    if (!context.plan || !context.node || !planIds.has(context.plan.id) || !version) return []
+    const score = submission.grade ? Object.values(submission.grade.rubricScores).reduce((total, value) => total + value, 0) : ''
+    return [[
+      escape(submission.studentId ?? 'anonymous'),
+      escape(context.plan.title),
+      escape(context.node.title),
+      escape(submission.status),
+      escape(version.version),
+      escape(score),
+    ].join(',')]
+  })
+  return ['member_id,plan_title,activity_title,status,version,score', ...rows].join('\n')
+}
+
 export function saveAsset(user: AuthUser, asset: StoredAsset) {
   const state = readState()
   if (!ownerOnly(user)) return false
