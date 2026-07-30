@@ -1,0 +1,151 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+enum EnrollmentRole {
+  STUDENT
+  TEACHER
+  MENTOR
+  ASSISTANT
+  HEAD_TEACHER
+}
+enum AssignmentStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+  ARCHIVED
+}
+enum TaskStatus {
+  LOCKED
+  AVAILABLE
+  IN_PROGRESS
+  SUBMITTED
+  RETURNED
+  GRADED
+  CLOSED
+}
+model Organization {
+  id String @id @default(cuid())
+  name String
+  cohorts Cohort[]
+  rooms TrainingRoom[]
+  classes Class[]
+  createdAt DateTime @default(now())
+}
+model TrainingRoom {
+  id String @id @default(cuid())
+  organizationId String
+  name String
+  organization Organization @relation(fields: [organizationId], references: [id])
+  classes Class[]
+  @@index([organizationId])
+}
+model Cohort {
+  id String @id @default(cuid())
+  organizationId String
+  name String
+  startsAt DateTime
+  endsAt DateTime
+  organization Organization @relation(fields: [organizationId], references: [id])
+  classes Class[]
+  @@unique([organizationId, name])
+}
+model Class {
+  id String @id @default(cuid())
+  organizationId String
+  roomId String
+  cohortId String
+  name String
+  organization Organization @relation(fields: [organizationId], references: [id])
+  room TrainingRoom @relation(fields: [roomId], references: [id])
+  cohort Cohort @relation(fields: [cohortId], references: [id])
+  enrollments ClassEnrollment[]
+  planAssignments PlanAssignment[]
+  @@unique([cohortId, name])
+  @@index([roomId])
+}
+model ClassEnrollment {
+  id String @id @default(cuid())
+  classId String
+  userId String
+  role EnrollmentRole
+  active Boolean @default(true)
+  class Class @relation(fields: [classId], references: [id], onDelete: Cascade)
+  @@unique([classId, userId])
+  @@index([userId, role])
+}
+model PlanAssignment {
+  id String @id @default(cuid())
+  classId String
+  planId String
+  title String
+  status AssignmentStatus @default(DRAFT)
+  availableAt DateTime
+  dueAt DateTime?
+  lateAllowed Boolean @default(false)
+  class Class @relation(fields: [classId], references: [id], onDelete: Cascade)
+  tasks StudentTask[]
+  dependencies TaskDependency[]
+  @@index([classId, status])
+}
+model TaskDependency {
+  id String @id @default(cuid())
+  planAssignmentId String
+  activityId String
+  prerequisiteActivityId String
+  planAssignment PlanAssignment @relation(fields: [planAssignmentId], references: [id], onDelete: Cascade)
+  @@unique([planAssignmentId, activityId, prerequisiteActivityId])
+}
+model StudentTask {
+  id String @id @default(cuid())
+  planAssignmentId String
+  studentId String
+  activityId String
+  status TaskStatus @default(LOCKED)
+  availableAt DateTime
+  dueAt DateTime?
+  planAssignment PlanAssignment @relation(fields: [planAssignmentId], references: [id], onDelete: Cascade)
+  submissions Submission[]
+  @@unique([planAssignmentId, studentId, activityId])
+  @@index([studentId, status])
+}
+model Submission {
+  id String @id @default(cuid())
+  studentTaskId String @unique
+  currentVersion Int @default(0)
+  submittedAt DateTime?
+  studentTask StudentTask @relation(fields: [studentTaskId], references: [id], onDelete: Cascade)
+  versions SubmissionVersion[]
+  grade Grade?
+}
+model SubmissionVersion {
+  id String @id @default(cuid())
+  submissionId String
+  version Int
+  text String
+  links Json @default("[]")
+  submittedAt DateTime @default(now())
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  @@unique([submissionId, version])
+}
+model Grade {
+  id String @id @default(cuid())
+  submissionId String @unique
+  reviewerId String
+  feedback String
+  score Decimal @db.Decimal(6, 2)
+  gradedAt DateTime @default(now())
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  items GradeItem[]
+}
+model GradeItem {
+  id String @id @default(cuid())
+  gradeId String
+  rubricItemId String
+  score Decimal @db.Decimal(6, 2)
+  grade Grade @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  @@unique([gradeId, rubricItemId])
+}
