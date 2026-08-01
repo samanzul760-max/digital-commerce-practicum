@@ -15,7 +15,7 @@
         <aside class="side">
           <NuxtLink to="/practicum/progress" class="active"><PracticumIcon name="dashboard" /><span>概况</span></NuxtLink>
           <NuxtLink to="/practicum/courses"><PracticumIcon name="book" /><span>我的课程</span></NuxtLink>
-          <NuxtLink to="/practicum/progress#achievements"><PracticumIcon name="trophy" /><span>成就</span></NuxtLink>
+          <NuxtLink to="/practicum/achievements"><PracticumIcon name="trophy" /><span>成就</span></NuxtLink>
           <NuxtLink to="/practicum/tasks"><PracticumIcon name="clipboard-check" /><span>任务</span></NuxtLink>
         </aside>
 
@@ -34,6 +34,11 @@
               </div>
             </div>
             <p v-if="backendStats" data-backend-stats class="sync-line">服务端同步：{{ backendStats.publishedPlanCount }} 门已发布课程 · {{ backendStats.activityCount }} 个实操活动</p>
+            <div class="overview-actions" aria-label="快捷操作">
+              <NuxtLink to="/practicum/tasks" class="overview-action-primary">继续上次实操</NuxtLink>
+              <NuxtLink to="/practicum/achievements" class="overview-action">查看我的勋章</NuxtLink>
+              <NuxtLink to="/practicum/tasks" class="overview-action">提交作业</NuxtLink>
+            </div>
           </section>
 
           <div class="dash-grid">
@@ -203,7 +208,7 @@ const progressEntries = computed(() => [
     tag: '数据',
     title: '查看成长数据',
     description: '查看学习进度、能力维度和数据看板。',
-    to: '/practicum/progress',
+    to: '/practicum/achievements',
   },
 ])
 

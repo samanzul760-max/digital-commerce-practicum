@@ -1892,6 +1892,9 @@ tr:last-child td { border-bottom: 0; }
 .site .live-metrics span { display:block; color:#806a4a; font-size:11px; }
 .site .live-metrics strong { display:block; margin-top:4px; color:#17222e; font-size:20px; }
 .site .sync-line { margin:16px 0 0; padding:7px 10px; color:#745f44; background:rgba(255,255,255,.46); border:1px solid #f3dba7; border-radius:4px; font-size:12px; }
+.site .overview-actions { display:flex; gap:8px; margin-top:13px; }
+.site .overview-action, .site .overview-action-primary { display:inline-flex; align-items:center; justify-content:center; min-height:30px; padding:0 10px; border:1px solid #f0c66d; border-radius:4px; color:#855c09; background:rgba(255,255,255,.56); font-size:12px; font-weight:700; text-decoration:none; }
+.site .overview-action-primary { color:#fff; background:#2563eb; border-color:#2563eb; }
 .todo-panel { padding:20px; background:#fff; border:1px solid var(--line); border-radius:6px; }
 .todo-panel-head { display:flex; align-items:center; justify-content:space-between; gap:16px; padding-bottom:16px; border-bottom:1px solid #edf0f2; }
 .todo-panel-head h2 { margin:0; font-size:18px; }
@@ -1902,10 +1905,63 @@ tr:last-child td { border-bottom: 0; }
 .todo-content h3 { margin:0; color:#17222e; font-size:15px; }
 .todo-content p { margin:7px 0 0; color:var(--practicum-muted); font-size:12px; }
 .todo-pagination { display:flex; justify-content:center; align-items:center; gap:12px; padding-top:18px; color:var(--practicum-muted); font-size:13px; }
+.achievements-page { width:min(1180px, 100%); margin:0 auto; padding:24px; }
+.achievement-overview { display:flex; justify-content:space-between; gap:32px; padding:28px 30px; color:#fff; background:#1d4ed8; border-radius:8px; }
+.achievement-eyebrow { margin:0 0 8px; color:#bfdbfe; font-size:13px; font-weight:700; }
+.achievement-overview h1 { margin:0; font-size:28px; }
+.achievement-overview > div > p:not(.achievement-eyebrow) { margin:10px 0 0; color:#dbeafe; }
+.achievement-metrics { display:flex; align-items:center; gap:24px; }
+.achievement-metrics div { min-width:112px; }
+.achievement-metrics span { display:block; color:#bfdbfe; font-size:12px; }
+.achievement-metrics strong { display:block; margin-top:5px; font-size:23px; }
+.achievement-metrics small { color:#bfdbfe; font-size:12px; }
+.achievement-metrics .primary-button { color:#1d4ed8; background:#fff; }
+.achievement-section { margin-top:20px; padding:22px; background:#fff; border:1px solid #e5e7eb; border-radius:7px; }
+.achievement-section-head { display:flex; justify-content:space-between; gap:20px; margin-bottom:18px; }
+.achievement-section-head h2 { margin:0; font-size:18px; }
+.achievement-section-head p { margin:6px 0 0; color:#667085; font-size:13px; }
+.skill-matrix { display:grid; gap:13px; }
+.skill-row { display:grid; grid-template-columns:220px minmax(120px, 1fr) 48px; gap:18px; align-items:center; }
+.skill-row strong, .skill-row span { display:block; }
+.skill-row span { margin-top:4px; color:#667085; font-size:12px; }
+.skill-progress, .badge-progress { overflow:hidden; height:8px; background:#e8edf5; border-radius:99px; }
+.skill-progress i, .badge-progress i { display:block; height:100%; background:#2563eb; border-radius:inherit; }
+.skill-row b { text-align:right; color:#1d4ed8; font-size:13px; }
+.badge-tabs { display:flex; gap:8px; flex-wrap:wrap; }
+.badge-tabs button { padding:7px 11px; color:#667085; background:#fff; border:1px solid #dbe2ea; border-radius:5px; font:inherit; font-size:13px; cursor:pointer; }
+.badge-tabs button.active { color:#1d4ed8; background:#eff6ff; border-color:#93c5fd; font-weight:700; }
+.badge-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:12px; }
+.badge-card { display:flex; gap:14px; min-height:156px; padding:16px; border:1px solid #e5e7eb; border-radius:7px; }
+.badge-card.badge-locked { filter:grayscale(1); opacity:.68; background:#f8fafc; }
+.badge-icon { display:grid; flex:0 0 48px; place-items:center; width:48px; height:48px; font-size:25px; background:#eff6ff; border-radius:50%; }
+.badge-unlocked .badge-icon { background:#fef3c7; }
+.badge-card-main { min-width:0; }
+.badge-card-main > span { color:#667085; font-size:11px; }
+.badge-card-main h3 { margin:3px 0 6px; font-size:16px; }
+.badge-card-main p { min-height:34px; margin:0 0 10px; color:#667085; font-size:12px; line-height:1.45; }
+.badge-card-main b { display:inline-block; color:#2563eb; font-size:12px; }
+.badge-card-main small { margin-left:8px; color:#b45309; font-weight:700; }
+.badge-progress { margin-bottom:6px; }
+.achievement-timeline { display:grid; gap:0; margin:0; padding:0; list-style:none; }
+.achievement-timeline li { position:relative; display:grid; grid-template-columns:18px 1fr; gap:11px; padding:0 0 20px; }
+.achievement-timeline li:not(:last-child)::before { position:absolute; top:16px; left:7px; width:1px; height:calc(100% - 8px); background:#dbe2ea; content:''; }
+.timeline-dot { width:15px; height:15px; margin-top:3px; background:#2563eb; border:3px solid #dbeafe; border-radius:50%; }
+.timeline-dot.points { background:#f59e0b; border-color:#fef3c7; }
+.achievement-timeline time { display:block; color:#667085; font-size:12px; }
+.achievement-timeline strong { display:block; margin-top:3px; font-size:14px; }
+.achievement-timeline p { margin:5px 0 0; color:#667085; font-size:13px; }
 @media (max-width: 640px) {
   .todo-panel { padding:14px; }
   .todo-item { grid-template-columns:1fr; gap:10px; padding:16px 0; }
   .todo-item .primary-button { width:100%; justify-content:center; }
+  .achievements-page { padding:16px; }
+  .achievement-overview, .achievement-metrics, .achievement-section-head { display:block; }
+  .achievement-metrics { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:22px; }
+  .achievement-metrics .primary-button { grid-column:1 / -1; justify-content:center; }
+  .skill-row { grid-template-columns:1fr 42px; gap:8px; }
+  .skill-progress { grid-column:1 / -1; grid-row:2; }
+  .badge-tabs { margin-top:14px; }
+  .badge-grid { grid-template-columns:1fr; }
 }
 @media (max-width: 640px) {
   .site .dash-welcome { min-height:0; padding:18px; }
@@ -1913,6 +1969,7 @@ tr:last-child td { border-bottom: 0; }
   .site .live-metrics { min-width:0; margin-top:16px; grid-template-columns:repeat(3, minmax(0, 1fr)); }
   .site .live-metrics div { padding:9px 7px; }
   .site .live-metrics strong { font-size:17px; }
+  .site .overview-actions { flex-wrap:wrap; }
 }
 .site .dash-welcome h2 {
   margin: 0;

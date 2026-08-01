@@ -76,6 +76,7 @@ import { usePracticumStore } from '~/composables/usePracticumStore'
 import { usePracticumServer } from '~/composables/usePracticumServer'
 import { canEditPlan, canViewPlan } from '~/domain/practicum/permissions'
 import type { Plan } from '~/domain/practicum/types'
+import { catalogCourses } from '~/data/practicum/course-catalog'
 
 const store = usePracticumStore()
 const server = usePracticumServer()
@@ -89,7 +90,11 @@ const serverPlans = ref<Plan[] | null>(null)
 const serverLoading = ref(false)
 const serverError = ref(false)
 
-const plansSource = computed(() => serverPlans.value ?? store.visiblePlansFor(store.state.activeRole))
+const plansSource = computed(() => {
+  const primary = serverPlans.value?.length ? serverPlans.value : store.visiblePlansFor(store.state.activeRole)
+  const ids = new Set(primary.map(plan => plan.id))
+  return [...primary, ...catalogCourses.filter(plan => !ids.has(plan.id))]
+})
 const filteredPlans = computed(() => plansSource.value
   .filter(plan => canViewPlan(store.state.activeRole, plan.status))
   .filter(plan => !isShellCourse(plan))
@@ -156,7 +161,8 @@ function moduleCount(planId: string) {
   return store.getPlanNodes(planId).filter(node => node.level === 1).length || plan?.moduleIds?.length || 0
 }
 function activityCount(planId: string) {
-  return store.getPlanNodes(planId).filter(node => node.level === 3).length
+  const catalog = catalogCourses.find(item => item.id === planId)
+  return store.getPlanNodes(planId).filter(node => node.level === 3).length || catalog?.taskCount || 0
 }
 function categoryFor(text: string) {
   if (text.includes('数据')) return 'data'
