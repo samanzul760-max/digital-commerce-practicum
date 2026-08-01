@@ -57,7 +57,10 @@ const roleAnnouncement = computed(() => {
   if (!store.state.activeRole) return ''
   return `当前身份：${roleLabels[store.state.activeRole]}`
 })
-const showBack = computed(() => route.path !== '/practicum' && route.path !== '/practicum/login')
+const showBack = computed(() => {
+  const topLevel = ['/practicum', '/practicum/login', '/practicum/progress', '/practicum/courses']
+  return !topLevel.includes(route.path)
+})
 
 function goBack() {
   if (window.history.length > 1) router.back()
