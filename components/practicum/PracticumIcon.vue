@@ -8,6 +8,7 @@
     <template v-else-if="name === 'check-square'"><rect x="4" y="4" width="16" height="16" rx="2" /><path d="m8 12 2.5 2.5L16 9" /></template>
     <template v-else-if="name === 'chart'"><path d="M4 20V4M4 20h16M8 17v-5M12 17V7M16 17v-8" /></template>
     <template v-else-if="name === 'trending-up'"><path d="m4 16 6-6 4 4 6-7M15 7h5v5" /></template>
+    <template v-else-if="name === 'trophy'"><path d="M8 4h8v5a4 4 0 0 1-8 0z" /><path d="M8 6H5v2a3 3 0 0 0 3 3M16 6h3v2a3 3 0 0 1-3 3M12 13v4M8 20h8M9 17h6" /></template>
     <template v-else-if="name === 'bell'"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></template>
     <template v-else-if="name === 'user-shield'"><circle cx="10" cy="8" r="3" /><path d="M4.5 20a5.5 5.5 0 0 1 11 0M18 12l3 1.2v2.6c0 2-1.3 3.8-3 4.6-1.7-.8-3-2.6-3-4.6v-2.6z" /></template>
     <template v-else-if="name === 'users'"><circle cx="9" cy="8" r="3" /><path d="M3.5 20a5.5 5.5 0 0 1 11 0M16 5.5a3 3 0 0 1 0 5M18.5 20a4.5 4.5 0 0 0-2.5-4" /></template>
