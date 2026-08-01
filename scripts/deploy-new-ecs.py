@@ -157,7 +157,7 @@ def connect(host: str, user: str, password: str | None = None) -> paramiko.SSHCl
         username=user,
         password=password,
         timeout=15,
-        banner_timeout=15,
+        banner_timeout=45,
         auth_timeout=15,
     )
     return client
@@ -198,9 +198,13 @@ cd {remote_dir!r}
 test -f package.json
 test -f nuxt.config.ts
 test -f tsconfig.json
-npm install
-tar -xzf {remote_archive!r} -C {remote_dir!r} package-lock.json
-npm run build
+if [ -x /usr/local/bin/npm ]; then
+  NPM=/usr/local/bin/npm
+else
+  NPM=npm
+fi
+"$NPM" ci --no-audit --no-fund
+"$NPM" run build
 pm2 restart {pm2_name!r}
 pm2 save
 rm -f {remote_archive!r}
@@ -252,7 +256,7 @@ def main() -> int:
     local_manifest = build_local_manifest(root)
     try:
         client = connect(args.host, args.user, args.password)
-    except paramiko.AuthenticationException:
+    except (paramiko.AuthenticationException, paramiko.SSHException):
         if args.password:
             raise
         args.password = getpass.getpass(f"SSH password for {args.user}@{args.host}: ")

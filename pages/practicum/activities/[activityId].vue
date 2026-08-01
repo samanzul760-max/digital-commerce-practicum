@@ -149,7 +149,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import type { ActivityType } from '~/domain/practicum/types'
 import { usePracticumStore } from '~/composables/usePracticumStore'
 import { canSubmitWork } from '~/domain/practicum/permissions'
@@ -162,6 +162,10 @@ const server = usePracticumServer()
 const auth = useAuthSession()
 const isLoading = ref(true)
 const serverSubmission = ref<Awaited<ReturnType<typeof server.getSubmission>>['submission'] | null>(null)
+const serverTaskId = ref<string | null>(null)
+const serverTaskStatus = ref<string | null>(null)
+const serverTaskSubmission = ref<Awaited<ReturnType<typeof server.getStudentTask>>['submission']>(null)
+let heartbeatTimer: ReturnType<typeof setInterval> | null = null
 onMounted(async () => {
   if (auth.state.value.user?.role !== 'STUDENT') {
     isLoading.value = false
@@ -174,7 +178,35 @@ onMounted(async () => {
   } finally {
     isLoading.value = false
   }
+  try {
+    const tasks = await server.listStudentTasks()
+    serverTaskId.value = tasks.items.find(task => task.activityId === activity.value?.id)?.id ?? null
+    if (serverTaskId.value) {
+      const detail = await server.getStudentTask(serverTaskId.value)
+      serverTaskStatus.value = detail.task.status
+      serverTaskSubmission.value = detail.submission
+      void recordHeartbeat('HEARTBEAT')
+      heartbeatTimer = setInterval(() => void recordHeartbeat('HEARTBEAT'), 60_000)
+      document.addEventListener('visibilitychange', onVisibilityChange)
+    }
+  } catch {
+    serverTaskId.value = null
+  }
 })
+
+onBeforeUnmount(() => {
+  if (heartbeatTimer) clearInterval(heartbeatTimer)
+  document.removeEventListener('visibilitychange', onVisibilityChange)
+})
+
+function onVisibilityChange() {
+  void recordHeartbeat(document.visibilityState === 'visible' ? 'VISIBILITY_VISIBLE' : 'VISIBILITY_HIDDEN')
+}
+
+async function recordHeartbeat(eventType: 'HEARTBEAT' | 'VISIBILITY_VISIBLE' | 'VISIBILITY_HIDDEN') {
+  if (!serverTaskId.value) return
+  try { await server.recordTaskHeartbeat(serverTaskId.value, eventType) } catch { /* Learning telemetry must not block the activity. */ }
+}
 const nodeId = computed(() => route.params.activityId as string)
 const activityNode = computed(() => store.state.nodes.find(n => n.id === nodeId.value) ?? null)
 const activity = computed(() => {
@@ -243,8 +275,8 @@ const practiceDraft = ref(store.state.practiceDrafts[nodeId.value] ?? '')
 const draftSaved = ref(false)
 const showSubmitConfirm = ref(false)
 const showUnsavedLeave = ref(false)
-const submissionVersions = computed(() => serverSubmission.value?.versions ?? [])
-const submissionStatus = computed(() => serverSubmission.value?.status ?? 'NOT_STARTED')
+const submissionVersions = computed(() => serverTaskSubmission.value?.versions ?? serverSubmission.value?.versions ?? [])
+const submissionStatus = computed(() => serverTaskStatus.value ?? serverSubmission.value?.status ?? 'NOT_STARTED')
 const returnedFeedback = computed(() => serverSubmission.value?.feedback ?? '')
 const submissionStatusLabel = computed(() => submissionStatus.value === 'RETURNED' ? '已退回' : submissionStatus.value === 'GRADED' ? '已评分' : '已提交')
 const submissionPending = ref(false)
@@ -262,8 +294,14 @@ async function submitPractice() {
   submissionError.value = ''
   try {
     if (auth.state.value.user?.role !== 'STUDENT') throw new Error('student session required')
-    const result = await server.submitPractice(nodeId.value, practiceDraft.value)
-    serverSubmission.value = result.submission
+    if (serverTaskId.value) {
+      const result = await server.submitStudentTask(serverTaskId.value, practiceDraft.value)
+      serverTaskStatus.value = result.task.status
+      serverTaskSubmission.value = result.submission
+    } else {
+      const result = await server.submitPractice(nodeId.value, practiceDraft.value)
+      serverSubmission.value = result.submission
+    }
     showSubmitConfirm.value = false
     draftSaved.value = false
   } catch {

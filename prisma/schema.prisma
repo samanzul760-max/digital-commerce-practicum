@@ -112,6 +112,35 @@ model StudentTask {
   @@unique([planAssignmentId, studentId, activityId])
   @@index([studentId, status])
 }
+model ActivityLog {
+  id String @id @default(cuid())
+  userId String
+  studentTaskId String?
+  eventType String
+  occurredAt DateTime @default(now())
+  metadata Json @default("{}")
+  @@index([userId, occurredAt])
+  @@index([studentTaskId, occurredAt])
+}
+model TaskEvent {
+  id String @id @default(cuid())
+  studentTaskId String
+  eventType String
+  createdAt DateTime @default(now())
+  payload Json @default("{}")
+  @@index([studentTaskId, createdAt])
+}
+model AutoGradeAttempt {
+  id String @id @default(cuid())
+  studentTaskId String
+  attempt Int
+  input Json @default("{}")
+  score Decimal? @db.Decimal(6, 2)
+  result Json @default("{}")
+  createdAt DateTime @default(now())
+  @@unique([studentTaskId, attempt])
+  @@index([studentTaskId, createdAt])
+}
 model Submission {
   id String @id @default(cuid())
   studentTaskId String @unique
@@ -120,6 +149,19 @@ model Submission {
   studentTask StudentTask @relation(fields: [studentTaskId], references: [id], onDelete: Cascade)
   versions SubmissionVersion[]
   grade Grade?
+  idempotencyKeys SubmissionIdempotencyKey[]
+}
+model SubmissionIdempotencyKey {
+  id String @id @default(cuid())
+  userId String
+  method String
+  path String
+  key String
+  submissionId String
+  createdAt DateTime @default(now())
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  @@unique([userId, method, path, key])
+  @@index([submissionId])
 }
 model SubmissionVersion {
   id String @id @default(cuid())
@@ -140,6 +182,19 @@ model Grade {
   gradedAt DateTime @default(now())
   submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
   items GradeItem[]
+  revisions GradeRevision[]
+}
+model GradeRevision {
+  id String @id @default(cuid())
+  gradeId String
+  revision Int
+  reviewerId String
+  feedback String
+  score Decimal @db.Decimal(6, 2)
+  createdAt DateTime @default(now())
+  grade Grade @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  @@unique([gradeId, revision])
+  @@index([gradeId, createdAt])
 }
 model GradeItem {
   id String @id @default(cuid())

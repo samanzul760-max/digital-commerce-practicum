@@ -1,4 +1,23 @@
-import type { PracticeSubmissionState, ReviewQueueItem, CurriculumNode, Activity, AuditEvent } from '~/domain/practicum/types'
+import type { PracticeSubmissionState, ReviewQueueItem, CurriculumNode, Activity, AuditEvent, Plan, PracticumNotification, PlanStatus } from '~/domain/practicum/types'
+
+export interface PaginatedPlans {
+  items: Plan[]
+  page: number
+  pageSize: number
+  total: number
+  totalPages: number
+}
+
+export interface NotificationResponse {
+  items: PracticumNotification[]
+  unread: number
+}
+
+export interface PlanDetailResponse {
+  plan: Plan
+  nodes: CurriculumNode[]
+  activities: Activity[]
+}
 
 export interface SubmissionDetail {
   submission: PracticeSubmissionState
@@ -46,6 +65,28 @@ export interface PracticumSkillMapItem {
 }
 
 export function usePracticumServer() {
+  async function listPlans(input: { keyword?: string; status?: PlanStatus; page?: number; pageSize?: number; sort?: 'createdAt' | 'updatedAt' | 'title'; direction?: 'asc' | 'desc' } = {}) {
+    const query = new URLSearchParams(Object.entries(input)
+      .filter(([, value]) => value !== undefined && value !== '')
+      .map(([key, value]) => [key, String(value)])).toString()
+    return await $fetch<PaginatedPlans>(`/api/practicum/plans${query ? `?${query}` : ''}`)
+  }
+
+  async function getPlan(planId: string) {
+    return await $fetch<PlanDetailResponse>(`/api/practicum/plans/${encodeURIComponent(planId)}`)
+  }
+
+  async function listNotifications() {
+    return await $fetch<NotificationResponse>('/api/practicum/notifications')
+  }
+
+  async function markNotificationRead(notificationId: string) {
+    return await $fetch<{ ok: true }>(`/api/practicum/notifications/${encodeURIComponent(notificationId)}/read`, {
+      method: 'POST',
+      headers: useCsrfHeaders(),
+    })
+  }
+
   async function listSubmissions(input: SubmissionQuery = {}) {
     const query = new URLSearchParams(Object.entries(input)
       .filter(([, value]) => value)
@@ -85,6 +126,26 @@ export function usePracticumServer() {
     return await $fetch<{ stats: Record<string, number> }>(`/api/practicum/stats?roomId=${encodeURIComponent(roomId)}`)
   }
 
+  async function getProgress(roomId: string, role: string) {
+    return await $fetch<{ plans: Array<{ id: string; title: string; status: string; total: number; completed: number; graded: number; percent: number; nextTaskId: string | null; averageScore: number | null }>; totals: { total: number; completed: number; percent: number } }>(`/api/practicum/progress?roomId=${encodeURIComponent(roomId)}&role=${encodeURIComponent(role)}`)
+  }
+
+  async function listStudentTasks() {
+    return await $fetch<{ items: Array<{ id: string; activityId: string; status: string; availableAt: string; dueAt: string | null; planAssignment: { id: string; title: string; lateAllowed: boolean } }> }>('/api/practicum/student/tasks')
+  }
+
+  async function recordTaskHeartbeat(taskId: string, eventType: 'HEARTBEAT' | 'VISIBILITY_VISIBLE' | 'VISIBILITY_HIDDEN') {
+    return await $fetch<{ ok: true }>(`/api/practicum/student-tasks/${encodeURIComponent(taskId)}/heartbeat`, { method: 'POST', headers: useCsrfHeaders(), body: { eventType } })
+  }
+
+  type StudentTaskSubmission = { id: string; currentVersion: number; submittedAt: string | null; versions: Array<{ id: string; version: number; text: string; submittedAt: string }> }
+  async function getStudentTask(taskId: string) {
+    return await $fetch<{ task: { id: string; status: string }; submission: StudentTaskSubmission | null }>(`/api/practicum/student-tasks/${encodeURIComponent(taskId)}`)
+  }
+  async function submitStudentTask(taskId: string, text: string) {
+    return await $fetch<{ task: { id: string; status: string }; submission: StudentTaskSubmission }>(`/api/practicum/student-tasks/${encodeURIComponent(taskId)}/submissions`, { method: 'POST', headers: useCsrfHeaders({ 'Idempotency-Key': `student-task-${taskId}-${crypto.randomUUID()}` }), body: { text } })
+  }
+
   async function getAnalytics(roomId: string) {
     return await $fetch<PracticumAnalytics>(`/api/practicum/analytics?roomId=${encodeURIComponent(roomId)}`)
   }
@@ -93,5 +154,5 @@ export function usePracticumServer() {
     return await $fetch<PracticumMemberAnalyticsDetail>(`/api/practicum/analytics/members/${encodeURIComponent(memberId)}?roomId=${encodeURIComponent(roomId)}`)
   }
 
-  return { listSubmissions, getSubmission, submitPractice, returnSubmission, gradeSubmission, getStats, getAnalytics, getMemberAnalytics }
+  return { listPlans, getPlan, listNotifications, markNotificationRead, listSubmissions, getSubmission, submitPractice, returnSubmission, gradeSubmission, getStats, getProgress, listStudentTasks, recordTaskHeartbeat, getStudentTask, submitStudentTask, getAnalytics, getMemberAnalytics }
 }

@@ -21,35 +21,24 @@
           <div class="metric"><span>老师反馈</span><strong>{{ feedbackCount }}</strong><small>建议优先查看</small></div>
         </div>
 
-        <section class="table-panel">
-          <div class="panel-head">
-            <div>
-              <strong>任务列表</strong>
-              <span>按状态和学习顺序展示</span>
-            </div>
+        <section class="todo-panel" data-server-todo-list>
+          <div class="todo-panel-head">
+            <div><h2>待办列表</h2><p>{{ taskRows.length }} 条待办任务</p></div>
+            <NuxtLink to="/practicum/courses" class="secondary-button compact-action">浏览课程</NuxtLink>
           </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>任务</th>
-                  <th>类型</th>
-                  <th>状态</th>
-                  <th>老师反馈</th>
-                  <th>操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="task in taskRows" :key="task.id">
-                  <td>{{ task.title }}</td>
-                  <td>{{ task.type }}</td>
-                  <td><span class="status-pill" :class="task.statusClass">{{ task.status }}</span></td>
-                  <td>{{ task.feedback || '暂无' }}</td>
-                  <td><NuxtLink :to="`/practicum/activities/${task.id}`" class="secondary-button compact-action">{{ task.action }}</NuxtLink></td>
-                </tr>
-              </tbody>
-            </table>
+          <PracticumStatePanel v-if="!taskRows.length" state="empty" title="暂无待办任务" description="计划分配到班级后，学生会在这里看到可学习的任务。" />
+          <div v-else class="todo-list">
+            <article v-for="task in paginatedTaskRows" :key="task.id" class="todo-item">
+              <div class="todo-type"><span class="status-pill" :class="task.statusClass">{{ task.type }}</span><span>{{ task.status }}</span></div>
+              <div class="todo-content"><h3>{{ task.title }}</h3><p>来源：{{ task.source }} · 发布时间：{{ task.publishedAt }}</p></div>
+              <NuxtLink :to="`/practicum/activities/${task.id}`" class="primary-button">{{ task.action === '查看条件' ? '查看条件' : '去学习' }}</NuxtLink>
+            </article>
           </div>
+          <nav v-if="taskRows.length > pageSize" class="todo-pagination" aria-label="待办分页">
+            <button type="button" class="secondary-button compact-action" :disabled="todoPage === 1" @click="todoPage--">上一页</button>
+            <span>第 {{ todoPage }} / {{ totalTodoPages }} 页</span>
+            <button type="button" class="secondary-button compact-action" :disabled="todoPage === totalTodoPages" @click="todoPage++">下一页</button>
+          </nav>
         </section>
       </section>
     </PracticumShell>
@@ -64,9 +53,22 @@ import type { ClassroomAssignment } from '../../domain/practicum/types'
 
 const store = usePracticumStore()
 const serverAssignments = ref<ClassroomAssignment[]>([])
+const serverStudentTasks = ref<Array<{ id: string; activityId: string; status: string; planAssignment: { title: string } }>>([])
+const todoPage = ref(1)
+const pageSize = 8
 onMounted(async () => {
   if (!canSubmitWork(store.state.activeRole)) return
-  try { serverAssignments.value = (await $fetch<{ items: ClassroomAssignment[] }>('/api/practicum/assignments')).items } catch { serverAssignments.value = [] }
+  try {
+    const [legacy, current] = await Promise.all([
+      $fetch<{ items: ClassroomAssignment[] }>('/api/practicum/assignments'),
+      $fetch<{ items: typeof serverStudentTasks.value }>('/api/practicum/student/tasks'),
+    ])
+    serverAssignments.value = legacy.items
+    serverStudentTasks.value = current.items
+  } catch {
+    serverAssignments.value = []
+    serverStudentTasks.value = []
+  }
 })
 const primaryPlan = computed(() => store.visiblePlansFor('STUDENT')[0] ?? null)
 const nodes = computed(() => primaryPlan.value ? store.getPlanNodes(primaryPlan.value.id) : [])
@@ -100,9 +102,16 @@ const activityTaskRows = computed(() => activityNodes.value.slice(0, 8).map(node
   }
 }))
 const taskRows = computed(() => [
-  ...serverAssignments.value.map(assignment => ({ id: assignment.id, title: assignment.title, type: '课堂作业', status: '待完成', statusClass: 'status-pill-red', feedback: assignment.instructions, action: '查看' })),
-  ...activityTaskRows.value,
+  ...serverStudentTasks.value.map(task => {
+    const node = activityNodes.value.find(item => item.activityId === task.activityId)
+    const status = task.status === 'RETURNED' ? '待修改' : task.status === 'GRADED' || task.status === 'CLOSED' ? '已完成' : task.status === 'LOCKED' ? '已锁定' : task.status === 'SUBMITTED' ? '待批阅' : '待提交'
+    return { id: node?.id ?? task.activityId, title: node?.title ?? task.activityId, type: activityTypeLabel(store.getActivityByNodeId(node?.id ?? '')?.type), status, statusClass: task.status === 'LOCKED' ? 'status-pill-gray' : task.status === 'RETURNED' ? 'status-pill-orange' : task.status === 'GRADED' ? '' : 'status-pill-red', feedback: '', action: task.status === 'LOCKED' ? '查看条件' : '进入', source: task.planAssignment.title, publishedAt: '服务端已分配' }
+  }),
+  ...serverAssignments.value.map(assignment => ({ id: assignment.id, title: assignment.title, type: '课堂作业', status: '待完成', statusClass: 'status-pill-red', feedback: assignment.instructions, action: '查看', source: '课堂分配', publishedAt: '待同步' })),
+  ...activityTaskRows.value.map(task => ({ ...task, source: primaryPlan.value?.title ?? '课程活动', publishedAt: '本地兼容数据' })),
 ])
+const totalTodoPages = computed(() => Math.max(1, Math.ceil(taskRows.value.length / pageSize)))
+const paginatedTaskRows = computed(() => taskRows.value.slice((todoPage.value - 1) * pageSize, todoPage.value * pageSize))
 
 function activityTypeLabel(type?: string) {
   if (type === 'SOFTWARE_ACTION') return '软件操作'

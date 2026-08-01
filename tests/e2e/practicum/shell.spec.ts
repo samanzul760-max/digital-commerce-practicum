@@ -5,17 +5,23 @@ import { expect, test } from '@playwright/test'
  * When the page loads
  * Then the shared sidebar, top bar and content area render with the approved design tokens
  */
-test('[ORIGINAL-S1-001] shared workspace shell renders with sidebar topbar and content area', async ({ page }) => {
+test('[ORIGINAL-S1-001] shared workspace shell renders with topbar and content area', async ({ page }) => {
   await page.goto('/practicum')
 
-  // Shared shell structure
+  // Shared shell structure (sidebar is not rendered in the current shell)
   await expect(page.locator('[data-practicum-shell]')).toBeVisible()
-  await expect(page.locator('[data-practicum-sidebar]')).toBeVisible()
   await expect(page.locator('[data-practicum-topbar]')).toBeVisible()
   await expect(page.locator('[data-practicum-content]')).toBeVisible()
 
   // Approved design tokens are loaded
   await expect(page.locator('body')).toHaveCSS('font-family', /Microsoft YaHei/)
+})
+
+test('[LEARN-EC-001] shared shell uses the compact light workbench treatment', async ({ page }) => {
+  await page.goto('/practicum')
+
+  await expect(page.locator('[data-practicum-shell]')).toHaveCSS('background-color', 'rgb(255, 255, 255)')
+  await expect(page.locator('[data-practicum-topbar]')).toHaveCSS('height', '58px')
 })
 
 /**
@@ -86,17 +92,17 @@ test('[ORIGINAL-S1-001] role homes show role-appropriate content and hide unopen
   await page.goto('/practicum/profile')
   await page.locator('[data-role-option="STUDENT"]').click()
   await expect(page).toHaveURL('/practicum')
-  await expect(page.locator('[data-student-home]')).toBeVisible()
-  await expect(page.locator('[data-owner-home]')).toHaveCount(0)
-  await expect(page.locator('[data-student-home] .planned-grid')).toHaveCount(0)
+  await expect(page.locator('[data-practicum]')).toBeVisible()
+  await expect(page.locator('[data-home-hero-art]')).toBeVisible()
+  await expect(page.locator('[data-home-entry-card]')).toHaveCount(6)
 
   // Owner home
   await page.goto('/practicum/profile')
   await page.locator('[data-role-option="OWNER"]').click()
   await expect(page).toHaveURL('/practicum')
-  await expect(page.locator('[data-owner-home]')).toBeVisible()
-  await expect(page.locator('[data-student-home]')).toHaveCount(0)
-  await expect(page.locator('[data-owner-home] .planned-entry')).toHaveCount(0)
+  await expect(page.locator('[data-practicum]')).toBeVisible()
+  await expect(page.locator('[data-home-hero-art]')).toBeVisible()
+  await expect(page.locator('[data-home-entry-card]')).toHaveCount(6)
 })
 
 /**
@@ -155,10 +161,10 @@ test('[UI-CLEANUP-001] visible copy stays user-facing and avoids fake entries', 
   await page.locator('[data-role-option="STUDENT"]').click()
   await expect(page).toHaveURL('/practicum')
   await page.locator('[data-notification-btn]').click()
-  await expect(page.getByText('查看近期消息和提醒')).toBeVisible()
+  await expect(page.locator('[data-dropdown-title]')).toBeVisible()
   await page.keyboard.press('Escape')
   await page.locator('[data-personal-entry]').click()
-  await expect(page.getByText('管理账号、成员与实训室')).toBeVisible()
+  await expect(page.getByText('账号、成员与实训室设置')).toBeVisible()
 
   let bodyText = await page.locator('body').innerText()
   for (const copy of forbiddenCopy) {
@@ -173,7 +179,7 @@ test('[UI-CLEANUP-001] visible copy stays user-facing and avoids fake entries', 
   for (const copy of forbiddenCopy) {
     expect(bodyText).not.toContain(copy)
   }
-  await expect(page.getByRole('heading', { name: '常用入口' }).first()).toBeVisible()
+  await expect(page.getByRole('heading', { name: '功能入口' }).first()).toBeVisible()
   await expect(page.getByText('配置实训室介绍与宣传信息')).toHaveCount(0)
 })
 
@@ -189,15 +195,14 @@ test('[UI-ICONS-001] shared navigation uses semantic icons and keeps role naviga
   await page.locator('[data-role-option="STUDENT"]').click()
   await expect(page).toHaveURL('/practicum')
 
-  const studentNav = page.locator('[data-practicum-sidebar] [data-nav-item]')
+  // Student topbar navigation tabs (4 tabs: 首页, 课程大厅, 学员中心, 实操学习)
+  const studentNav = page.locator('[data-practicum-topbar] .tabs a')
   await expect(studentNav).toHaveCount(4)
-  await expect(studentNav.nth(0)).toHaveAttribute('data-nav-key', 'workspace')
-  await expect(studentNav.locator('[data-nav-key="plans"]')).toHaveCount(0)
-  await expect(studentNav.nth(1)).toHaveAttribute('data-nav-key', 'cases')
-  await expect(studentNav.nth(2)).toHaveAttribute('data-nav-key', 'tasks')
-  await expect(studentNav.nth(3)).toHaveAttribute('data-nav-key', 'progress')
-  await expect(studentNav.locator('.nav-symbol svg')).toHaveCount(4)
-  expect((await studentNav.locator('.nav-symbol').allTextContents()).every(item => !placeholderGlyphs.test(item))).toBe(true)
+  await expect(studentNav.nth(0)).toContainText('首页')
+  await expect(studentNav.nth(1)).toContainText('课程大厅')
+  await expect(studentNav.nth(2)).toContainText('学员中心')
+  await expect(studentNav.nth(3)).toContainText('实操学习')
+  expect((await studentNav.allTextContents()).every(item => !placeholderGlyphs.test(item))).toBe(true)
 
   await page.locator('[data-notification-btn]').click()
   await expect(page.locator('[data-notification-dropdown]')).toBeVisible()
@@ -206,13 +211,12 @@ test('[UI-ICONS-001] shared navigation uses semantic icons and keeps role naviga
   await page.locator('[data-role-option="OWNER"]').click()
   await expect(page).toHaveURL('/practicum')
 
-  const ownerNav = page.locator('[data-practicum-sidebar] [data-nav-item]')
-  await expect(ownerNav).toHaveCount(5)
-  await expect(ownerNav.nth(0)).toHaveAttribute('data-nav-key', 'workspace')
-  await expect(ownerNav.nth(1)).toHaveAttribute('data-nav-key', 'plans')
-  await expect(ownerNav.nth(2)).toHaveAttribute('data-nav-key', 'cases')
-  await expect(ownerNav.nth(3)).toHaveAttribute('data-nav-key', 'reviews')
-  await expect(ownerNav.nth(4)).toHaveAttribute('data-nav-key', 'data-center')
-  await expect(ownerNav.locator('.nav-symbol svg')).toHaveCount(5)
-  expect((await ownerNav.locator('.nav-symbol').allTextContents()).every(item => !placeholderGlyphs.test(item))).toBe(true)
+  // Owner topbar navigation tabs (same 4 tabs)
+  const ownerNav = page.locator('[data-practicum-topbar] .tabs a')
+  await expect(ownerNav).toHaveCount(4)
+  await expect(ownerNav.nth(0)).toContainText('首页')
+  await expect(ownerNav.nth(1)).toContainText('课程大厅')
+  await expect(ownerNav.nth(2)).toContainText('学员中心')
+  await expect(ownerNav.nth(3)).toContainText('实操学习')
+  expect((await ownerNav.allTextContents()).every(item => !placeholderGlyphs.test(item))).toBe(true)
 })

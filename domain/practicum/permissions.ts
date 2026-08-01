@@ -166,22 +166,35 @@ export const NAV_ITEMS: NavItemDef[] = [
   },
   {
     key: 'plans',
-    label: '教学',
+    label: '课程大厅',
     icon: 'book',
-    to: '/practicum#plans',
+    to: '/practicum/courses',
     roles: ['OWNER'],
     activeMatch: (path) =>
+      path.startsWith('/practicum/courses') ||
       path.startsWith('/practicum/plans') ||
       path.startsWith('/practicum/resources') ||
       path.startsWith('/practicum/learn') ||
       path.startsWith('/practicum/activities'),
   },
   {
+    key: 'plans',
+    label: '课程',
+    icon: 'book',
+    to: '/practicum/courses',
+    roles: ['STUDENT'],
+    activeMatch: (path) =>
+      path.startsWith('/practicum/courses') ||
+      path.startsWith('/practicum/learn') ||
+      path.startsWith('/practicum/activities') ||
+      path.startsWith('/practicum/cases'),
+  },
+  {
     key: 'cases',
     label: '案例',
     icon: 'layers',
     to: '/practicum/cases',
-    roles: ['OWNER', 'TEACHER', 'MENTOR', 'STUDENT'],
+    roles: ['OWNER', 'TEACHER', 'MENTOR'],
     activeMatch: (path) => path.startsWith('/practicum/cases'),
   },
   {

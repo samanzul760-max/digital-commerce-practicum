@@ -156,3 +156,32 @@ Quality gate: `npm.cmd run typecheck` passed. The complete Playwright suite and 
 ## 2026-07-30 Review queue server-source slice
 
 `teacher-review.spec.ts` first timed out while an OWNER session attempted to render student-only local practice controls. The queue field scenario now creates an authenticated STUDENT submission through `/api/practicum/submissions`, then verifies the OWNER review queue from a separate authenticated context. `npx.cmd playwright test tests/e2e/practicum/teacher-review.spec.ts --grep "owner sees complete submission fields" --reporter=list` passed 1/1. The remaining review filter, return, revision, and grading legacy cases are still being migrated and are not marked as complete.
+
+## 2026-08-01 Task dependency unlock slice
+
+| BDD | RED | GREEN | Result |
+|---|---|---|---|
+| `SB-PLAN-002` locked task submission | `task-dependency-api.spec.ts` expected `409 TASK_LOCKED`, but the API returned `200`. | The focused suite passed after the submission API rejects `LOCKED` tasks before it creates evidence. | Students cannot submit a locked dependent task. |
+| `SB-PLAN-002` read-time unlock | The task list returned a dependent task with `LOCKED` status even when every prerequisite was graded. | The focused suite passed after server-side dependency evaluation updates the task to `AVAILABLE` in a Prisma transaction. | The student receives a persisted unlock state. |
+| `SB-PLAN-002` grade-time unlock | The teacher grade API left a dependent task in `LOCKED` after grading its prerequisite. | The focused suite passed after grading, task-state transition, and dependency unlock share one Prisma transaction. | A successful prerequisite grade immediately unlocks eligible dependent work. |
+
+Focused verification: `npx.cmd playwright test tests/e2e/practicum/task-dependency-api.spec.ts --reporter=list` passed 3/3. `npx.cmd playwright test tests/e2e/practicum/assignments-api.spec.ts --reporter=list` passed 3/3, and `npm.cmd run typecheck` passed after all three behaviors. Broader regression and production build remain required before this slice can be marked `IMPLEMENTED_VERIFIED`.
+
+## 2026-08-01 Submission idempotency slice
+
+| BDD | RED | GREEN | Result |
+|---|---|---|---|
+| `SB-SUB-002` repeated submission key | A second request with the same `Idempotency-Key` created version `2`; the test expected the original version `1`. | The API now records the first submission in `SubmissionIdempotencyKey` under a database uniqueness constraint and returns that submission on retry. | A retry produces no additional immutable version. |
+
+Migration: `20260801090000_submission_idempotency` adds `SubmissionIdempotencyKey`, its scoped unique index, and a cascading foreign key to `Submission`. `npx.cmd prisma migrate deploy` applied the migration; `npx.cmd prisma migrate status` then reported the database schema up to date. Focused verification: `npx.cmd playwright test tests/e2e/practicum/task-dependency-api.spec.ts --reporter=list` passed 4/4 and `npm.cmd run typecheck` passed. Broader regression, build, concurrent duplicate-request coverage, and a rollback script remain `PARTIAL`.
+
+## 2026-08-01 Progress, audit and frontend bridge slice
+
+| Capability | Frontend connection | Result |
+|---|---|---|
+| Server progress aggregation | `/practicum/progress` calls `/api/practicum/progress`; its primary progress rows use Prisma aggregate data, with loading, empty, error, forbidden and retry states. | `PARTIAL`: continuing-learning cards and notifications still have legacy Store compatibility data. |
+| Immutable grade history | `GradeRevision` migration records each teacher grading decision beside the current `Grade` snapshot. | `PARTIAL`: history display and Prisma return flow remain to be connected to the review UI. |
+| Learning audit telemetry | Activities resolve the current `StudentTask`, then send server Heartbeat and Visibility events to `ActivityLog`; failures do not interrupt learning. | `PARTIAL`: duration aggregation and staff-side log views remain absent. |
+| New student submission route | When an activity maps to a Prisma task, the activity page reads and submits evidence through `/api/practicum/student-tasks/:taskId`, preserving versions and idempotency. | `PARTIAL`: unmapped legacy activity data remains on its compatibility route until the plan/activity ID migration is complete. |
+
+Database migrations `20260801103000_grade_revisions` and `20260801110000_learning_audit_events` were applied. `npx.cmd prisma migrate status`, `npm.cmd run typecheck`, and `npm.cmd run build` passed. `frontend-backend-bridge.spec.ts` passed 4/4 after the progress page race fix; `progress-mobile.spec.ts` passed at 390px with no horizontal overflow. The complete suite, concurrent idempotency test, rollback rehearsal, attachment storage, automatic grading, dependency-cycle validation and the full legacy JSON retirement are still `PARTIAL` or `MISSING`.

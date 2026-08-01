@@ -1,10 +1,10 @@
 <template>
   <ClientOnly>
     <PracticumShell context-title="审核中心" context-meta="OWNER 审核工作区">
-      <p v-if="!canReview(store.state.activeRole)" data-forbidden class="empty-state">你没有访问审核中心的权限。</p>
+      <PracticumStatePanel v-if="!canReview(store.state.activeRole)" data-forbidden state="forbidden" title="无法访问审核中心" description="审核与批改仅向教学管理角色开放。" />
 
-      <p v-else-if="isLoading" data-review-loading class="empty-state">正在加载审核队列...</p>
-      <p v-else-if="loadError" data-review-error class="empty-state" role="alert">审核队列加载失败，请刷新重试。</p>
+      <PracticumStatePanel v-else-if="isLoading" data-review-loading state="loading" title="正在加载审核队列" description="正在获取最新的学生提交。" />
+      <PracticumStatePanel v-else-if="loadError" data-review-error state="error" title="审核队列加载失败" description="暂时无法获取审核数据，请重新加载。" @retry="retryQueue" />
 
       <div v-else data-review-queue>
         <div class="page-heading">
@@ -118,6 +118,11 @@ async function loadQueue() {
   } finally {
     isLoading.value = false
   }
+}
+
+function retryQueue() {
+  isLoading.value = true
+  void loadQueue()
 }
 
 onMounted(() => {

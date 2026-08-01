@@ -1,10 +1,10 @@
 <template>
   <aside data-practicum-sidebar class="workspace-sidebar" aria-label="主导航">
     <div class="product-mark">
-      <span class="product-glyph" aria-hidden="true"><PracticumIcon name="dashboard" /></span>
+      <span class="product-glyph" aria-hidden="true">L</span>
       <span>
-        <strong>数字商贸实训工作台</strong>
-        <small>教学与实训协同平台</small>
+        <strong>LearnEC 实训工作台</strong>
+        <small>教学与实操协同平台</small>
       </span>
     </div>
 
@@ -24,6 +24,11 @@
       </NuxtLink>
     </nav>
 
+    <div class="sidebar-foot">
+      <strong>{{ store.state.activeRole === 'OWNER' ? '教学管理' : '下一次学习' }}</strong>
+      <span>{{ store.state.activeRole === 'OWNER' ? '批阅、成员与数据集中处理' : '继续完成当前实训任务' }}</span>
+      <div class="sidebar-progress"><span /></div>
+    </div>
   </aside>
 </template>
 
@@ -35,7 +40,6 @@ import { visibleNavItems as getVisibleNavItems } from '../../domain/practicum/pe
 
 const route = useRoute()
 const store = usePracticumStore()
-
 const visibleNavItems = computed(() => getVisibleNavItems(store.state.activeRole))
 
 function isActive(item: { activeMatch: (path: string) => boolean }) {

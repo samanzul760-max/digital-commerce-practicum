@@ -1,640 +1,246 @@
 <template>
   <ClientOnly>
-    <PracticumShell context-title="成长数据" :context-meta="contextMeta">
-      <!-- Loading -->
-      <div v-if="isLoading" data-loading class="empty-state">正在加载成长数据...</div>
+    <PracticumShell context-title="学员中心" :context-meta="contextMeta">
+      <PracticumStatePanel
+        v-if="!canViewProgress(store.state.activeRole)"
+        data-forbidden
+        state="forbidden"
+        title="无法访问学员中心"
+        description="请切换到学生或管理员身份后重试。"
+      />
 
-      <!-- Error -->
-      <div v-else-if="loadError" data-error class="empty-state">
-        <p>加载成长数据时出现问题。</p>
-        <button type="button" class="secondary-button compact-action" style="margin-top:10px" @click="retryLoad">重新加载</button>
-      </div>
+      <section v-else class="dashboard" data-student-growth>
+        <PracticumStatePanel v-if="progressLoading" state="loading" title="正在同步学习进度" description="正在从服务端读取最新任务状态。" data-progress-loading />
+        <PracticumStatePanel v-else-if="progressError" state="error" title="进度暂时无法加载" description="请检查网络后重试，页面不会使用本地数据覆盖服务端结果。" data-progress-error @retry="loadProgress" />
+        <aside class="side">
+          <NuxtLink to="/practicum/progress" class="active"><PracticumIcon name="dashboard" /><span>概况</span></NuxtLink>
+          <NuxtLink to="/practicum/courses"><PracticumIcon name="book" /><span>我的课程</span></NuxtLink>
+          <NuxtLink to="/practicum/progress#achievements"><PracticumIcon name="trophy" /><span>成就</span></NuxtLink>
+          <NuxtLink to="/practicum/tasks"><PracticumIcon name="clipboard-check" /><span>任务</span></NuxtLink>
+        </aside>
 
-      <!-- Forbidden -->
-      <p v-else-if="!canViewProgress(store.state.activeRole)" data-forbidden class="empty-state">你没有访问成长数据页面的权限。</p>
-
-      <!-- Student growth data -->
-      <div v-else-if="store.state.activeRole === 'STUDENT'" data-student-growth>
-        <!-- Growth radar + overview -->
-        <section data-growth-overview class="growth-overview-band" aria-labelledby="growth-title">
-          <div class="growth-title-row">
-            <h2 id="growth-title">能力雷达</h2>
-            <span class="growth-meta">{{ contextMeta }}</span>
-          </div>
-          <div v-if="!growthDimensions.length" data-empty-growth class="empty-state">暂无成长数据。完成实训活动并收到评分后，这里会展示你的能力雷达图。</div>
-          <div v-else class="growth-radar-wrap">
-            <svg
-              data-radar-chart
-              :viewBox="`0 0 ${radarSize} ${radarSize}`"
-              :width="radarSize"
-              :height="radarSize"
-              :aria-label="radarAriaLabel"
-              role="img"
-            >
-              <!-- Grid rings -->
-              <circle
-                v-for="ring in 4" :key="'ring-' + ring"
-                :cx="radarCx" :cy="radarCy"
-                :r="radarR * ring / 4"
-                fill="none" :stroke="gridColor" stroke-width="1"
-              />
-              <!-- Axes -->
-              <line
-                v-for="(_, i) in growthDimensions" :key="'axis-' + i"
-                :x1="radarCx" :y1="radarCy"
-                :x2="radarCx + radarR * Math.cos(angle(i))"
-                :y2="radarCy + radarR * Math.sin(angle(i))"
-                :stroke="gridColor" stroke-width="0.5"
-              />
-              <!-- Data polygon -->
-              <polygon
-                v-if="growthDimensions.length"
-                :points="radarPoints"
-                fill="var(--growth-accent, #2563eb)"
-                fill-opacity="0.12"
-                stroke="var(--growth-accent, #2563eb)"
-                stroke-width="2"
-                stroke-linejoin="round"
-              />
-              <!-- Data dots -->
-              <circle
-                v-for="(dim, i) in growthDimensions" :key="'dot-' + i"
-                :cx="radarCx + (radarR * dim.score / dim.maxScore) * Math.cos(angle(i))"
-                :cy="radarCy + (radarR * dim.score / dim.maxScore) * Math.sin(angle(i))"
-                r="3.5"
-                fill="var(--growth-accent, #2563eb)"
-                stroke="#fff"
-                stroke-width="1.5"
-              />
-              <!-- Labels -->
-              <text
-                v-for="(dim, i) in growthDimensions" :key="'label-' + i"
-                :x="radarCx + (radarR + 24) * Math.cos(angle(i))"
-                :y="radarCy + (radarR + 24) * Math.sin(angle(i))"
-                text-anchor="middle"
-                dominant-baseline="central"
-                font-size="12"
-                font-weight="500"
-                fill="var(--practicum-ink-soft)"
-                font-family="Microsoft YaHei UI, PingFang SC, sans-serif"
-              >{{ dim.label }}</text>
-            </svg>
-            <div class="growth-quick-stats">
-              <div class="gqs-item">
-                <span class="gqs-value">{{ avgScore }}</span>
-                <span class="gqs-label">综合评分</span>
+        <main class="dash-main">
+          <section class="dash-welcome">
+            <div class="live-heading">
+              <div>
+                <p class="live-label">实时学习运营</p>
+                <h2>{{ store.state.activeRole === 'OWNER' ? '教学进度总览' : '本周学习进度' }}</h2>
+                <p>{{ store.state.activeRole === 'OWNER' ? `当前有 ${pendingReviewCount} 份作业等待批阅。` : `距离本周学习目标还差 ${todoCount} 个任务，继续保持。` }}</p>
               </div>
-              <div class="gqs-item">
-                <span class="gqs-value mastered">{{ masteredCount }}</span>
-                <span class="gqs-label">已掌握</span>
-              </div>
-              <div class="gqs-item">
-                <span class="gqs-value weak">{{ weakCount }}</span>
-                <span class="gqs-label">需加强</span>
+              <div class="live-metrics" aria-label="服务端实时数据">
+                <div><span>完成率</span><strong data-overall-progress>{{ serverProgress?.totals.percent ?? 0 }}%</strong></div>
+                <div><span>已分配任务</span><strong>{{ serverProgress?.totals.total ?? 0 }}</strong></div>
+                <div><span>已完成</span><strong>{{ serverProgress?.totals.completed ?? 0 }}</strong></div>
               </div>
             </div>
-          </div>
-        </section>
+            <p v-if="backendStats" data-backend-stats class="sync-line">服务端同步：{{ backendStats.publishedPlanCount }} 门已发布课程 · {{ backendStats.activityCount }} 个实操活动</p>
+          </section>
 
-        <!-- Growth dimension cards -->
-        <section v-if="growthDimensions.length" data-growth-dimensions aria-labelledby="dimensions-title">
-          <h2 id="dimensions-title" class="section-heading">能力详情</h2>
-          <div class="growth-dim-grid">
-            <div
-              v-for="dim in growthDimensions"
-              :key="dim.key"
-              :data-growth-dim="dim.key"
-              :class="['growth-dim-card', dim.score >= 60 ? 'growth-dim-mastered' : 'growth-dim-weak']"
-            >
-              <div class="growth-dim-head">
-                <span class="growth-dim-name">{{ dim.label }}</span>
-                <span :class="['growth-dim-score', dim.score >= 60 ? 'score-mastered' : 'score-weak']">{{ dim.score }}</span>
-              </div>
-              <div class="growth-dim-track">
-                <span class="growth-dim-fill" :style="{ width: dim.score + '%' }" />
-              </div>
-              <span class="growth-dim-status">{{ dim.score >= 60 ? '已掌握' : '需要加强' }}</span>
-            </div>
-          </div>
-        </section>
-
-        <!-- Existing sections: overall + module progress, returned work, rubric, timeline (preserved from prior student view) -->
-        <section data-overall-progress class="progress-band" aria-labelledby="overall-title" style="margin-top:24px">
-          <h2 id="overall-title">总体进度</h2>
-          <div class="progress-track" role="progressbar" :aria-label="`计划完成进度 ${planProgress.percent}%`" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="planProgress.percent">
-            <span :style="{ width: `${planProgress.percent}%` }" />
-          </div>
-          <div class="progress-number">{{ planProgress.percent }}%<small>{{ planProgress.completed }} / {{ planProgress.total }} 活动</small></div>
-        </section>
-
-        <section data-module-progress aria-labelledby="modules-title">
-          <h2 id="modules-title" class="section-heading">模块进度</h2>
-          <div v-for="mod in moduleList" :key="mod.id" class="form-panel">
-            <h3>{{ mod.title }}</h3>
-            <div class="progress-track" role="progressbar" :aria-label="`${mod.title} ${moduleProgressMap[mod.id]?.percent ?? 0}%`" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="moduleProgressMap[mod.id]?.percent ?? 0">
-              <span :style="{ width: `${moduleProgressMap[mod.id]?.percent ?? 0}%` }" />
-            </div>
-            <p class="meta">{{ moduleProgressMap[mod.id]?.completed ?? 0 }} / {{ moduleProgressMap[mod.id]?.total ?? 0 }} 活动</p>
-            <div v-for="unit in unitsForModule(mod.id)" :key="unit.id" class="unit-row">
-              <span>{{ unit.title }}</span>
-              <span class="meta">{{ unitProgressMap[unit.id]?.completed ?? 0 }} / {{ unitProgressMap[unit.id]?.total ?? 0 }}</span>
-            </div>
-          </div>
-          <p v-if="!moduleList.length" data-empty class="empty-state">暂无已发布的教学模块。</p>
-        </section>
-
-        <section data-returned-work aria-labelledby="returned-title">
-          <h2 id="returned-title" class="section-heading">待修改作业</h2>
-          <div v-if="returnedWork.length">
-            <div v-for="item in returnedWork" :key="item.nodeId" class="form-panel">
-              <NuxtLink :to="`/practicum/activities/${item.nodeId}`">
-                <strong>{{ item.title }}</strong>
-                <p class="meta">状态：已退回 · {{ item.feedback }}</p>
-              </NuxtLink>
-            </div>
-          </div>
-          <p v-else data-empty-returned class="empty-state">暂无待修改作业。</p>
-        </section>
-
-        <section data-rubric-results aria-labelledby="rubric-title">
-          <h2 id="rubric-title" class="section-heading">量规结果</h2>
-          <div v-if="rubricResults.length">
-            <div v-for="result in rubricResults" :key="result.nodeId" class="form-panel">
-              <h3>{{ result.activityTitle }}</h3>
-              <table class="data-table" :aria-label="`${result.activityTitle} 量规结果`">
-                <thead><tr><th>评分维度</th><th>得分</th><th>满分</th></tr></thead>
-                <tbody>
-                  <tr v-for="dim in result.dimensions" :key="dim.label">
-                    <td>{{ dim.label }}</td><td>{{ dim.score }}</td><td>{{ dim.maxScore }}</td>
-                  </tr>
-                </tbody>
-              </table>
-              <p class="meta">总分：{{ result.totalScore }} / {{ result.maxTotal }} · 评语：{{ result.feedback }}</p>
-            </div>
-          </div>
-          <p v-else data-empty-rubric class="empty-state">暂无已评分作业的量规结果。</p>
-        </section>
-
-        <section data-evidence-timeline aria-labelledby="timeline-title">
-          <h2 id="timeline-title" class="section-heading">提交记录</h2>
-          <div v-if="evidenceTimeline.length" class="timeline-list">
-            <div v-for="item in evidenceTimeline" :key="item.nodeId + '-' + item.version" class="form-panel timeline-item">
-              <p><strong>{{ item.title }}</strong></p>
-              <p class="meta">版本 {{ item.version }} · {{ item.status }} · {{ item.submittedAt }}</p>
-              <p v-if="item.feedback" class="meta">反馈：{{ item.feedback }}</p>
-            </div>
-          </div>
-          <p v-else data-empty-timeline class="empty-state">暂无提交记录。</p>
-        </section>
-      </div>
-
-      <!-- Owner view -->
-      <div v-else-if="store.state.activeRole === 'OWNER'" data-owner-progress>
-        <!-- Metrics overview -->
-        <div class="metric-strip">
-          <div class="metric">
-            <span>班级完成率</span>
-            <strong>{{ classCompletion.percent }}%</strong>
-            <small>{{ classCompletion.completed }} / {{ classCompletion.total }} 人次</small>
-          </div>
-          <div class="metric">
-            <span>待审核</span>
-            <strong>{{ pendingReviewCount }}</strong>
-            <small>份提交等待处理</small>
-          </div>
-          <div class="metric">
-            <span>已提交</span>
-            <strong>{{ statusDistribution.find(r => r.label === '已提交')?.count ?? 0 }}</strong>
-            <small>学生已上交</small>
-          </div>
-          <div class="metric">
-            <span>已评分</span>
-            <strong>{{ statusDistribution.find(r => r.label === '已评分')?.count ?? 0 }}</strong>
-            <small>已完成批阅</small>
-          </div>
-        </div>
-
-        <!-- Two-column dashboard -->
-        <div class="student-grid">
-          <div class="main-column">
-            <div class="panel">
-              <div class="panel-head">
-                <strong>班级完成趋势</strong>
-                <NuxtLink v-if="pendingReviewCount > 0" to="/practicum/reviews" class="text-link compact-link">前往审核中心 →</NuxtLink>
-              </div>
-              <div class="progress-band" style="border:0;border-radius:0;margin:0">
-                <div class="progress-track" role="progressbar" :aria-label="`班级完成 ${classCompletion.percent}%`" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="classCompletion.percent">
-                  <span :style="{ width: `${classCompletion.percent}%` }" />
+          <div class="dash-grid">
+            <div>
+              <section class="paper">
+                <h3>{{ store.state.activeRole === 'OWNER' ? '班级课程进度' : '主修的课程' }}</h3>
+                <div v-if="displayProgressPlans.length">
+                  <NuxtLink
+                    v-for="(plan, index) in displayProgressPlans.slice(0, 4)"
+                    :key="plan.id"
+                    :to="plan.source === 'server' ? '/practicum/tasks' : (store.state.activeRole === 'OWNER' ? `/practicum/courses/${plan.id}` : `/practicum/learn/${plan.id}`)"
+                    class="progress-row"
+                  >
+                    <div class="thumb" :style="{ background: colors[index % colors.length] }" />
+                    <div>
+                      {{ plan.title }}：{{ plan.percent }}% 完成
+                      <div class="track"><i :style="{ width: plan.percent + '%' }" /></div>
+                    </div>
+                    <b>{{ plan.percent }}%</b>
+                  </NuxtLink>
                 </div>
-                <div class="progress-number">{{ classCompletion.percent }}%<small>{{ classCompletion.completed }} / {{ classCompletion.total }} 人次</small></div>
-              </div>
-            </div>
+                <PracticumStatePanel v-else-if="!progressLoading && !progressError" state="empty" title="尚未分配可统计任务" description="已发布课程不会自动产生班级进度。请先将计划分配给班级，页面才会显示真实的服务端完成率。" />
+              </section>
 
-            <!-- Weak rubric dimensions -->
-            <div class="panel">
-              <div class="panel-head">
-                <strong>薄弱量规维度</strong>
-                <span>{{ weakRubricDimensions.length }} 项待关注</span>
-              </div>
-              <div v-if="weakRubricDimensions.length" class="table-wrap">
-                <table aria-label="薄弱量规维度">
-                  <thead><tr><th>评分维度</th><th>平均得分率</th><th>评分次数</th><th>所属活动</th></tr></thead>
-                  <tbody>
-                    <tr v-for="row in weakRubricDimensions" :key="row.label">
-                      <td>{{ row.label }}</td>
-                      <td>
-                        <span :class="row.avgPercent < 50 ? 'status-pill-red' : 'status-pill-orange'" class="status-pill">{{ row.avgPercent }}%</span>
-                      </td>
-                      <td>{{ row.submissionCount }}</td>
-                      <td>{{ row.activityTitle }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <p v-else data-empty-weak class="empty-state" style="border:0;margin:14px 16px">暂无评分数据可供分析。</p>
-            </div>
-          </div>
-
-          <div class="side-column">
-            <!-- Status distribution -->
-            <div class="panel">
-              <div class="panel-head">
-                <strong>提交状态分布</strong>
-              </div>
-              <div v-if="statusDistribution.length" class="route-list">
-                <div v-for="row in statusDistribution" :key="row.label" class="route-item">
-                  <span class="route-number">{{ row.count }}</span>
-                  <span class="route-copy">
-                    <strong>{{ row.label }}</strong>
-                    <span>当前状态</span>
-                  </span>
+              <section class="paper" style="margin-top:15px">
+                <h3>继续学习</h3>
+                <div class="cards progress-entry-cards">
+                  <PracticumCourseCard
+                    v-for="plan in plans.slice(0, 2)"
+                    :key="plan.id"
+                    :plan="plan"
+                    :module-count="moduleCount(plan.id)"
+                    :activity-count="activityCount(plan.id)"
+                    :can-learn="store.state.activeRole === 'STUDENT' && plan.status === 'PUBLISHED'"
+                    :can-manage="store.state.activeRole === 'OWNER'"
+                  />
+                  <NuxtLink
+                    v-for="entry in progressEntries"
+                    :key="entry.to"
+                    :to="entry.to"
+                    class="progress-entry-card"
+                    data-progress-entry-card
+                  >
+                    <span>{{ entry.tag }}</span>
+                    <strong>{{ entry.title }}</strong>
+                    <p>{{ entry.description }}</p>
+                  </NuxtLink>
                 </div>
-              </div>
-              <p v-else data-empty class="empty-state" style="border:0;margin:14px 16px">暂无提交数据。</p>
+                <PracticumStatePanel
+                  v-if="!plans.length && !progressEntries.length"
+                  state="empty"
+                  title="暂无学习记录"
+                  description="去课程大厅选择课程开始学习吧。"
+                />
+              </section>
             </div>
 
-            <!-- Quick actions -->
-            <div class="side-section">
-              <h2>快捷操作</h2>
-              <p v-if="pendingReviewCount > 0">有 {{ pendingReviewCount }} 份提交等待审核。前往审核中心处理学生作业。</p>
-              <p v-else>暂无待处理事项。学生提交作业后这里会显示提醒。</p>
-              <NuxtLink v-if="pendingReviewCount > 0" to="/practicum/reviews">
-                <button type="button" class="primary-button" style="margin-top:10px;width:100%">进入审核中心</button>
-              </NuxtLink>
-            </div>
+            <section class="paper">
+              <h3>学习日历</h3>
+              <div class="calendar" aria-label="学习日历">
+                <b v-for="day in calendarDays" :key="day" :style="markedDays.includes(day) ? 'background:#e6f4ff;color:#147bd1' : ''">{{ day < 4 ? '' : day - 3 }}</b>
+              </div>
+              <div class="calendar-info">
+                <h3 style="margin-top:20px">下一次提醒</h3>
+                <p class="calendar-detail">
+                  周五 19:30<br>
+                  <b style="color:#17222e">{{ nextReminder }}</b>
+                </p>
+                <h3 style="margin-top:16px">最近任务</h3>
+                <div v-if="recentTaskItems.length" class="calendar-list">
+                  <NuxtLink
+                    v-for="item in recentTaskItems"
+                    :key="item.to"
+                    :to="item.to"
+                    class="calendar-list-item"
+                  >{{ item.label }}</NuxtLink>
+                </div>
+                <p v-else class="calendar-detail">暂无待办任务</p>
+                <h3 style="margin-top:16px">最近通知</h3>
+                <div v-if="recentCalendarNotifications.length" class="calendar-list">
+                  <NuxtLink
+                    v-for="item in recentCalendarNotifications"
+                    :key="item.id"
+                    :to="item.targetRoute"
+                    class="calendar-list-item"
+                  >{{ item.title }}</NuxtLink>
+                </div>
+                <p v-else class="calendar-detail">暂无新通知</p>
+              </div>
+            </section>
           </div>
-        </div>
-      </div>
+        </main>
+      </section>
     </PracticumShell>
   </ClientOnly>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
-import { usePracticumStore, type GrowthDimension } from '../../composables/usePracticumStore'
-import { canViewProgress } from '../../domain/practicum/permissions'
+import { computed, onMounted, ref } from 'vue'
+import { usePracticumStore } from '~/composables/usePracticumStore'
+import { usePracticumServer } from '~/composables/usePracticumServer'
+import { canViewProgress } from '~/domain/practicum/permissions'
 
 const store = usePracticumStore()
-const isLoading = ref(true)
-const loadError = ref(false)
-const growthData = ref<{ dimensions: GrowthDimension[]; hasData: boolean }>({ dimensions: [], hasData: false })
-
-const radarSize = 260
-const radarCx = radarSize / 2
-const radarCy = radarSize / 2
-const radarR = 100
-const gridColor = 'var(--practicum-border)'
-
-const publishedPlan = computed(() => store.state.plans.find(p => p.status === 'PUBLISHED'))
-const contextMeta = computed(() => {
-  if (publishedPlan.value) return `${store.state.room.title} · ${publishedPlan.value.title}`
-  return store.state.room.title
+const server = usePracticumServer()
+const backendStats = ref<Record<string, number> | null>(null)
+const serverProgress = ref<{ plans: Array<{ id: string; title: string; percent: number; total: number; completed: number }>; totals: { total: number; completed: number; percent: number } } | null>(null)
+const progressLoading = ref(false)
+const progressError = ref(false)
+const plans = computed(() => store.visiblePlansFor(store.state.activeRole))
+const displayProgressPlans = computed(() => serverProgress.value
+  ? serverProgress.value.plans.map(plan => ({ ...plan, source: 'server' as const }))
+  : [])
+const pendingReviewCount = computed(() => store.getReviewQueue().filter(item => item.status === 'SUBMITTED').length)
+const todoCount = computed(() => {
+  const plan = plans.value[0]
+  if (!plan) return 0
+  const progress = store.getPlanProgress(plan.id)
+  return Math.max(progress.total - progress.completed, 0)
 })
+const contextMeta = computed(() => store.state.room.title)
+const colors = ['#ff9d45', '#8b75e4', '#49ac86', '#4d8be5']
+const calendarDays = Array.from({ length: 35 }, (_, index) => index)
+const markedDays = [7, 14, 20, 27]
+const nextReminder = computed(() => store.state.activeRole === 'OWNER' ? '批阅中心：处理最新学生提交' : '直播复盘：商品详情页优化')
 
-const growthDimensions = computed(() => growthData.value.dimensions)
-const avgScore = computed(() => {
-  if (!growthDimensions.value.length) return '--'
-  const sum = growthDimensions.value.reduce((a: number, d: GrowthDimension) => a + d.score, 0)
-  return Math.round(sum / growthDimensions.value.length)
-})
-const masteredCount = computed(() => growthDimensions.value.filter((d: GrowthDimension) => d.score >= 60).length)
-const weakCount = computed(() => growthDimensions.value.filter((d: GrowthDimension) => d.score < 60).length)
-
-function angle(i: number): number {
-  return -Math.PI / 2 + (2 * Math.PI * i) / growthDimensions.value.length
-}
-
-const radarPoints = computed(() =>
-  growthDimensions.value
-    .map((dim: GrowthDimension, i: number) => {
-      const dist = radarR * dim.score / dim.maxScore
-      return `${radarCx + dist * Math.cos(angle(i))},${radarCy + dist * Math.sin(angle(i))}`
-    })
-    .join(' ')
-)
-
-const radarAriaLabel = computed(() => {
-  if (!growthDimensions.value.length) return '六维能力雷达图：暂无数据'
-  return `六维能力雷达图：${growthDimensions.value.map((d: GrowthDimension) => `${d.label} ${d.score}分`).join('，')}`
-})
-
-function loadGrowth() {
-  isLoading.value = true
-  loadError.value = false
-  try {
-    const result = store.getGrowthData('student-001')
-    growthData.value = { dimensions: result.dimensions, hasData: result.hasData }
-    isLoading.value = false
-  } catch {
-    loadError.value = true
-    isLoading.value = false
+const recentTaskItems = computed(() => {
+  const items: { label: string; to: string }[] = []
+  if (todoCount.value > 0) {
+    items.push({ label: `还有 ${todoCount.value} 个任务待完成`, to: '/practicum/tasks' })
   }
-}
+  const reviewItems = store.getReviewQueue().filter(item => item.status === 'RETURNED')
+  if (reviewItems.length > 0) {
+    items.push({ label: `${reviewItems.length} 份作业已退回待修改`, to: '/practicum/tasks' })
+  }
+  if (!items.length) {
+    items.push({ label: '去课程大厅浏览课程', to: '/practicum/courses' })
+  }
+  return items.slice(0, 3)
+})
 
-function retryLoad() {
-  loadGrowth()
-}
+const recentCalendarNotifications = computed(() => {
+  if (!store.state.activeRole) return []
+  return store.notificationsForRole(store.state.activeRole).slice(0, 3)
+})
+
+const progressEntries = computed(() => [
+  {
+    tag: '任务',
+    title: '查看待办任务',
+    description: '把未完成的实操、退回修改和下一步学习集中处理。',
+    to: '/practicum/tasks',
+  },
+  {
+    tag: '课程',
+    title: '发现更多课程',
+    description: '去课程大厅继续选择适合自己的电商实训项目。',
+    to: '/practicum/courses',
+  },
+  {
+    tag: '提醒',
+    title: '查看通知反馈',
+    description: '查看老师批改、课程提醒和作业反馈。',
+    to: '/practicum/notifications',
+  },
+  {
+    tag: '数据',
+    title: '查看成长数据',
+    description: '查看学习进度、能力维度和数据看板。',
+    to: '/practicum/progress',
+  },
+])
 
 onMounted(() => {
-  loadGrowth()
+  void Promise.all([loadBackendStats(), loadProgress()])
 })
 
-// Preserved existing computations
-const planProgress = computed(() => {
-  if (!publishedPlan.value) return { total: 0, completed: 0, percent: 0 }
-  return store.getPlanProgress(publishedPlan.value.id)
-})
-
-const moduleList = computed(() => {
-  if (!publishedPlan.value) return []
-  return store.state.nodes.filter(n => n.planId === publishedPlan.value!.id && n.level === 1)
-})
-
-const moduleProgressMap = computed(() => {
-  const map: Record<string, { total: number; completed: number; percent: number }> = {}
-  for (const mod of moduleList.value) {
-    map[mod.id] = store.getModuleProgress(mod.id)
+async function loadProgress() {
+  progressLoading.value = true
+  progressError.value = false
+  try {
+    serverProgress.value = await server.getProgress(String(store.state.room.id ?? ''), String(store.state.activeRole ?? 'STUDENT'))
+  } catch {
+    progressError.value = true
+  } finally {
+    progressLoading.value = false
   }
-  return map
-})
-
-const unitProgressMap = computed(() => {
-  const map: Record<string, { total: number; completed: number; percent: number }> = {}
-  if (!publishedPlan.value) return map
-  const units = store.state.nodes.filter(n => n.planId === publishedPlan.value!.id && n.level === 2)
-  for (const unit of units) {
-    const activities = store.state.nodes.filter(n => n.level === 3 && n.parentId === unit.id)
-    const completed = activities.filter(n => store.isActivityComplete(n.id)).length
-    map[unit.id] = { total: activities.length, completed, percent: activities.length ? Math.round((completed / activities.length) * 100) : 0 }
-  }
-  return map
-})
-
-function unitsForModule(moduleId: string) {
-  return store.state.nodes.filter(n => n.parentId === moduleId && n.level === 2)
 }
 
-const returnedWork = computed(() => {
-  const items: { nodeId: string; title: string; feedback: string }[] = []
-  for (const [nodeId, submission] of Object.entries(store.state.practiceSubmissions)) {
-    if (submission.status === 'RETURNED' && submission.studentId === 'student-001') {
-      const node = store.state.nodes.find(n => n.id === nodeId)
-      items.push({ nodeId, title: node?.title ?? '未知活动', feedback: submission.feedback ?? '无反馈' })
-    }
+async function loadBackendStats() {
+  try {
+    const response = await server.getStats(store.state.room.id)
+    backendStats.value = response.stats
+  } catch {
+    backendStats.value = null
   }
-  return items
-})
+}
 
-const evidenceTimeline = computed(() => {
-  const items: { nodeId: string; title: string; version: number; status: string; submittedAt: string; feedback?: string }[] = []
-  for (const [nodeId, submission] of Object.entries(store.state.practiceSubmissions)) {
-    if (submission.studentId !== 'student-001') continue
-    const node = store.state.nodes.find(n => n.id === nodeId)
-    for (const version of submission.versions) {
-      items.push({ nodeId, title: node?.title ?? '未知活动', version: version.version, status: submission.status, submittedAt: version.submittedAt, feedback: submission.feedback })
-    }
-  }
-  return items.sort((a, b) => b.submittedAt.localeCompare(a.submittedAt))
-})
-
-const rubricResults = computed(() => store.getStudentRubricResults('student-001'))
-
-// Owner computations
-const allSubmissions = computed(() => Object.entries(store.state.practiceSubmissions))
-const classCompletion = computed(() => {
-  if (!publishedPlan.value) return { total: 0, completed: 0, percent: 0 }
-  const activityCount = store.state.nodes.filter(n => n.planId === publishedPlan.value!.id && n.level === 3).length
-  const memberCount = store.state.members.filter(m => m.role === 'STUDENT').length || 1
-  const total = activityCount * memberCount
-  let completed = 0
-  for (const [, sub] of allSubmissions.value) { if (sub.status === 'GRADED') completed++ }
-  return { total, completed, percent: total ? Math.round((completed / total) * 100) : 0 }
-})
-const pendingReviewCount = computed(() => allSubmissions.value.filter(([, sub]) => sub.status === 'SUBMITTED').length)
-const statusDistribution = computed(() => {
-  const counts: Record<string, number> = { SUBMITTED: 0, RETURNED: 0, GRADED: 0 }
-  for (const [, sub] of allSubmissions.value) { counts[sub.status] = (counts[sub.status] || 0) + 1 }
-  return [
-    { label: '已提交', count: counts.SUBMITTED },
-    { label: '已退回', count: counts.RETURNED },
-    { label: '已评分', count: counts.GRADED },
-  ]
-})
-const weakRubricDimensions = computed(() => store.getWeakRubricDimensions())
+function progressFor(planId: string) {
+  const remote = serverProgress.value?.plans.find((plan) => plan.id === planId)
+  if (remote) return remote
+  return store.getPlanProgress(planId)
+}
+function moduleCount(planId: string) {
+  return store.getPlanNodes(planId).filter(node => node.level === 1).length
+}
+function activityCount(planId: string) {
+  return store.getPlanNodes(planId).filter(node => node.level === 3).length
+}
 </script>
-
-<style scoped>
-/* Growth data styles — extends main.css tokens */
-:root {
-  --growth-accent: #2563eb;
-}
-
-.growth-overview-band {
-  background: var(--practicum-surface);
-  border: 1px solid var(--practicum-border);
-  border-radius: var(--practicum-radius-sm);
-  padding: 22px 24px;
-  margin-bottom: 24px;
-}
-.growth-title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 18px;
-}
-.growth-title-row h2 {
-  margin: 0;
-  font-size: 17px;
-}
-.growth-meta {
-  color: var(--practicum-muted);
-  font-size: 13px;
-}
-.growth-radar-wrap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 32px;
-  flex-wrap: wrap;
-  padding: 12px 0;
-}
-.growth-quick-stats {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  min-width: 120px;
-}
-.gqs-item {
-  padding: 10px 14px;
-  background: #fafbfc;
-  border: 1px solid var(--practicum-border);
-  border-radius: var(--practicum-radius-sm);
-  text-align: center;
-}
-.gqs-value {
-  display: block;
-  font-size: 26px;
-  font-weight: 800;
-  color: var(--practicum-accent);
-  line-height: 1.15;
-  font-family: Bahnschrift, "Microsoft YaHei UI", sans-serif;
-}
-.gqs-value.mastered {
-  color: var(--practicum-success);
-}
-.gqs-value.weak {
-  color: var(--practicum-orange);
-}
-.gqs-label {
-  display: block;
-  margin-top: 4px;
-  color: var(--practicum-muted);
-  font-size: 12px;
-}
-
-.growth-dim-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-  margin-bottom: 8px;
-}
-.growth-dim-card {
-  background: var(--practicum-surface);
-  border: 1px solid var(--practicum-border);
-  border-radius: var(--practicum-radius-sm);
-  padding: 16px;
-}
-.growth-dim-mastered {
-  border-top: 3px solid var(--practicum-success);
-}
-.growth-dim-weak {
-  border-top: 3px solid var(--practicum-orange);
-}
-.growth-dim-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-.growth-dim-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--practicum-ink);
-}
-.growth-dim-score {
-  font-size: 22px;
-  font-weight: 800;
-  font-family: Bahnschrift, "Microsoft YaHei UI", sans-serif;
-}
-.score-mastered { color: var(--practicum-success); }
-.score-weak { color: var(--practicum-orange); }
-.growth-dim-track {
-  height: 6px;
-  background: #eaecf0;
-  border-radius: 999px;
-  overflow: hidden;
-  margin-bottom: 8px;
-}
-.growth-dim-fill {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--growth-accent);
-  transition: width 0.4s ease-out;
-}
-.growth-dim-mastered .growth-dim-fill {
-  background: var(--practicum-success);
-}
-.growth-dim-weak .growth-dim-fill {
-  background: var(--practicum-orange);
-}
-.growth-dim-status {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--practicum-muted);
-}
-.growth-dim-mastered .growth-dim-status {
-  color: var(--practicum-success);
-}
-.growth-dim-weak .growth-dim-status {
-  color: var(--practicum-orange);
-}
-
-/* meta helper */
-.meta {
-  color: var(--practicum-muted);
-  font-size: 12px;
-}
-.unit-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 0 6px 14px;
-  font-size: 13px;
-  color: var(--practicum-ink-soft);
-}
-.unit-row + .unit-row {
-  border-top: 1px solid var(--practicum-border);
-}
-.form-panel a {
-  text-decoration: none;
-  color: inherit;
-}
-.timeline-item {
-  margin-bottom: 8px;
-}
-.section-heading {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 16px;
-}
-.section-heading h2 {
-  margin: 0;
-  font-size: 17px;
-}
-
-@media (max-width: 900px) {
-  .growth-dim-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (max-width: 560px) {
-  .growth-dim-grid {
-    grid-template-columns: 1fr;
-  }
-  .growth-radar-wrap {
-    flex-direction: column;
-    gap: 16px;
-  }
-  .growth-quick-stats {
-    flex-direction: row;
-    gap: 10px;
-    min-width: auto;
-  }
-  .gqs-item {
-    flex: 1;
-  }
-}
-</style>
