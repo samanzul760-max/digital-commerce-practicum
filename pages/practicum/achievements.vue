@@ -4,6 +4,12 @@
       <PracticumStatePanel v-if="store.state.activeRole !== 'STUDENT'" state="forbidden" title="成就仅向学生视图开放" description="切换到学生身份后可查看个人学习成就。" />
       <main v-else class="achievements-page" data-achievements-page>
         <section class="achievement-overview" data-achievement-overview>
+          <div class="achievement-visual" aria-hidden="true">
+            <span class="achievement-spark spark-one">✦</span>
+            <span class="achievement-spark spark-two">✦</span>
+            <div class="achievement-medal"><span>★</span></div>
+            <div class="achievement-ribbon"><i /><i /></div>
+          </div>
           <div>
             <p class="achievement-eyebrow">学习成就档案</p>
             <h1>{{ overview.title }}</h1>

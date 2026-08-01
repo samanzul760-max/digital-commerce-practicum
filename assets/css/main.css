@@ -1907,6 +1907,18 @@ tr:last-child td { border-bottom: 0; }
 .todo-pagination { display:flex; justify-content:center; align-items:center; gap:12px; padding-top:18px; color:var(--practicum-muted); font-size:13px; }
 .achievements-page { width:min(1180px, 100%); margin:0 auto; padding:24px; }
 .achievement-overview { display:flex; justify-content:space-between; gap:32px; padding:28px 30px; color:#fff; background:#1d4ed8; border-radius:8px; }
+.workspace-backbar { padding: 12px clamp(18px, 4vw, 42px) 0; background: var(--practicum-paper); }
+.workspace-back { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 7px 11px; border: 1px solid var(--practicum-border); border-radius: 8px; color: var(--practicum-muted); background: #fff; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.workspace-back:hover { color: var(--practicum-accent); border-color: var(--practicum-accent); }
+.workspace-back .practicum-icon { width: 16px; height: 16px; }
+.achievement-visual { position: relative; display: grid; place-items: center; min-height: 170px; min-width: 175px; }
+.achievement-medal { display: grid; place-items: center; width: 112px; height: 112px; border: 8px solid #fff; border-radius: 50%; background: linear-gradient(145deg, #ffb648, #f07823); box-shadow: 0 14px 28px rgba(177, 88, 18, .24), inset 0 0 0 2px rgba(255,255,255,.35); transform: rotate(-8deg); }
+.achievement-medal span { display: grid; place-items: center; width: 66px; height: 66px; border: 2px solid rgba(255,255,255,.8); border-radius: 50%; color: #fff; font-size: 38px; }
+.achievement-ribbon { position: absolute; top: 122px; display: flex; gap: 3px; transform: rotate(-8deg); }
+.achievement-ribbon i { display: block; width: 25px; height: 42px; background: #1976c9; clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 76%, 0 100%); }
+.achievement-ribbon i:last-child { background: #55a6e8; transform: translateY(7px); }
+.achievement-spark { position: absolute; color: #f3a52f; font-size: 23px; }
+.spark-one { top: 14px; left: 20%; }.spark-two { right: 18%; bottom: 25px; font-size: 16px; color: #1976c9; }
 .achievement-eyebrow { margin:0 0 8px; color:#bfdbfe; font-size:13px; font-weight:700; }
 .achievement-overview h1 { margin:0; font-size:28px; }
 .achievement-overview > div > p:not(.achievement-eyebrow) { margin:10px 0 0; color:#dbeafe; }
@@ -1955,6 +1967,12 @@ tr:last-child td { border-bottom: 0; }
   .todo-item { grid-template-columns:1fr; gap:10px; padding:16px 0; }
   .todo-item .primary-button { width:100%; justify-content:center; }
   .achievements-page { padding:16px; }
+  .workspace-backbar { padding: 10px 16px 0; }
+  .achievement-visual { min-height: 128px; min-width: 0; }
+  .achievement-medal { width: 88px; height: 88px; border-width: 6px; }
+  .achievement-medal span { width: 52px; height: 52px; font-size: 28px; }
+  .achievement-ribbon { top: 96px; }
+  .achievement-ribbon i { width: 20px; height: 33px; }
   .achievement-overview, .achievement-metrics, .achievement-section-head { display:block; }
   .achievement-metrics { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:22px; }
   .achievement-metrics .primary-button { grid-column:1 / -1; justify-content:center; }
