@@ -95,6 +95,12 @@ const homeEntries = computed(() => {
       to: '/practicum/courses',
     },
     {
+      tag: '教程',
+      title: '教程中心',
+      description: '阅读本地原创教程、提交要求和评分标准。',
+      to: '/practicum/tutorials',
+    },
+    {
       tag: '实操',
       title: '继续学习',
       description: '进入视频学习、实操任务和右侧学习大纲。',
