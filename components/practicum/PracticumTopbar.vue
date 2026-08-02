@@ -29,6 +29,12 @@
         <span v-if="unreadCount" data-notification-badge class="notification-badge">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
       </button>
 
+      <NuxtLink
+        v-if="store.state.activeRole === 'OWNER'"
+        to="/practicum/achievements"
+        data-achievements-topbar-link
+        class="topbar-insight-link"
+      >学情成就</NuxtLink>
       <NuxtLink v-if="store.state.activeRole === 'TEACHER'" to="/practicum/classes" data-teacher-classes-link class="blue-btn topbar-primary">我的班级</NuxtLink>
       <NuxtLink v-else :to="primaryAction.to" class="blue-btn topbar-primary">{{ primaryAction.label }}</NuxtLink>
 

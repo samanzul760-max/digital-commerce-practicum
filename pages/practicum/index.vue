@@ -56,6 +56,7 @@
               :to="entry.to"
               class="home-entry-card"
               data-home-entry-card
+              :data-achievements-home-entry="entry.to === '/practicum/achievements' ? '' : undefined"
             >
               <span>{{ entry.tag }}</span>
               <strong>{{ entry.title }}</strong>
@@ -148,6 +149,12 @@ const homeEntries = computed(() => {
         title: '成员管理',
         description: '管理学生、教师列表，分配班级和虚拟组。',
         to: '/practicum/members',
+      },
+      {
+        tag: '成就',
+        title: '学生完成情况',
+        description: '查看虚拟分组、任务完成率、学生排名和能力明细。',
+        to: '/practicum/achievements',
       },
       {
         tag: '数据',
