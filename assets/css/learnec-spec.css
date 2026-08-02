@@ -1,0 +1,115 @@
+:root {
+  --blue: #147bd1;
+  --bg: #f4f7f8;
+  --line: #e9edf0;
+  --ink: #17222e;
+  --muted: #697786;
+}
+
+.paper {
+  padding: 16px 20px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.blue-btn,
+.primary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 8px 14px;
+  color: #fff;
+  background: var(--blue);
+  border: 0;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.blue-btn:hover,
+.primary-button:hover {
+  background: #0f6fbe;
+  box-shadow: 0 4px 10px rgba(20, 123, 209, 0.16);
+}
+
+.secondary-button,
+.ghost-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 8px 12px;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.secondary-button:hover,
+.ghost-button:hover {
+  color: var(--blue);
+  background: #edf7ff;
+  border-color: #b8d9f3;
+}
+
+.site input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']),
+.site select {
+  height: 32px;
+  min-height: 32px;
+  padding: 0 12px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  outline: none;
+  font-size: 12px;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.site textarea {
+  padding: 9px 12px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  outline: none;
+  font-size: 12px;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.site input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):focus,
+.site select:focus,
+.site textarea:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(20, 123, 209, 0.12);
+}
+
+.empty-state {
+  color: var(--muted);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+button:disabled,
+.blue-btn:disabled,
+.secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  box-shadow: none;
+}
+

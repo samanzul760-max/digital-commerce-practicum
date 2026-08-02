@@ -65,7 +65,7 @@ export function canAccessRoute(role: PracticumRole | null, routePath: string): b
   }
 
   if (role === 'TEACHER' || role === 'MENTOR') {
-    return routePath === '/practicum' || routePath.startsWith('/practicum/profile') || routePath.startsWith('/practicum/cases')
+    return routePath === '/practicum' || routePath.startsWith('/practicum/profile') || routePath.startsWith('/practicum/cases') || routePath.startsWith('/practicum/classes')
   }
 
   return false
@@ -196,6 +196,14 @@ export const NAV_ITEMS: NavItemDef[] = [
     to: '/practicum/cases',
     roles: ['OWNER', 'TEACHER', 'MENTOR'],
     activeMatch: (path) => path.startsWith('/practicum/cases'),
+  },
+  {
+    key: 'classes',
+    label: '我的班级',
+    icon: 'users',
+    to: '/practicum/classes',
+    roles: ['TEACHER'],
+    activeMatch: (path) => path.startsWith('/practicum/classes'),
   },
   {
     key: 'reviews',

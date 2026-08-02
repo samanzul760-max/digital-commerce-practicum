@@ -1,8 +1,16 @@
 <template>
   <ClientOnly>
     <PracticumShell context-title="任务" context-meta="集中查看待提交、待修改、已通过和老师反馈">
-      <section v-if="!canSubmitWork(store.state.activeRole)" data-forbidden class="empty-state">
-        学生任务页仅学生视角可用。请切换到学生视角后查看。
+      <section v-if="!canSubmitWork(store.state.activeRole)" data-forbidden class="permission-empty-state paper">
+        <div class="permission-empty-icon" aria-hidden="true">
+          <PracticumIcon name="switch" />
+        </div>
+        <h1>学生任务页仅学生视角可用</h1>
+        <p>切换身份后即可查看待提交任务、老师反馈与学习进度。</p>
+        <button data-switch-to-student class="blue-btn" type="button" @click="switchToStudentView">
+          <PracticumIcon name="switch" />
+          切换至学生视角
+        </button>
       </section>
 
       <section v-else data-student-tasks class="dashboard-page">
@@ -11,17 +19,17 @@
             <h1>我的任务</h1>
             <p>集中查看待提交、待修改和老师反馈。</p>
           </div>
-          <NuxtLink v-if="nextActivity" :to="`/practicum/activities/${nextActivity.id}`" class="primary-button">进入下一项</NuxtLink>
+          <NuxtLink v-if="nextActivity" :to="`/practicum/activities/${nextActivity.id}`" class="blue-btn">进入下一项</NuxtLink>
         </div>
 
-        <div class="metric-strip">
-          <div class="metric"><span>待提交</span><strong>{{ pendingTasks.length }}</strong><small>最近截止 {{ deadlineLabel }}</small></div>
-          <div class="metric"><span>待修改</span><strong>{{ returnedTasks.length }}</strong><small>来自老师反馈</small></div>
-          <div class="metric"><span>已完成</span><strong>{{ completedCount }}</strong><small>当前计划累计</small></div>
-          <div class="metric"><span>老师反馈</span><strong>{{ feedbackCount }}</strong><small>建议优先查看</small></div>
+        <div class="metric-strip task-metric-strip" data-task-metrics>
+          <div class="metric paper"><span>待提交</span><strong>{{ pendingTasks.length }}</strong><small>最近截止 {{ deadlineLabel }}</small></div>
+          <div class="metric paper"><span>待修改</span><strong>{{ returnedTasks.length }}</strong><small>来自老师反馈</small></div>
+          <div class="metric paper"><span>已完成</span><strong>{{ completedCount }}</strong><small>当前计划累计</small></div>
+          <div class="metric paper"><span>老师反馈</span><strong>{{ feedbackCount }}</strong><small>建议优先查看</small></div>
         </div>
 
-        <section class="todo-panel" data-server-todo-list>
+        <section class="todo-panel paper" data-server-todo-list>
           <div class="todo-panel-head">
             <div><h2>待办列表</h2><p>{{ taskRows.length }} 条待办任务</p></div>
             <NuxtLink to="/practicum/courses" class="secondary-button compact-action">浏览课程</NuxtLink>
@@ -31,7 +39,7 @@
             <article v-for="task in paginatedTaskRows" :key="task.id" class="todo-item">
               <div class="todo-type"><span class="status-pill" :class="task.statusClass">{{ task.type }}</span><span>{{ task.status }}</span></div>
               <div class="todo-content"><h3>{{ task.title }}</h3><p>来源：{{ task.source }} · 发布时间：{{ task.publishedAt }}</p></div>
-              <NuxtLink :to="`/practicum/activities/${task.id}`" class="primary-button">{{ task.action === '查看条件' ? '查看条件' : '去学习' }}</NuxtLink>
+              <NuxtLink :to="`/practicum/activities/${task.id}`" class="blue-btn task-learn-button">{{ task.action === '查看条件' ? '查看条件' : '去学习' }}</NuxtLink>
             </article>
           </div>
           <nav v-if="taskRows.length > pageSize" class="todo-pagination" aria-label="待办分页">
@@ -118,5 +126,9 @@ function activityTypeLabel(type?: string) {
   if (type === 'TRAINING') return '训练活动'
   if (type === 'PRACTICE_ACTIVITY') return '实践提交'
   return '学习活动'
+}
+
+function switchToStudentView() {
+  store.switchRole('STUDENT')
 }
 </script>

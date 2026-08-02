@@ -10,8 +10,8 @@
       />
 
       <section v-else class="dashboard" data-student-growth>
-        <PracticumStatePanel v-if="progressLoading" state="loading" title="正在同步学习进度" description="正在从服务端读取最新任务状态。" data-progress-loading />
-        <PracticumStatePanel v-else-if="progressError" state="error" title="进度暂时无法加载" description="请检查网络后重试，页面不会使用本地数据覆盖服务端结果。" data-progress-error @retry="loadProgress" />
+        <div v-if="progressLoading" class="progress-state"><PracticumStatePanel state="loading" title="正在同步学习进度" description="正在从服务端读取最新任务状态。" data-progress-loading /></div>
+        <div v-else-if="progressError" class="progress-state"><PracticumStatePanel state="error" title="进度暂时无法加载" description="请检查网络后重试，页面不会使用本地数据覆盖服务端结果。" data-progress-error @retry="loadProgress" /></div>
         <aside class="side">
           <NuxtLink to="/practicum/progress" class="active"><PracticumIcon name="dashboard" /><span>概况</span></NuxtLink>
           <NuxtLink to="/practicum/courses"><PracticumIcon name="book" /><span>我的课程</span></NuxtLink>
@@ -34,6 +34,7 @@
               </div>
             </div>
             <p v-if="backendStats" data-backend-stats class="sync-line">服务端同步：{{ backendStats.publishedPlanCount }} 门已发布课程 · {{ backendStats.activityCount }} 个实操活动</p>
+            <p v-if="progressSource === 'LOCAL_DEMO'" data-progress-local-fallback class="sync-warning">当前显示本地演示进度：PostgreSQL 暂未连接，连接数据库后将自动切换为真实进度。</p>
             <div class="overview-actions" aria-label="快捷操作">
               <NuxtLink to="/practicum/tasks" class="overview-action-primary">继续上次实操</NuxtLink>
               <NuxtLink to="/practicum/achievements" class="overview-action">查看我的勋章</NuxtLink>
@@ -148,6 +149,7 @@ const backendStats = ref<Record<string, number> | null>(null)
 const serverProgress = ref<{ plans: Array<{ id: string; title: string; percent: number; total: number; completed: number }>; totals: { total: number; completed: number; percent: number } } | null>(null)
 const progressLoading = ref(false)
 const progressError = ref(false)
+const progressSource = ref<'SERVER' | 'LOCAL_DEMO'>('SERVER')
 const plans = computed(() => store.visiblePlansFor(store.state.activeRole))
 const displayProgressPlans = computed(() => serverProgress.value
   ? serverProgress.value.plans.map(plan => ({ ...plan, source: 'server' as const }))
@@ -221,8 +223,19 @@ async function loadProgress() {
   progressError.value = false
   try {
     serverProgress.value = await server.getProgress(String(store.state.room.id ?? ''), String(store.state.activeRole ?? 'STUDENT'))
+    progressSource.value = 'SERVER'
   } catch {
-    progressError.value = true
+    // Keep the local workspace usable while PostgreSQL is not running locally.
+    // This is explicitly marked in the UI and must not be treated as production truth.
+    const fallbackPlans = store.visiblePlansFor(store.state.activeRole)
+      .filter(plan => plan.status === 'PUBLISHED')
+      .map(plan => {
+        const progress = store.getPlanProgress(plan.id)
+        return { id: plan.id, title: plan.title, status: plan.status, total: progress.total, completed: progress.completed, graded: 0, percent: progress.percent, nextTaskId: null, averageScore: null }
+      })
+    serverProgress.value = { plans: fallbackPlans, totals: { total: fallbackPlans.reduce((sum, plan) => sum + plan.total, 0), completed: fallbackPlans.reduce((sum, plan) => sum + plan.completed, 0), percent: fallbackPlans.length ? Math.round(fallbackPlans.reduce((sum, plan) => sum + plan.percent, 0) / fallbackPlans.length) : 0 } }
+    progressSource.value = 'LOCAL_DEMO'
+    progressError.value = false
   } finally {
     progressLoading.value = false
   }
@@ -249,3 +262,9 @@ function activityCount(planId: string) {
   return store.getPlanNodes(planId).filter(node => node.level === 3).length
 }
 </script>
+
+<style scoped>
+.progress-state {
+  grid-column: 1 / -1;
+}
+</style>

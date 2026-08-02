@@ -26,11 +26,17 @@ test.describe('platform API contract', () => {
   })
 
   test('owner updates a member and the change persists', async ({ page }) => {
-    const updated = await page.request.patch('/api/practicum/members/member-001', { headers: await csrfHeaders(page), data: { group: `小组-${Date.now()}` } })
-    expect(updated.ok()).toBeTruthy()
-    expect((await updated.json()).member.group).toContain('小组-')
-    const list = await page.request.get('/api/practicum/members?page=1&pageSize=10')
-    expect((await list.json()).items[0]).toEqual(expect.objectContaining({ id: 'member-001' }))
+    const before = await page.request.get('/api/practicum/members?page=1&pageSize=50')
+    const original = (await before.json()).items.find((item: { id: string }) => item.id === 'member-001')
+    try {
+      const updated = await page.request.patch('/api/practicum/members/member-001', { headers: await csrfHeaders(page), data: { group: `小组-${Date.now()}` } })
+      expect(updated.ok()).toBeTruthy()
+      expect((await updated.json()).member.group).toContain('小组-')
+      const list = await page.request.get('/api/practicum/members?page=1&pageSize=10')
+      expect((await list.json()).items[0]).toEqual(expect.objectContaining({ id: 'member-001' }))
+    } finally {
+      await page.request.patch('/api/practicum/members/member-001', { headers: await csrfHeaders(page), data: { group: original.group } })
+    }
   })
 
   test('notifications can be marked read and stats use persisted records', async ({ page }) => {

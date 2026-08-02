@@ -1,10 +1,12 @@
 generator client {
   provider = "prisma-client-js"
 }
+
 datasource db {
   provider = "postgresql"
-  url = env("DATABASE_URL")
+  url      = env("DATABASE_URL")
 }
+
 enum EnrollmentRole {
   STUDENT
   TEACHER
@@ -12,12 +14,14 @@ enum EnrollmentRole {
   ASSISTANT
   HEAD_TEACHER
 }
+
 enum AssignmentStatus {
   DRAFT
   PUBLISHED
   CLOSED
   ARCHIVED
 }
+
 enum TaskStatus {
   LOCKED
   AVAILABLE
@@ -27,180 +31,268 @@ enum TaskStatus {
   GRADED
   CLOSED
 }
-model Organization {
-  id String @id @default(cuid())
-  name String
-  cohorts Cohort[]
-  rooms TrainingRoom[]
-  classes Class[]
-  createdAt DateTime @default(now())
+
+enum RoomMemberRole {
+  OWNER
+  STUDENT
 }
+
+model Organization {
+  id        String         @id @default(cuid())
+  name      String
+  cohorts   Cohort[]
+  rooms     TrainingRoom[]
+  classes   Class[]
+  createdAt DateTime       @default(now())
+}
+
 model TrainingRoom {
-  id String @id @default(cuid())
+  id             String         @id @default(cuid())
   organizationId String
-  name String
-  organization Organization @relation(fields: [organizationId], references: [id])
-  classes Class[]
+  name           String
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  classes        Class[]
+  virtualGroups  VirtualGroup[]
+  members        RoomMember[]
+
   @@index([organizationId])
 }
+
+model VirtualGroup {
+  id        String       @id @default(cuid())
+  roomId    String
+  name      String
+  room      TrainingRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  members   RoomMember[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@unique([roomId, name])
+  @@index([roomId])
+}
+
+model RoomMember {
+  id                String         @id @default(cuid())
+  roomId            String
+  displayName       String
+  role              RoomMemberRole @default(STUDENT)
+  groupId           String?
+  isDemo            Boolean        @default(false)
+  completionPercent Int            @default(0)
+  gradedCount       Int            @default(0)
+  avgScore          Int            @default(0)
+  skillMetrics      Json           @default("[]")
+  planProgress      Json           @default("[]")
+  room              TrainingRoom   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  group             VirtualGroup?  @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@unique([roomId, displayName])
+  @@index([roomId, role])
+  @@index([groupId])
+}
+
 model Cohort {
-  id String @id @default(cuid())
+  id             String       @id @default(cuid())
   organizationId String
-  name String
-  startsAt DateTime
-  endsAt DateTime
-  organization Organization @relation(fields: [organizationId], references: [id])
-  classes Class[]
+  name           String
+  startsAt       DateTime
+  endsAt         DateTime
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  classes        Class[]
+
   @@unique([organizationId, name])
 }
+
 model Class {
-  id String @id @default(cuid())
-  organizationId String
-  roomId String
-  cohortId String
-  name String
-  organization Organization @relation(fields: [organizationId], references: [id])
-  room TrainingRoom @relation(fields: [roomId], references: [id])
-  cohort Cohort @relation(fields: [cohortId], references: [id])
-  enrollments ClassEnrollment[]
+  id              String            @id @default(cuid())
+  organizationId  String
+  roomId          String
+  cohortId        String
+  name            String
+  organization    Organization      @relation(fields: [organizationId], references: [id])
+  room            TrainingRoom      @relation(fields: [roomId], references: [id])
+  cohort          Cohort            @relation(fields: [cohortId], references: [id])
+  enrollments     ClassEnrollment[]
   planAssignments PlanAssignment[]
+
   @@unique([cohortId, name])
   @@index([roomId])
 }
+
 model ClassEnrollment {
-  id String @id @default(cuid())
+  id      String         @id @default(cuid())
   classId String
-  userId String
-  role EnrollmentRole
-  active Boolean @default(true)
-  class Class @relation(fields: [classId], references: [id], onDelete: Cascade)
+  userId  String
+  role    EnrollmentRole
+  active  Boolean        @default(true)
+  class   Class          @relation(fields: [classId], references: [id], onDelete: Cascade)
+
   @@unique([classId, userId])
   @@index([userId, role])
 }
+
 model PlanAssignment {
-  id String @id @default(cuid())
-  classId String
-  planId String
-  title String
-  status AssignmentStatus @default(DRAFT)
-  availableAt DateTime
-  dueAt DateTime?
-  lateAllowed Boolean @default(false)
-  class Class @relation(fields: [classId], references: [id], onDelete: Cascade)
-  tasks StudentTask[]
-  dependencies TaskDependency[]
+  id              String                         @id @default(cuid())
+  classId         String
+  planId          String
+  title           String
+  status          AssignmentStatus               @default(DRAFT)
+  availableAt     DateTime
+  dueAt           DateTime?
+  lateAllowed     Boolean                        @default(false)
+  class           Class                          @relation(fields: [classId], references: [id], onDelete: Cascade)
+  tasks           StudentTask[]
+  dependencies    TaskDependency[]
+  idempotencyKeys PlanAssignmentIdempotencyKey[]
+
   @@index([classId, status])
 }
-model TaskDependency {
-  id String @id @default(cuid())
+
+model PlanAssignmentIdempotencyKey {
+  id               String         @id @default(cuid())
+  userId           String
+  method           String
+  path             String
+  key              String
   planAssignmentId String
-  activityId String
+  createdAt        DateTime       @default(now())
+  planAssignment   PlanAssignment @relation(fields: [planAssignmentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, method, path, key])
+  @@index([planAssignmentId])
+}
+
+model TaskDependency {
+  id                     String         @id @default(cuid())
+  planAssignmentId       String
+  activityId             String
   prerequisiteActivityId String
-  planAssignment PlanAssignment @relation(fields: [planAssignmentId], references: [id], onDelete: Cascade)
+  planAssignment         PlanAssignment @relation(fields: [planAssignmentId], references: [id], onDelete: Cascade)
+
   @@unique([planAssignmentId, activityId, prerequisiteActivityId])
 }
+
 model StudentTask {
-  id String @id @default(cuid())
+  id               String         @id @default(cuid())
   planAssignmentId String
-  studentId String
-  activityId String
-  status TaskStatus @default(LOCKED)
-  availableAt DateTime
-  dueAt DateTime?
-  planAssignment PlanAssignment @relation(fields: [planAssignmentId], references: [id], onDelete: Cascade)
-  submissions Submission[]
+  studentId        String
+  activityId       String
+  status           TaskStatus     @default(LOCKED)
+  availableAt      DateTime
+  dueAt            DateTime?
+  planAssignment   PlanAssignment @relation(fields: [planAssignmentId], references: [id], onDelete: Cascade)
+  submissions      Submission[]
+
   @@unique([planAssignmentId, studentId, activityId])
   @@index([studentId, status])
 }
+
 model ActivityLog {
-  id String @id @default(cuid())
-  userId String
+  id            String   @id @default(cuid())
+  userId        String
   studentTaskId String?
-  eventType String
-  occurredAt DateTime @default(now())
-  metadata Json @default("{}")
+  eventType     String
+  occurredAt    DateTime @default(now())
+  metadata      Json     @default("{}")
+
   @@index([userId, occurredAt])
   @@index([studentTaskId, occurredAt])
 }
+
 model TaskEvent {
-  id String @id @default(cuid())
+  id            String   @id @default(cuid())
   studentTaskId String
-  eventType String
-  createdAt DateTime @default(now())
-  payload Json @default("{}")
+  eventType     String
+  createdAt     DateTime @default(now())
+  payload       Json     @default("{}")
+
   @@index([studentTaskId, createdAt])
 }
+
 model AutoGradeAttempt {
-  id String @id @default(cuid())
+  id            String   @id @default(cuid())
   studentTaskId String
-  attempt Int
-  input Json @default("{}")
-  score Decimal? @db.Decimal(6, 2)
-  result Json @default("{}")
-  createdAt DateTime @default(now())
+  attempt       Int
+  input         Json     @default("{}")
+  score         Decimal? @db.Decimal(6, 2)
+  result        Json     @default("{}")
+  createdAt     DateTime @default(now())
+
   @@unique([studentTaskId, attempt])
   @@index([studentTaskId, createdAt])
 }
+
 model Submission {
-  id String @id @default(cuid())
-  studentTaskId String @unique
-  currentVersion Int @default(0)
-  submittedAt DateTime?
-  studentTask StudentTask @relation(fields: [studentTaskId], references: [id], onDelete: Cascade)
-  versions SubmissionVersion[]
-  grade Grade?
+  id              String                     @id @default(cuid())
+  studentTaskId   String                     @unique
+  currentVersion  Int                        @default(0)
+  submittedAt     DateTime?
+  studentTask     StudentTask                @relation(fields: [studentTaskId], references: [id], onDelete: Cascade)
+  versions        SubmissionVersion[]
+  grade           Grade?
   idempotencyKeys SubmissionIdempotencyKey[]
 }
+
 model SubmissionIdempotencyKey {
-  id String @id @default(cuid())
-  userId String
-  method String
-  path String
-  key String
+  id           String     @id @default(cuid())
+  userId       String
+  method       String
+  path         String
+  key          String
   submissionId String
-  createdAt DateTime @default(now())
-  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
   @@unique([userId, method, path, key])
   @@index([submissionId])
 }
+
 model SubmissionVersion {
-  id String @id @default(cuid())
+  id           String     @id @default(cuid())
   submissionId String
-  version Int
-  text String
-  links Json @default("[]")
-  submittedAt DateTime @default(now())
-  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  version      Int
+  text         String
+  links        Json       @default("[]")
+  submittedAt  DateTime   @default(now())
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
   @@unique([submissionId, version])
 }
+
 model Grade {
-  id String @id @default(cuid())
-  submissionId String @unique
-  reviewerId String
-  feedback String
-  score Decimal @db.Decimal(6, 2)
-  gradedAt DateTime @default(now())
-  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
-  items GradeItem[]
-  revisions GradeRevision[]
+  id           String          @id @default(cuid())
+  submissionId String          @unique
+  reviewerId   String
+  feedback     String
+  score        Decimal         @db.Decimal(6, 2)
+  gradedAt     DateTime        @default(now())
+  submission   Submission      @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  items        GradeItem[]
+  revisions    GradeRevision[]
 }
+
 model GradeRevision {
-  id String @id @default(cuid())
-  gradeId String
-  revision Int
+  id         String   @id @default(cuid())
+  gradeId    String
+  revision   Int
   reviewerId String
-  feedback String
-  score Decimal @db.Decimal(6, 2)
-  createdAt DateTime @default(now())
-  grade Grade @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  feedback   String
+  score      Decimal  @db.Decimal(6, 2)
+  createdAt  DateTime @default(now())
+  grade      Grade    @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+
   @@unique([gradeId, revision])
   @@index([gradeId, createdAt])
 }
+
 model GradeItem {
-  id String @id @default(cuid())
-  gradeId String
+  id           String  @id @default(cuid())
+  gradeId      String
   rubricItemId String
-  score Decimal @db.Decimal(6, 2)
-  grade Grade @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  score        Decimal @db.Decimal(6, 2)
+  grade        Grade   @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+
   @@unique([gradeId, rubricItemId])
 }

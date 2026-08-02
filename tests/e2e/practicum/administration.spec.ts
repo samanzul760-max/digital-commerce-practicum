@@ -27,10 +27,20 @@ test('[ASSUME-S2-001] administrator manages anonymized members and virtual group
   await page.goto('/practicum/profile')
   await page.locator('[data-role-option="OWNER"]').click()
   await page.goto('/practicum/members')
+  await expect(page.locator('[data-member-row]')).toHaveCount(20)
+  await expect(page.locator('[data-member-group-summary]')).toHaveCount(2)
   const member = page.locator('[data-member-row]').first()
-  await member.locator('[data-member-group]').fill('运营一组')
-  await member.locator('[data-save-member-group]').click()
-  await expect(member).toContainText('运营一组')
+  const memberId = await member.getAttribute('data-member-id')
+  const originalGroup = await member.locator('[data-member-group]').inputValue()
+  const target = page.locator(`[data-member-id="${memberId}"]`)
+  try {
+    await target.locator('[data-member-group]').fill('运营一组')
+    await target.locator('[data-save-member-group]').click()
+    await expect(target).toContainText('运营一组')
+  } finally {
+    await target.locator('[data-member-group]').fill(originalGroup)
+    await target.locator('[data-save-member-group]').click()
+  }
 })
 
 /**

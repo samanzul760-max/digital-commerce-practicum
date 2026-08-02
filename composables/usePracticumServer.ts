@@ -44,9 +44,23 @@ export interface PracticumAnalytics {
 export interface PracticumMemberAnalytics {
   memberId: string
   learnerLabel: string
+  groupLabel?: string
+  isDemo?: boolean
   completionPercent: number
   gradedCount: number
   avgScore: number
+}
+
+export interface AdminAchievementAnalytics {
+  summary: {
+    learnerCount: number
+    averageCompletionPercent: number
+    completedTaskCount: number
+    pendingReviewCount: number
+  }
+  groups: Array<{ groupLabel: string; learnerCount: number; averageCompletionPercent: number; completedTaskCount: number }>
+  items: PracticumMemberAnalytics[]
+  skillDimensions: Array<{ skill: string; score: number }>
 }
 
 export interface PracticumMemberAnalyticsDetail {
@@ -62,6 +76,60 @@ export interface PracticumSkillMapItem {
   score: number
   mastery: 'MASTERED' | 'DEVELOPING' | 'NEEDS_SUPPORT'
   explanation: string
+}
+
+export interface PracticumRoomMember {
+  id: string
+  label: string
+  role: 'OWNER' | 'STUDENT'
+  group: string
+  isDemo: boolean
+}
+
+export interface PracticumRoomMembersResponse {
+  items: PracticumRoomMember[]
+  groups: Array<{ id: string; name: string; memberCount: number }>
+  page: number
+  pageSize: number
+  total: number
+  totalPages: number
+}
+
+export interface PracticumClass {
+  id: string
+  organizationId: string
+  roomId: string
+  cohortId: string
+  name: string
+  cohort?: { id: string; name: string }
+}
+
+export interface PracticumCohort {
+  id: string
+  name: string
+  startsAt: string
+  endsAt: string
+}
+
+export interface ClassEnrollment {
+  id: string
+  classId: string
+  userId: string
+  role: string
+  active: boolean
+}
+
+export interface ClassAssignment {
+  id: string
+  planId: string
+  title: string
+  status: string
+  availableAt: string
+  dueAt: string | null
+  lateAllowed: boolean
+  taskCount: number
+  submittedCount: number
+  gradedCount: number
 }
 
 export function usePracticumServer() {
@@ -134,6 +202,42 @@ export function usePracticumServer() {
     return await $fetch<{ items: Array<{ id: string; activityId: string; status: string; availableAt: string; dueAt: string | null; planAssignment: { id: string; title: string; lateAllowed: boolean } }> }>('/api/practicum/student/tasks')
   }
 
+  async function listClasses(organizationId: string, roomId: string) {
+    return await $fetch<{ items: PracticumClass[] }>(`/api/practicum/classes?organizationId=${encodeURIComponent(organizationId)}&roomId=${encodeURIComponent(roomId)}`)
+  }
+
+  async function listCohorts(organizationId: string, roomId: string) {
+    return await $fetch<{ items: PracticumCohort[] }>(`/api/practicum/cohorts?organizationId=${encodeURIComponent(organizationId)}&roomId=${encodeURIComponent(roomId)}`)
+  }
+
+  async function createClass(input: { organizationId: string; roomId: string; cohortId: string; name: string }) {
+    return await $fetch<{ class: PracticumClass }>('/api/practicum/classes', { method: 'POST', headers: useCsrfHeaders(), body: input })
+  }
+
+  async function listEnrollments(classId: string) {
+    return await $fetch<{ items: ClassEnrollment[] }>(`/api/practicum/classes/${encodeURIComponent(classId)}/enrollments`)
+  }
+
+  async function enrollStudent(classId: string, userId: string) {
+    return await $fetch<{ enrollment: ClassEnrollment }>(`/api/practicum/classes/${encodeURIComponent(classId)}/enrollments`, { method: 'POST', headers: useCsrfHeaders(), body: { userId, role: 'STUDENT' } })
+  }
+
+  async function listStudentRoster(organizationId: string, roomId: string) {
+    return await $fetch<{ items: Array<{ id: string; displayLabel: string }> }>(`/api/practicum/roster/students?organizationId=${encodeURIComponent(organizationId)}&roomId=${encodeURIComponent(roomId)}`)
+  }
+
+  async function listClassAssignments(classId: string) {
+    return await $fetch<{ items: ClassAssignment[] }>(`/api/practicum/classes/${encodeURIComponent(classId)}/assignments`)
+  }
+
+  async function publishClassAssignment(classId: string, input: { planId: string; title: string; activityIds: string[]; availableAt: string; dueAt?: string; lateAllowed?: boolean }) {
+    return await $fetch<{ assignment: ClassAssignment; taskCount: number }>(`/api/practicum/classes/${encodeURIComponent(classId)}/assignments`, {
+      method: 'POST',
+      headers: useCsrfHeaders({ 'Idempotency-Key': `class-assignment-${crypto.randomUUID()}` }),
+      body: input,
+    })
+  }
+
   async function recordTaskHeartbeat(taskId: string, eventType: 'HEARTBEAT' | 'VISIBILITY_VISIBLE' | 'VISIBILITY_HIDDEN') {
     return await $fetch<{ ok: true }>(`/api/practicum/student-tasks/${encodeURIComponent(taskId)}/heartbeat`, { method: 'POST', headers: useCsrfHeaders(), body: { eventType } })
   }
@@ -154,5 +258,21 @@ export function usePracticumServer() {
     return await $fetch<PracticumMemberAnalyticsDetail>(`/api/practicum/analytics/members/${encodeURIComponent(memberId)}?roomId=${encodeURIComponent(roomId)}`)
   }
 
-  return { listPlans, getPlan, listNotifications, markNotificationRead, listSubmissions, getSubmission, submitPractice, returnSubmission, gradeSubmission, getStats, getProgress, listStudentTasks, recordTaskHeartbeat, getStudentTask, submitStudentTask, getAnalytics, getMemberAnalytics }
+  async function listMemberAchievementAnalytics(roomId: string) {
+    return await $fetch<AdminAchievementAnalytics>(`/api/practicum/analytics/members?roomId=${encodeURIComponent(roomId)}`)
+  }
+
+  async function listRoomMembers(roomId: string) {
+    return await $fetch<PracticumRoomMembersResponse>(`/api/practicum/members?roomId=${encodeURIComponent(roomId)}&pageSize=50`)
+  }
+
+  async function updateRoomMember(memberId: string, roomId: string, input: { group?: string; role?: 'OWNER' | 'STUDENT' }) {
+    return await $fetch<{ member: PracticumRoomMember }>(`/api/practicum/members/${encodeURIComponent(memberId)}`, { method: 'PATCH', headers: useCsrfHeaders(), body: { roomId, ...input } })
+  }
+
+  async function removeRoomMember(memberId: string, roomId: string) {
+    return await $fetch<{ ok: true }>(`/api/practicum/members/${encodeURIComponent(memberId)}?roomId=${encodeURIComponent(roomId)}`, { method: 'DELETE', headers: useCsrfHeaders() })
+  }
+
+  return { listPlans, getPlan, listNotifications, markNotificationRead, listSubmissions, getSubmission, submitPractice, returnSubmission, gradeSubmission, getStats, getProgress, listStudentTasks, listClasses, listCohorts, createClass, listEnrollments, enrollStudent, listStudentRoster, listClassAssignments, publishClassAssignment, recordTaskHeartbeat, getStudentTask, submitStudentTask, getAnalytics, getMemberAnalytics, listMemberAchievementAnalytics, listRoomMembers, updateRoomMember, removeRoomMember }
 }

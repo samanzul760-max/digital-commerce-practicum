@@ -1,5 +1,7 @@
 import { defineConfig } from '@playwright/test'
 
+const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:4175'
+
 export default defineConfig({
   testDir: './tests/e2e',
   globalSetup: './tests/e2e/global-setup.ts',
@@ -8,20 +10,20 @@ export default defineConfig({
   workers: 1,
   reporter: 'list',
   use: {
-    baseURL: 'http://127.0.0.1:4175',
+    baseURL,
     storageState: 'output/playwright/auth-state.json',
     channel: 'msedge',
     screenshot: 'only-on-failure',
     trace: 'on-first-retry',
     viewport: { width: 1366, height: 768 },
   },
-  webServer: {
+  webServer: process.env.PLAYWRIGHT_BASE_URL ? undefined : {
     command: 'node node_modules/nuxt/bin/nuxt.mjs dev --host 127.0.0.1 --port 4175',
     env: {
       NUXT_IGNORE_LOCK: '1',
       PRACTICUM_DATA_DIR: '.data-e2e',
     },
-    url: 'http://127.0.0.1:4175/practicum',
+    url: `${baseURL}/practicum`,
     reuseExistingServer: true,
     timeout: 120_000,
   },

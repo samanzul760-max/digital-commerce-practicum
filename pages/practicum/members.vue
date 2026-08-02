@@ -1,69 +1,64 @@
 <template>
   <ClientOnly>
-    <PracticumShell context-title="成员管理" context-meta="匿名原型成员与虚拟分组">
+    <PracticumShell context-title="成员管理" context-meta="数据库成员与虚拟分组">
       <section class="profile-page">
         <div class="page-heading">
           <div>
             <p class="eyebrow">成员与分组</p>
             <h1>成员管理</h1>
-            <p>此处仅提供匿名成员和虚拟分组演示。不涉及真实账号或外部通讯。</p>
+            <p>管理当前实训室的学生、角色与虚拟分组。所有修改都会同步到学习成就统计。</p>
           </div>
         </div>
 
-        <p v-if="isLoading" data-loading class="empty-state">正在加载成员列表...</p>
-        <p v-else-if="!canManageMembers(store.state.activeRole)" data-forbidden class="empty-state">只有管理员可以管理成员。</p>
+        <p v-if="!canManageMembers(store.state.activeRole)" data-forbidden class="empty-state">只有管理员可以管理成员。</p>
+        <PracticumStatePanel v-else-if="isLoading" state="loading" title="正在加载成员列表" description="正在从数据库读取当前实训室的成员与分组。" />
+        <PracticumStatePanel v-else-if="loadError" data-members-error state="error" title="成员数据暂时无法加载" description="请检查数据库连接后重试。" @retry="loadMembers" />
 
         <template v-else>
           <div class="section-heading">
             <h2>成员列表</h2>
-            <span class="status-pill">{{ store.state.members.length }} 名成员</span>
+            <span class="status-pill">{{ members.length }} 名成员</span>
           </div>
 
-          <p v-if="!store.state.members.length" data-members-empty class="empty-state">暂无成员。</p>
-
+          <p v-if="!members.length" data-members-empty class="empty-state">当前实训室暂无成员。</p>
           <div v-else class="plan-list">
-            <div v-for="member in store.state.members" :key="member.id" data-member-row class="plan-row">
-              <div>
-                <strong>{{ member.label }}</strong>
+            <div v-for="member in members" :key="member.id" data-member-row :data-member-id="member.id" class="plan-row member-management-row paper">
+              <div class="member-management-identity">
+                <strong :title="member.label">{{ member.label }}</strong>
                 <span>{{ roleLabel(member.role) }} · {{ member.group }}</span>
               </div>
-              <div class="form-actions">
-                <input data-member-group v-model="groups[member.id]" aria-label="虚拟分组" style="min-height:44px;padding:9px 11px;border:1px solid #afbcc8;border-radius:4px;" placeholder="输入分组名称">
+              <div class="form-actions member-management-actions">
+                <input v-model="groups[member.id]" data-member-group aria-label="虚拟分组" placeholder="输入分组名称">
                 <button data-save-member-group class="secondary-button" type="button" @click="saveGroup(member.id)">保存分组</button>
-                <button data-change-member-role class="ghost-button" type="button" @click="openRoleChange(member.id)">变更角色</button>
-                <button data-remove-member class="ghost-button" type="button" @click="openRemoveMember(member.id)">移除</button>
+                <button data-change-member-role class="secondary-button" type="button" @click="openRoleChange(member.id)">变更角色</button>
+                <button data-remove-member class="secondary-button member-remove-button" type="button" @click="openRemoveMember(member.id)">移除</button>
               </div>
             </div>
           </div>
 
-          <!-- Virtual group summary -->
-          <div v-if="groupSummary.length" style="margin-top:24px;">
+          <div v-if="groupSummary.length" class="member-group-section">
             <div class="section-heading"><h2>虚拟分组概览</h2></div>
-            <div class="plan-list">
-              <div v-for="g in groupSummary" :key="g.name" class="plan-row">
-                <div><strong>{{ g.name }}</strong><span>{{ g.count }} 名成员</span></div>
-              </div>
+            <div class="member-group-overview">
+              <article v-for="group in groupSummary" :key="group.id" data-member-group-summary class="paper">
+                <strong :title="group.name">{{ group.name }}</strong>
+                <span>{{ group.memberCount }} 名成员</span>
+              </article>
             </div>
           </div>
 
-          <!-- Role change confirmation -->
-          <section v-if="roleChangeTarget" data-role-change-impact class="form-panel">
+          <section v-if="roleChangeTarget" data-role-change-impact class="form-panel paper">
             <h2>变更成员角色</h2>
             <p>{{ roleChangeMember?.label }} 当前角色：{{ roleLabel(roleChangeMember?.role) }}。变更后该成员将获得不同工作区权限。</p>
             <div class="form-actions">
-              <select data-new-role-select v-model="newRole" style="min-height:44px;">
-                <option value="OWNER">管理员</option>
-                <option value="STUDENT">学生</option>
-              </select>
+              <select v-model="newRole" data-new-role-select><option value="OWNER">管理员</option><option value="STUDENT">学生</option></select>
               <button data-confirm-role-change class="primary-button" type="button" @click="handleRoleChange">确认变更</button>
               <button class="secondary-button" type="button" @click="roleChangeTarget = null">取消</button>
             </div>
           </section>
 
-          <!-- Remove member confirmation -->
-          <section v-if="removeTarget" data-remove-member-impact class="form-panel">
+          <section v-if="removeTarget" data-remove-member-impact class="form-panel paper">
             <h2>移除成员确认</h2>
-            <p>{{ removeTargetMember?.label }}（{{ roleLabel(removeTargetMember?.role) }} · {{ removeTargetMember?.group }}）将被移出实训室。该成员的提交记录将保留但不可再访问。</p>
+            <p>{{ removeTargetMember?.label }} 将被移出当前实训室，其历史统计不再进入班级汇总。</p>
             <div class="form-actions">
               <button data-confirm-remove-member class="danger-button" type="button" @click="handleRemoveMember">确认移除</button>
               <button class="secondary-button" type="button" @click="removeTarget = null">取消</button>
@@ -76,57 +71,70 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, onMounted } from 'vue'
-import { usePracticumStore } from '../../composables/usePracticumStore'
-import { canManageMembers } from '../../domain/practicum/permissions'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { type PracticumRoomMember, usePracticumServer } from '~/composables/usePracticumServer'
+import { usePracticumStore } from '~/composables/usePracticumStore'
+import { canManageMembers } from '~/domain/practicum/permissions'
 
 const store = usePracticumStore()
+const server = usePracticumServer()
+const members = ref<PracticumRoomMember[]>([])
+const groupSummary = ref<Array<{ id: string; name: string; memberCount: number }>>([])
+const groups = reactive<Record<string, string>>({})
 const isLoading = ref(true)
-onMounted(() => { isLoading.value = false })
-const groups = reactive(Object.fromEntries(store.state.members.map(m => [m.id, m.group])) as Record<string, string>)
+const loadError = ref(false)
 const roleChangeTarget = ref<string | null>(null)
 const newRole = ref<'OWNER' | 'STUDENT'>('STUDENT')
 const removeTarget = ref<string | null>(null)
+const roomId = computed(() => String(store.state.room.id ?? 'room-001'))
+const roleChangeMember = computed(() => members.value.find(member => member.id === roleChangeTarget.value) ?? null)
+const removeTargetMember = computed(() => members.value.find(member => member.id === removeTarget.value) ?? null)
 
-const roleChangeMember = computed(() => roleChangeTarget.value ? store.state.members.find(m => m.id === roleChangeTarget.value) ?? null : null)
-const removeTargetMember = computed(() => removeTarget.value ? store.state.members.find(m => m.id === removeTarget.value) ?? null : null)
-
-const groupSummary = computed(() => {
-  const map = new Map<string, number>()
-  for (const m of store.state.members) {
-    const g = m.group || '未分组'
-    map.set(g, (map.get(g) ?? 0) + 1)
+async function loadMembers() {
+  if (!canManageMembers(store.state.activeRole)) { isLoading.value = false; return }
+  isLoading.value = true
+  loadError.value = false
+  try {
+    const response = await server.listRoomMembers(roomId.value)
+    members.value = response.items
+    groupSummary.value = response.groups
+    for (const member of response.items) groups[member.id] = member.group
+  } catch {
+    members.value = []
+    groupSummary.value = []
+    loadError.value = true
+  } finally {
+    isLoading.value = false
   }
-  return [...map.entries()].map(([name, count]) => ({ name, count }))
-})
-
-function roleLabel(role?: string) {
-  return role === 'OWNER' ? '管理员' : '学生'
 }
 
-function saveGroup(id: string) {
-  store.updateMemberGroup(id, groups[id]?.trim() || '未分组')
+function roleLabel(role?: string) { return role === 'OWNER' ? '管理员' : '学生' }
+
+async function saveGroup(id: string) {
+  await server.updateRoomMember(id, roomId.value, { group: groups[id]?.trim() || '未分组' })
+  await loadMembers()
 }
 
 function openRoleChange(memberId: string) {
   roleChangeTarget.value = memberId
-  const member = store.state.members.find(m => m.id === memberId)
-  newRole.value = member?.role === 'OWNER' ? 'STUDENT' : 'OWNER'
+  newRole.value = roleChangeMember.value?.role === 'OWNER' ? 'STUDENT' : 'OWNER'
 }
 
-function handleRoleChange() {
+async function handleRoleChange() {
   if (!roleChangeTarget.value) return
-  store.updateMemberRole(roleChangeTarget.value, newRole.value)
+  await server.updateRoomMember(roleChangeTarget.value, roomId.value, { role: newRole.value })
   roleChangeTarget.value = null
+  await loadMembers()
 }
 
-function openRemoveMember(memberId: string) {
-  removeTarget.value = memberId
-}
+function openRemoveMember(memberId: string) { removeTarget.value = memberId }
 
-function handleRemoveMember() {
+async function handleRemoveMember() {
   if (!removeTarget.value) return
-  store.removeMember(removeTarget.value)
+  await server.removeRoomMember(removeTarget.value, roomId.value)
   removeTarget.value = null
+  await loadMembers()
 }
+
+onMounted(loadMembers)
 </script>

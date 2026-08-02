@@ -7,7 +7,12 @@ playwright-report/
 *.log
 .data/
 .data-e2e/
+.data-e2e-*/
+.playwright-cli/
 output/playwright/auth-state.json
+deploy-error.txt
+headers.txt
+page.html
 __pycache__/
 *.py[cod]
 .worktrees/

@@ -10,6 +10,7 @@
           <div>
             <p class="eyebrow">成员数据</p>
             <h1 data-member-label>{{ detail.member.learnerLabel }}</h1>
+            <p v-if="detail.member.groupLabel" data-member-group>{{ detail.member.groupLabel }} · {{ detail.member.isDemo ? '演示学生' : '正式学生' }}</p>
           </div>
         </section>
         <section class="metric-strip" aria-label="成员学习概览">
@@ -23,7 +24,7 @@
             <table class="data-table">
               <thead><tr><th>计划</th><th>已评分</th><th>活动数</th><th>完成率</th></tr></thead>
               <tbody>
-                <tr v-for="plan in detail.plans" :key="plan.planId">
+                <tr v-for="plan in detail.plans" :key="plan.planId" data-member-plan-row>
                   <td>{{ plan.title }}</td><td>{{ plan.gradedCount }}</td><td>{{ plan.activityCount }}</td><td>{{ plan.completionPercent }}%</td>
                 </tr>
               </tbody>
@@ -37,7 +38,7 @@
             <table class="data-table">
               <thead><tr><th>能力维度</th><th>得分</th><th>掌握程度</th><th>说明</th></tr></thead>
               <tbody>
-                <tr v-for="item in detail.skillMap" :key="item.skill">
+                <tr v-for="item in detail.skillMap" :key="item.skill" data-member-skill-row>
                   <td>{{ item.skill }}</td><td>{{ item.score }}%</td><td>{{ masteryLabel(item.mastery) }}</td><td>{{ item.explanation }}</td>
                 </tr>
               </tbody>

@@ -6,6 +6,7 @@ import { commerceCaseActivities, commerceCaseNodes } from '../../data/practicum/
 import { seedNodes, seedOrganizations, seedPlans, seedRooms } from '../../data/practicum/seed'
 import type { Activity, ActivityType, AuditEvent, ClassroomAssignment, CurriculumNode, Organization, Plan, PlanStatus, PrototypeMember, PracticumNotification, ResourceKind, SupportingResource, PracticeSubmissionState, SubmissionVersion, ReviewQueueItem, FeedbackEntry } from '../../domain/practicum/types'
 import type { AuthUser } from './auth-store'
+import { defaultSkillLabels, getRoomMemberRow, getRoomMemberRows } from '../services/room-members'
 
 export interface PersistedPlan extends Plan {
   version: number
@@ -104,6 +105,15 @@ function canAccessRoom(user: AuthUser, roomId: string) {
 function isSubmissionOwnedByMember(member: PrototypeMember, submission: PracticeSubmissionState) {
   const userId = member.userId ?? (member.id === 'member-001' ? 'user-student-001' : member.id)
   return submission.studentId === member.id || submission.studentId === userId
+}
+
+function canonicalSkillLabel(label: string) {
+  if (/数据|分析/.test(label)) return '数据分析'
+  if (/内容|文案|策划/.test(label)) return '内容策划'
+  if (/视觉|设计|呈现/.test(label)) return '视觉呈现'
+  if (/营销|投放|推广/.test(label)) return '营销投放'
+  if (/客户|客服|服务/.test(label)) return '客户服务'
+  return '商品运营'
 }
 
 export function getWorkspaceContext(user: AuthUser, selection?: { organizationId?: string; roomId?: string }) {
@@ -513,7 +523,7 @@ export function removeMember(user: AuthUser, memberId: string) {
 
 export function listNotifications(user: AuthUser) {
   const state = readState()
-  const items = state.notifications.filter(notification => notification.targetRole === user.role)
+  const items = user.role === 'OWNER' ? state.notifications : state.notifications.filter(notification => notification.targetRole === user.role)
   return { items: clone(items), unread: items.filter(item => !item.read).length }
 }
 
@@ -618,77 +628,83 @@ export function getAnalytics(user: AuthUser, roomId: string) {
   })
 }
 
-export function getMemberAnalytics(user: AuthUser, roomId: string) {
+export async function getMemberAnalytics(user: AuthUser, roomId: string) {
   const state = readState()
   if (!ownerOnly(user) || !canAccessRoom(user, roomId)) return null
 
   const planIds = new Set(state.plans.filter(plan => plan.roomId === roomId).map(plan => plan.id))
   const activityIds = new Set(state.nodes.filter(node => node.level === 3 && planIds.has(node.planId)).map(node => node.id))
-  const activityCount = activityIds.size
-  const rows = state.members
-    .filter(member => member.role === 'STUDENT')
-    .map(member => {
-      const submissions = Object.entries(state.submissions)
-        .filter(([activityId, submission]) => activityIds.has(activityId) && isSubmissionOwnedByMember(member, submission))
-        .map(([, submission]) => submission)
-      const graded = submissions.filter(submission => submission.status === 'GRADED' && submission.grade)
-      const scores = graded.flatMap(submission => Object.values(submission.grade!.rubricScores))
-      return {
-        memberId: member.id,
-        learnerLabel: member.label,
-        completionPercent: activityCount ? Math.round((graded.length / activityCount) * 100) : 0,
-        gradedCount: graded.length,
-        avgScore: scores.length ? Math.round(scores.reduce((total, score) => total + score, 0) / scores.length) : 0,
-      }
-    })
+  const roomSubmissions = Object.entries(state.submissions)
+    .filter(([activityId]) => activityIds.has(activityId))
+
+  const databaseRows = await getRoomMemberRows(roomId)
+  const rows = databaseRows
+    .map(({ skillMetrics: _skillMetrics, planProgress: _planProgress, ...member }) => member)
     .sort((left, right) => right.completionPercent - left.completionPercent || left.learnerLabel.localeCompare(right.learnerLabel, 'zh-CN'))
 
-  return clone({ items: rows })
+  const skillTotals = new Map(defaultSkillLabels.map(skill => [skill, { score: 0, maxScore: 0 }]))
+  for (const member of databaseRows) {
+    for (const metric of member.skillMetrics) {
+      const skill = canonicalSkillLabel(metric.skill)
+      const current = skillTotals.get(skill)!
+      current.score += metric.score
+      current.maxScore += 100
+    }
+  }
+  for (const [activityId, submission] of roomSubmissions) {
+    if (submission.status !== 'GRADED' || !submission.grade) continue
+    const activity = activityContext(state, activityId).activity
+    if (activity?.config.type !== 'PRACTICE_ACTIVITY') continue
+    for (const dimension of activity.config.rubric) {
+      const skill = canonicalSkillLabel(dimension.label)
+      const current = skillTotals.get(skill)!
+      current.score += submission.grade.rubricScores[dimension.id] ?? 0
+      current.maxScore += dimension.maxScore
+    }
+  }
+
+  const skillDimensions = defaultSkillLabels.map(skill => {
+    const totals = skillTotals.get(skill)!
+    return { skill, score: totals.maxScore ? Math.round((totals.score / totals.maxScore) * 100) : 0 }
+  })
+
+  const groups = [...new Set(rows.map(member => member.groupLabel ?? '未分组'))].map(groupLabel => {
+    const members = rows.filter(member => (member.groupLabel ?? '未分组') === groupLabel)
+    return {
+      groupLabel,
+      learnerCount: members.length,
+      averageCompletionPercent: members.length ? Math.round(members.reduce((sum, member) => sum + member.completionPercent, 0) / members.length) : 0,
+      completedTaskCount: members.reduce((sum, member) => sum + member.gradedCount, 0),
+    }
+  }).filter(group => group.learnerCount)
+
+  return clone({
+    summary: {
+      learnerCount: rows.length,
+      averageCompletionPercent: rows.length ? Math.round(rows.reduce((sum, row) => sum + row.completionPercent, 0) / rows.length) : 0,
+      completedTaskCount: rows.reduce((sum, row) => sum + row.gradedCount, 0),
+      pendingReviewCount: roomSubmissions.filter(([, submission]) => submission.status === 'SUBMITTED').length,
+    },
+    items: rows,
+    groups,
+    skillDimensions,
+  })
 }
 
-export function getMemberAnalyticsDetail(user: AuthUser, roomId: string, memberId: string) {
-  const summary = getMemberAnalytics(user, roomId)
+export async function getMemberAnalyticsDetail(user: AuthUser, roomId: string, memberId: string) {
+  const summary = await getMemberAnalytics(user, roomId)
   if (!summary) return null
   const member = summary.items.find(item => item.memberId === memberId)
   if (!member) return { kind: 'NOT_FOUND' as const }
 
-  const state = readState()
-  const memberRecord = state.members.find(item => item.id === memberId)
-  if (!memberRecord) return { kind: 'NOT_FOUND' as const }
-  const plans = state.plans
-    .filter(plan => plan.roomId === roomId)
-    .map(plan => {
-      const activityIds = new Set(state.nodes.filter(node => node.planId === plan.id && node.level === 3).map(node => node.id))
-      const gradedCount = Object.entries(state.submissions)
-        .filter(([activityId, submission]) => activityIds.has(activityId) && isSubmissionOwnedByMember(memberRecord, submission) && submission.status === 'GRADED')
-        .length
-      return {
-        planId: plan.id,
-        title: plan.title,
-        activityCount: activityIds.size,
-        gradedCount,
-        completionPercent: activityIds.size ? Math.round((gradedCount / activityIds.size) * 100) : 0,
-      }
-    })
-
-  const skillTotals = new Map<string, { label: string; score: number; maxScore: number }>()
-  for (const [activityId, submission] of Object.entries(state.submissions)) {
-    if (!isSubmissionOwnedByMember(memberRecord, submission) || submission.status !== 'GRADED' || !submission.grade) continue
-    const context = activityContext(state, activityId)
-    if (context.plan?.roomId !== roomId || context.activity?.config.type !== 'PRACTICE_ACTIVITY') continue
-    for (const dimension of context.activity.config.rubric) {
-      const current = skillTotals.get(dimension.label) ?? { label: dimension.label, score: 0, maxScore: 0 }
-      current.score += submission.grade.rubricScores[dimension.id] ?? 0
-      current.maxScore += dimension.maxScore
-      skillTotals.set(dimension.label, current)
-    }
-  }
-  const skillMap = [...skillTotals.values()]
+  const databaseMember = await getRoomMemberRow(roomId, memberId)
+  if (!databaseMember) return { kind: 'NOT_FOUND' as const }
+  const skillMap = databaseMember.skillMetrics
     .map(item => {
-      const score = item.maxScore ? Math.round((item.score / item.maxScore) * 100) : 0
+      const score = item.score
       const mastery = score >= 80 ? 'MASTERED' : score >= 60 ? 'DEVELOPING' : 'NEEDS_SUPPORT'
       return {
-        skill: item.label,
+        skill: item.skill,
         score,
         mastery,
         explanation: mastery === 'MASTERED' ? '评分表现稳定，可继续提升综合应用。' : mastery === 'DEVELOPING' ? '已具备基础能力，建议结合反馈继续练习。' : '建议根据评分反馈完成针对性练习。',
@@ -699,7 +715,7 @@ export function getMemberAnalyticsDetail(user: AuthUser, roomId: string, memberI
   return clone({
     kind: 'OK' as const,
     member,
-    plans,
+    plans: databaseMember.planProgress,
     skillMap,
     strengths: skillMap.filter(item => item.mastery === 'MASTERED'),
     improvements: skillMap.filter(item => item.mastery !== 'MASTERED'),
@@ -920,4 +936,51 @@ export function transitionPlan(user: AuthUser, planId: string, action: 'publish'
   plan.updatedAt = new Date().toISOString()
   writeState(state)
   return { kind: 'OK' as const, plan: clone(plan) }
+}
+
+export function batchPublishPlans(user: AuthUser, planIds: string[]) {
+  const state = readState()
+  if (!ownerOnly(user)) return { kind: 'FORBIDDEN' as const }
+  const uniqueIds = [...new Set(planIds.filter(Boolean))]
+  if (!uniqueIds.length || uniqueIds.length > 50) return { kind: 'VALIDATION' as const }
+  const plans = uniqueIds.map(id => state.plans.find(plan => plan.id === id))
+  if (plans.some(plan => !plan || !canAccessRoom(user, plan!.roomId))) return { kind: 'NOT_FOUND' as const }
+  if (plans.some(plan => plan!.status !== 'DRAFT' || !plan!.title.trim() || !plan!.description.trim())) return { kind: 'VALIDATION' as const }
+  const now = new Date().toISOString()
+  for (const plan of plans as PersistedPlan[]) {
+    plan.status = 'PUBLISHED'
+    plan.version += 1
+    plan.updatedAt = now
+  }
+  writeState(state)
+  return { kind: 'OK' as const, plans: clone(plans) }
+}
+
+export function createAdminNotification(user: AuthUser, input: { title: string; message: string; targetRole?: 'STUDENT'; targetRoute?: string }, idempotencyKey?: string) {
+  const state = readState()
+  if (!ownerOnly(user)) return { kind: 'FORBIDDEN' as const }
+  const title = input.title.trim()
+  const message = input.message.trim()
+  if (!title || !message || title.length > 120 || message.length > 2000) return { kind: 'VALIDATION' as const }
+  if (idempotencyKey) {
+    const existing = state.idempotency[`${user.id}:${idempotencyKey}`]
+    if (existing) {
+      const notification = state.notifications.find(item => item.id === existing.entityId)
+      if (notification) return { kind: 'OK' as const, replayed: true, notification: clone(notification) }
+    }
+  }
+  const notification: PracticumNotification = {
+    id: `notification-${randomUUID()}`,
+    type: 'PLAN_PUBLISHED',
+    title,
+    message,
+    targetRole: input.targetRole ?? 'STUDENT',
+    targetRoute: input.targetRoute?.trim() || '/practicum/tasks',
+    read: false,
+    createdAt: new Date().toISOString(),
+  }
+  appendNotification(state, notification)
+  if (idempotencyKey) state.idempotency[`${user.id}:${idempotencyKey}`] = { userId: user.id, method: 'POST', path: '/notifications', entityId: notification.id }
+  writeState(state)
+  return { kind: 'OK' as const, replayed: false, notification: clone(notification) }
 }

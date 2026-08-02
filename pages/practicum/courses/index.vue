@@ -40,8 +40,19 @@
                 <option value="basic">入门</option>
                 <option value="advanced">进阶</option>
               </select>
-              <NuxtLink v-if="canEditPlan(store.state.activeRole)" to="/practicum#plans" class="blue-btn">新建课程</NuxtLink>
+              <button v-if="canEditPlan(store.state.activeRole)" data-create-plan type="button" class="blue-btn" @click="showCreateForm = !showCreateForm">新建课程</button>
+              <button v-if="canEditPlan(store.state.activeRole)" data-bulk-publish type="button" class="blue-btn" :disabled="!selectedDraftIds.length" @click="publishSelected">批量发布（{{ selectedDraftIds.length }}）</button>
             </div>
+
+            <form v-if="showCreateForm && canEditPlan(store.state.activeRole)" data-create-plan-form class="form-panel create-plan-panel" @submit.prevent="createDraftPlan">
+              <div class="form-panel-heading"><strong>创建教学计划</strong><button type="button" class="text-link" @click="showCreateForm = false">取消</button></div>
+              <label class="field">课程名称<input v-model.trim="createTitle" data-plan-title-input required maxlength="120"></label>
+              <label class="field">课程简介<textarea v-model.trim="createDescription" data-plan-desc-input required maxlength="2000" rows="3"></textarea></label>
+              <p v-if="createError" class="form-error" role="alert">{{ createError }}</p>
+              <button data-plan-submit class="primary-button" type="submit" :disabled="createSaving">{{ createSaving ? '创建中…' : '创建草稿并编辑' }}</button>
+            </form>
+
+            <p v-if="bulkResult" data-bulk-result class="success-state">{{ bulkResult }}</p>
 
             <p v-if="serverLoading" data-backend-loading class="empty-state">正在从后端加载课程...</p>
             <p v-else-if="serverError" data-backend-fallback class="empty-state">后端课程暂时不可用，已显示本地演示课程。</p>
@@ -53,15 +64,16 @@
               description="调整筛选条件，或等待教学管理员发布新的课程。"
             />
             <div v-else-if="filteredPlans.length" class="grid">
-              <PracticumCourseCard
-                v-for="plan in filteredPlans"
-                :key="plan.id"
-                :plan="plan"
-                :module-count="moduleCount(plan.id)"
-                :activity-count="activityCount(plan.id)"
-                :can-learn="canViewPlan(store.state.activeRole, plan.status) && store.state.activeRole === 'STUDENT'"
-                :can-manage="canEditPlan(store.state.activeRole)"
-              />
+              <div v-for="plan in filteredPlans" :key="plan.id" class="course-card-wrap">
+                <label v-if="canEditPlan(store.state.activeRole) && plan.status === 'DRAFT'" class="plan-select-label"><input v-model="selectedDraftIds" data-plan-select type="checkbox" :value="plan.id"><span>选择草稿</span></label>
+                <PracticumCourseCard
+                  :plan="plan"
+                  :module-count="moduleCount(plan.id)"
+                  :activity-count="activityCount(plan.id)"
+                  :can-learn="canViewPlan(store.state.activeRole, plan.status) && store.state.activeRole === 'STUDENT'"
+                  :can-manage="canEditPlan(store.state.activeRole)"
+                />
+              </div>
             </div>
           </main>
         </div>
@@ -89,6 +101,13 @@ const statusFilters = ref(['PUBLISHED', 'DRAFT', 'ARCHIVED'])
 const serverPlans = ref<Plan[] | null>(null)
 const serverLoading = ref(false)
 const serverError = ref(false)
+const showCreateForm = ref(false)
+const createTitle = ref('')
+const createDescription = ref('')
+const createSaving = ref(false)
+const createError = ref('')
+const selectedDraftIds = ref<string[]>([])
+const bulkResult = ref('')
 
 const plansSource = computed(() => {
   const primary = serverPlans.value?.length ? serverPlans.value : store.visiblePlansFor(store.state.activeRole)
@@ -164,6 +183,42 @@ function activityCount(planId: string) {
   const catalog = catalogCourses.find(item => item.id === planId)
   return store.getPlanNodes(planId).filter(node => node.level === 3).length || catalog?.taskCount || 0
 }
+
+async function createDraftPlan() {
+  if (!createTitle.value || !createDescription.value || createSaving.value) return
+  createSaving.value = true
+  createError.value = ''
+  try {
+    const result = await $fetch<{ plan: Plan }>('/api/practicum/plans', {
+      method: 'POST',
+      headers: useCsrfHeaders({ 'Idempotency-Key': `plan-${crypto.randomUUID()}` }),
+      body: { roomId: store.state.room.id, title: createTitle.value, description: createDescription.value },
+    })
+    await navigateTo(`/practicum/plans/${result.plan.id}/edit`)
+  } catch {
+    createError.value = '课程创建失败，请检查内容后重试。'
+  } finally {
+    createSaving.value = false
+  }
+}
+
+async function publishSelected() {
+  if (!selectedDraftIds.value.length) return
+  bulkResult.value = ''
+  try {
+    const result = await $fetch<{ plans: Plan[] }>('/api/practicum/plans/batch-publish', {
+      method: 'POST',
+      headers: useCsrfHeaders({ 'Idempotency-Key': `batch-publish-${crypto.randomUUID()}` }),
+      body: { planIds: selectedDraftIds.value },
+    })
+    const published = new Map(result.plans.map(plan => [plan.id, plan]))
+    serverPlans.value = (serverPlans.value ?? []).map(plan => published.get(plan.id) ?? plan)
+    selectedDraftIds.value = []
+    bulkResult.value = `已发布 ${result.plans.length} 门课程。`
+  } catch {
+    bulkResult.value = '批量发布失败：请确认草稿内容完整后重试。'
+  }
+}
 function categoryFor(text: string) {
   if (text.includes('数据')) return 'data'
   if (text.includes('营销') || text.includes('投放') || text.includes('增长')) return 'marketing'
@@ -173,3 +228,11 @@ function levelFor(planId: string) {
   return planId.charCodeAt(0) % 2 ? 'basic' : 'advanced'
 }
 </script>
+
+<style scoped>
+.create-plan-panel { margin: 12px 0 16px; }
+.form-panel-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.course-card-wrap { min-width: 0; }
+.plan-select-label { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 6px 2px; color: var(--practicum-muted); font-size: 12px; }
+.success-state { margin: 10px 0; color: #137333; }
+</style>

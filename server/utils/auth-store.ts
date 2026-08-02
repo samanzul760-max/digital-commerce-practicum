@@ -102,6 +102,17 @@ function publicUser(user: StoredUser): AuthUser {
   return safeUser
 }
 
+export function findPublicUserById(userId: string): AuthUser | null {
+  const user = allUsers().find(item => item.id === userId)
+  return user ? publicUser(user) : null
+}
+
+export function listStudentRoster(roomId: string) {
+  return allUsers()
+    .filter(user => user.role === 'STUDENT' && user.roomIds.includes(roomId))
+    .map(user => ({ id: user.id, displayLabel: user.displayName.slice(0, 1) }))
+}
+
 function findUser(identifier: string) {
   const normalized = identifier.trim().toLowerCase()
   return allUsers().find(user => user.identifier.toLowerCase() === normalized)
