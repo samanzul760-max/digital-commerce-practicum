@@ -232,7 +232,8 @@ function levelFor(planId: string) {
 <style scoped>
 .create-plan-panel { margin: 12px 0 16px; }
 .form-panel-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.course-card-wrap { min-width: 0; }
-.plan-select-label { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 6px 2px; color: var(--practicum-muted); font-size: 12px; }
+.course-card-wrap { display: grid; grid-template-rows: 21px minmax(0, 1fr); gap: 6px; min-width: 0; }
+.course-card-wrap :deep(.course-card) { grid-row: 2; }
+.plan-select-label { display: inline-flex; grid-row: 1; align-items: center; gap: 6px; margin-left: 2px; color: var(--practicum-muted); font-size: 12px; }
 .success-state { margin: 10px 0; color: #137333; }
 </style>

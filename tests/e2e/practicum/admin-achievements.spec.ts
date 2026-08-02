@@ -200,6 +200,22 @@ test('owner sees class achievement observability instead of the student-only pro
   await expect(page.getByText('成就仅向学生视图开放')).toHaveCount(0)
 })
 
+test('owner can discover student completion from the topbar and home function entries', async ({ page }) => {
+  await selectWorkspaceRole(page, 'OWNER')
+
+  await expect(page.locator('[data-achievements-topbar-link]')).toHaveText('学情成就')
+  const homeEntry = page.locator('[data-achievements-home-entry]')
+  await expect(homeEntry).toContainText('学生完成情况')
+  await homeEntry.click()
+  await expect(page).toHaveURL('/practicum/achievements')
+  await expect(page.locator('[data-admin-achievements-page]')).toBeVisible()
+})
+
+test('student does not see the administrator achievement shortcut', async ({ page }) => {
+  await selectWorkspaceRole(page, 'STUDENT')
+  await expect(page.locator('[data-achievements-topbar-link]')).toHaveCount(0)
+})
+
 test('owner opens the selected student completion detail from the achievement ranking', async ({ page }) => {
   await selectWorkspaceRole(page, 'OWNER')
   await page.goto('/practicum/achievements')
