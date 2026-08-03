@@ -8,8 +8,10 @@ playwright-report/
 .data/
 .data-e2e/
 .data-e2e-*/
+.data-preview-*/
 .playwright-cli/
 output/playwright/auth-state.json
+output/video-audit/
 deploy-error.txt
 headers.txt
 page.html
