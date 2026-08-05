@@ -5,16 +5,16 @@ async function loginAsStudent(page: import('@playwright/test').Page) {
   await page.locator('[data-role-option="STUDENT"]').click()
 }
 
-test('[LEARN-EC-PARITY-001] practicum pages use the LearnEC static template structure', async ({ page }) => {
+test('[LEARN-EC-PARITY-001] practicum pages use the unified workspace shell', async ({ page }) => {
   await loginAsStudent(page)
 
   await page.goto('/practicum')
-  await expect(page.locator('.site')).toBeVisible()
-  await expect(page.locator('.top')).toBeVisible()
-  await expect(page.locator('.tabs')).toBeVisible()
-  await expect(page.locator('.hero')).toBeVisible()
-  await expect(page.locator('.hero-scene')).toBeVisible()
-  await expect(page.locator('.wrap .cards .course-card').first()).toBeVisible()
+  await expect(page.locator('[data-practicum-sidebar]')).toBeVisible()
+  await expect(page.locator('[data-practicum-topbar]')).toBeVisible()
+  await expect(page.locator('[data-current-organization]')).toBeVisible()
+  await expect(page.locator('[data-student-home]')).toBeVisible()
+  await expect(page.getByRole('heading', { name: '今日运营工作队列' })).toBeVisible()
+  await expect(page.locator('.hero, .hero-scene')).toHaveCount(0)
 
   await page.goto('/practicum/courses')
   await expect(page.locator('.course-layout .filters')).toBeVisible()
@@ -24,7 +24,8 @@ test('[LEARN-EC-PARITY-001] practicum pages use the LearnEC static template stru
   await page.goto('/practicum/progress')
   await expect(page.locator('.dashboard .side')).toBeVisible()
   await expect(page.locator('.dash-welcome')).toBeVisible()
-  await expect(page.locator('.medals .medal')).toHaveCount(3)
+  await expect(page.locator('[data-student-growth]')).toBeVisible()
+  await expect(page.locator('[data-progress-entry-card]')).not.toHaveCount(0)
   await expect(page.locator('.calendar')).toBeVisible()
 
   await page.goto('/practicum/learn/plan-wdds')

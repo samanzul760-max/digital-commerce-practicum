@@ -150,8 +150,7 @@ test('[CASE-S2-006] administrator sees protected deletion impact for a curriculu
   })).status()).toBe(201)
   await studentContext.close()
 
-  await page.goto('/practicum')
-  await page.locator('[data-plan-card]').first().locator('a').click()
+  await page.goto('/practicum/plans/plan-wdds/edit')
 
   const module = page.locator('[data-module]').first()
   await module.locator('[data-module-toggle]').click()
@@ -189,11 +188,38 @@ test('[CASE-S2-003] administrator receives publish validation for an incomplete 
  * Then the plan becomes read-only and is hidden from the student workspace
  */
 test('[CASE-S2-003] administrator archives a published plan into a read-only state', async ({ page }) => {
+  const key = `archive-plan-${Date.now()}`
+  const planTitle = `归档计划 ${key}`
   await page.goto('/practicum/profile')
   await page.locator('[data-role-option="OWNER"]').click()
-  const planCard = page.locator('[data-plan-card]').first()
-  const planTitle = await planCard.locator('strong').innerText()
-  await planCard.locator('a').click()
+  const created = await page.request.post('/api/practicum/plans', {
+    headers: await csrfHeaders(page, { 'Idempotency-Key': key }),
+    data: { roomId: 'room-001', title: planTitle, description: '用于验证归档后只读与学生不可见。' },
+  })
+  expect(created.status()).toBe(201)
+  const plan = (await created.json()).plan
+  const moduleResponse = await page.request.post(`/api/practicum/plans/${plan.id}/nodes`, {
+    headers: await csrfHeaders(page),
+    data: { title: '归档模块', level: 1, parentId: null, version: plan.version },
+  })
+  expect(moduleResponse.status()).toBe(201)
+  const moduleSnapshot = await moduleResponse.json()
+  const module = moduleSnapshot.nodes.find((node: { level: number }) => node.level === 1)
+  const unitResponse = await page.request.post(`/api/practicum/plans/${plan.id}/nodes`, {
+    headers: await csrfHeaders(page),
+    data: { title: '归档单元', level: 2, parentId: module.id, version: moduleSnapshot.plan.version },
+  })
+  expect(unitResponse.status()).toBe(201)
+  const unitSnapshot = await unitResponse.json()
+  const unit = unitSnapshot.nodes.find((node: { level: number }) => node.level === 2)
+  const activityResponse = await page.request.post(`/api/practicum/plans/${plan.id}/activities`, {
+    headers: await csrfHeaders(page),
+    data: { parentId: unit.id, title: '归档活动', type: 'SOFTWARE_ACTION', version: unitSnapshot.plan.version },
+  })
+  expect(activityResponse.status()).toBe(201)
+  expect((await page.request.post(`/api/practicum/plans/${plan.id}/publish`, { headers: await csrfHeaders(page) })).status()).toBe(200)
+
+  await page.goto(`/practicum/plans/${plan.id}/edit`)
   await page.locator('[data-request-archive]').click()
   await page.locator('[data-confirm-archive]').click()
   await expect(page.locator('[data-plan-read-only]')).toBeVisible()
@@ -206,7 +232,7 @@ test('[CASE-S2-003] administrator archives a published plan into a read-only sta
 /**
  * Given an administrator has created a draft plan
  * When the administrator refreshes the practicum workspace
- * Then the approved plan data remains available from browser storage
+ * Then the plan remains available from the server-owned repository
  */
 test('[ASSUME-S2-001] administrator plan changes persist after a browser refresh', async ({ page }) => {
   const planTitle = `Persistent plan ${Date.now()}`
@@ -218,7 +244,9 @@ test('[ASSUME-S2-001] administrator plan changes persist after a browser refresh
   await page.locator('[data-plan-submit]').click()
   await page.reload()
   await expect(page.locator('[data-plan-card]').filter({ hasText: planTitle })).toBeVisible()
-  await expect(page.evaluate(() => localStorage.getItem('digital-commerce-practicum.v1'))).resolves.toContain(planTitle)
+  const response = await page.request.get('/api/practicum/plans?keyword=' + encodeURIComponent(planTitle))
+  expect(response.ok()).toBeTruthy()
+  expect((await response.json()).items).toEqual(expect.arrayContaining([expect.objectContaining({ title: planTitle })]))
 })
 
 /**

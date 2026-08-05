@@ -17,6 +17,9 @@
     <template v-else-if="name === 'upload'"><path d="M12 15V3m-4 4 4-4 4 4M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" /></template>
     <template v-else-if="name === 'folder'"><path d="M3 6a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></template>
     <template v-else-if="name === 'plus-square'"><rect x="4" y="4" width="16" height="16" rx="2" /><path d="M12 8v8M8 12h8" /></template>
+    <template v-else-if="name === 'pencil'"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4z" /></template>
+    <template v-else-if="name === 'trash'"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" /></template>
+    <template v-else-if="name === 'x'"><path d="m6 6 12 12M18 6 6 18" /></template>
     <template v-else-if="name === 'file-check'"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6m-11.5 6 2 2 4-4" /></template>
   </svg>
 </template>

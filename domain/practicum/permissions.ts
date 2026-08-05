@@ -226,6 +226,14 @@ export const NAV_ITEMS: NavItemDef[] = [
     activeMatch: (path) => path === '/practicum/tasks',
   },
   {
+    key: 'shop',
+    label: '店铺',
+    icon: 'layers',
+    to: '/practicum/shop/products',
+    roles: ['STUDENT'],
+    activeMatch: (path) => path.startsWith('/practicum/shop'),
+  },
+  {
     key: 'data-center',
     label: '数据',
     icon: 'chart',

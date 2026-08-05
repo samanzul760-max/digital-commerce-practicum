@@ -3,10 +3,18 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "nuxt dev",
+    "db:up": "powershell -ExecutionPolicy Bypass -File scripts/use-docker-postgres.ps1",
+    "db:status": "powershell -ExecutionPolicy Bypass -File scripts/use-docker-postgres.ps1 -StatusOnly",
+    "dev": "npm run db:up && nuxt dev",
+    "dev:direct": "nuxt dev",
+    "env:check": "node scripts/ensure-dev-env.js --check",
+    "env:ensure": "node scripts/ensure-dev-env.js",
     "build": "nuxt build",
     "typecheck": "nuxi typecheck",
-    "test:e2e": "playwright test",
+    "test:e2e": "node scripts/warmup-and-test.js",
+    "test:e2e:ai": "node scripts/warmup-and-test.js",
+    "test:e2e:direct": "playwright test",
+    "test:e2e:docker": "powershell -ExecutionPolicy Bypass -File scripts/use-docker-postgres.ps1 -RunE2E",
     "deploy:new-ecs": "python scripts/deploy-new-ecs.py"
   },
   "dependencies": {

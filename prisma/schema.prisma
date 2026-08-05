@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -37,6 +38,22 @@ enum RoomMemberRole {
   STUDENT
 }
 
+enum StoreStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+}
+
+enum FreightChargeType {
+  PIECE
+  WEIGHT
+}
+
 model Organization {
   id        String         @id @default(cuid())
   name      String
@@ -54,8 +71,82 @@ model TrainingRoom {
   classes        Class[]
   virtualGroups  VirtualGroup[]
   members        RoomMember[]
+  stores         Store[]
 
   @@index([organizationId])
+}
+
+model Store {
+  id               String            @id @default(cuid())
+  roomId           String
+  ownerId          String
+  name             String
+  status           StoreStatus       @default(ACTIVE)
+  room             TrainingRoom      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  products         Product[]
+  freightTemplates FreightTemplate[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@unique([roomId, ownerId])
+  @@index([roomId, status])
+}
+
+model Product {
+  id                String           @id @default(cuid())
+  storeId           String
+  freightTemplateId String?
+  title             String
+  category          String
+  description       String           @default("")
+  status            ProductStatus    @default(DRAFT)
+  basePrice         Decimal          @db.Decimal(12, 2)
+  store             Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  freightTemplate   FreightTemplate? @relation(fields: [freightTemplateId], references: [id], onDelete: SetNull)
+  skus              ProductSKU[]
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@index([storeId, status])
+  @@index([freightTemplateId])
+  @@index([storeId, updatedAt])
+}
+
+model ProductSKU {
+  id         String   @id @default(cuid())
+  productId  String
+  skuCode    String
+  name       String
+  attributes Json     @default("{}")
+  price      Decimal  @db.Decimal(12, 2)
+  stock      Int      @default(0)
+  enabled    Boolean  @default(true)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([productId, skuCode])
+  @@index([productId, enabled])
+}
+
+model FreightTemplate {
+  id                    String            @id @default(cuid())
+  storeId               String
+  name                  String
+  chargeType            FreightChargeType @default(PIECE)
+  firstUnit             Decimal           @default(1) @db.Decimal(10, 2)
+  firstFee              Decimal           @db.Decimal(12, 2)
+  additionalUnit        Decimal           @default(1) @db.Decimal(10, 2)
+  additionalFee         Decimal           @db.Decimal(12, 2)
+  freeShippingThreshold Decimal?          @db.Decimal(12, 2)
+  isDefault             Boolean           @default(false)
+  store                 Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  products              Product[]
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  @@unique([storeId, name])
+  @@index([storeId, isDefault])
 }
 
 model VirtualGroup {

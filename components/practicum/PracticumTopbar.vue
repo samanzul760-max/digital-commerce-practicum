@@ -1,19 +1,25 @@
 <template>
-  <header data-practicum-topbar class="workspace-topbar top">
-    <NuxtLink to="/practicum" class="logo" aria-label="LearnEC 首页">
-      <b aria-hidden="true">L</b>LearnEC
-    </NuxtLink>
+  <header data-practicum-topbar class="workspace-topbar">
+    <div class="context-title">
+      <strong data-context-label>{{ contextTitle }}</strong>
+      <span>{{ contextMeta }}</span>
+    </div>
 
-    <nav class="tabs topbar-tabs" aria-label="全局导航">
-      <NuxtLink
-        v-for="item in globalTabs"
-        :key="item.to"
-        :to="item.to"
-        :class="{ active: item.active(route.path) }"
+    <div v-if="workspace.state.value.organization && workspace.state.value.room" class="workspace-context" aria-label="当前工作空间">
+      <strong data-current-organization>{{ workspace.state.value.organization.name }}</strong>
+      <span data-current-room>{{ workspace.state.value.room.title }}</span>
+      <small data-current-teaching-mode>{{ workspace.state.value.room.teachingMode === 'TEACHING' ? '教学模式' : '自主学习模式' }}</small>
+      <select
+        v-if="workspace.state.value.organizations.length > 1"
+        data-workspace-context-select
+        :value="workspace.state.value.room.id"
+        aria-label="切换实训室"
+        :disabled="workspace.state.value.loading"
+        @change="handleRoomChange"
       >
-        {{ item.label }}
-      </NuxtLink>
-    </nav>
+        <option v-for="option in roomOptions" :key="option.roomId" :value="option.roomId">{{ option.organizationName }} · {{ option.roomTitle }}</option>
+      </select>
+    </div>
 
     <div class="right topbar-actions">
       <button
@@ -167,11 +173,17 @@ const firstPublishedPlan = computed(() => store.state.plans.find(plan => plan.st
 const primaryAction = computed(() => store.state.activeRole === 'STUDENT'
   ? { label: '立即开始', to: firstPublishedPlan.value ? `/practicum/learn/${firstPublishedPlan.value.id}` : '/practicum/courses' }
   : { label: '教学管理', to: '/practicum/reviews' })
+const roomOptions = computed(() => workspace.state.value.organizations.flatMap(organization => organization.roomIds.map(roomId => ({
+  roomId,
+  organizationName: organization.name,
+  roomTitle: roomId === workspace.state.value.room?.id ? workspace.state.value.room.title : roomId,
+}))))
 const globalTabs = [
   { label: '首页', to: '/practicum', active: (path: string) => path === '/practicum' },
   { label: '课程大厅', to: '/practicum/courses', active: (path: string) => path.startsWith('/practicum/courses') },
   { label: '学员中心', to: '/practicum/progress', active: (path: string) => path.startsWith('/practicum/progress') || path.startsWith('/practicum/tasks') },
   { label: '实操学习', to: firstPublishedPlan.value ? `/practicum/learn/${firstPublishedPlan.value.id}` : '/practicum/courses', active: (path: string) => path.startsWith('/practicum/learn') || path.startsWith('/practicum/activities') },
+  { label: '模拟店铺', to: '/practicum/shop/products', active: (path: string) => path.startsWith('/practicum/shop') },
 ]
 
 function closeMenus() {
@@ -185,6 +197,9 @@ function toggleNotification() {
 function toggleProfile() {
   profileOpen.value = !profileOpen.value
   notificationOpen.value = false
+}
+function handleRoomChange(event: Event) {
+  void workspace.selectRoom((event.target as HTMLSelectElement).value)
 }
 function handleMarkAllRead() {
   store.markAllNotificationsRead()

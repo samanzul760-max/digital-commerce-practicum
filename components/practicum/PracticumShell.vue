@@ -1,6 +1,8 @@
 <template>
   <a class="skip-link" href="#practicum-main">跳到主要内容</a>
-  <div data-practicum-shell class="workspace-shell site">
+  <div data-practicum-shell class="workspace-shell">
+    <PracticumSidebar />
+    <div data-shell-main class="workspace-main">
     <PracticumTopbar :context-title="contextTitle" :context-meta="contextMeta" />
     <span v-if="auth.state.value.user" data-workspace-authenticated class="sr-only">当前账号：{{ auth.state.value.user.displayName }}</span>
     <div class="sr-only" data-role-live-region aria-live="polite" aria-atomic="true">{{ roleAnnouncement }}</div>
@@ -22,6 +24,7 @@
     <main id="practicum-main" data-practicum-content class="workspace-content" tabindex="-1">
       <slot />
     </main>
+    </div>
   </div>
 </template>
 
@@ -30,6 +33,7 @@ import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePracticumStore } from '../../composables/usePracticumStore'
 import { useAuthSession } from '../../composables/useAuthSession'
+import PracticumSidebar from './PracticumSidebar.vue'
 import PracticumTopbar from './PracticumTopbar.vue'
 
 withDefaults(defineProps<{
@@ -58,7 +62,7 @@ const roleAnnouncement = computed(() => {
   return `当前身份：${roleLabels[store.state.activeRole]}`
 })
 const showBack = computed(() => {
-  const topLevel = ['/practicum', '/practicum/login', '/practicum/progress', '/practicum/courses']
+  const topLevel = ['/practicum', '/practicum/login', '/practicum/progress', '/practicum/courses', '/practicum/shop/products']
   return !topLevel.includes(route.path)
 })
 

@@ -366,12 +366,28 @@ export function deleteCurriculumNode(user: AuthUser, planId: string, nodeId: str
   if (plan.status !== 'DRAFT') return { kind: 'STATE' as const }
   if (!Number.isInteger(input.version)) return { kind: 'VALIDATION' as const }
   if (input.version !== plan.version) return { kind: 'CONFLICT' as const, currentVersion: plan.version }
-  const index = state.nodes.findIndex(item => item.id === nodeId && item.planId === planId)
-  if (index < 0) return { kind: 'NOT_FOUND' as const }
-  if (state.nodes.some(item => item.parentId === nodeId)) return { kind: 'STATE' as const }
-  if ((state.submissions[nodeId]?.versions.length ?? 0) > 0) return { kind: 'STATE' as const }
+  const node = state.nodes.find(item => item.id === nodeId && item.planId === planId)
+  if (!node) return { kind: 'NOT_FOUND' as const }
 
-  state.nodes.splice(index, 1)
+  const descendantIds = new Set([node.id])
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const candidate of state.nodes) {
+      if (candidate.parentId && descendantIds.has(candidate.parentId) && !descendantIds.has(candidate.id)) {
+        descendantIds.add(candidate.id)
+        changed = true
+      }
+    }
+  }
+  if ([...descendantIds].some(id => (state.submissions[id]?.versions.length ?? 0) > 0)) return { kind: 'STATE' as const }
+
+  const activityIds = new Set(state.nodes
+    .filter(item => descendantIds.has(item.id))
+    .map(item => item.activityId)
+    .filter((activityId): activityId is string => Boolean(activityId)))
+  state.nodes = state.nodes.filter(item => !descendantIds.has(item.id))
+  state.activities = state.activities.filter(item => !activityIds.has(item.id))
   plan.version += 1
   plan.updatedAt = new Date().toISOString()
   writeState(state)
@@ -935,7 +951,7 @@ export function transitionPlan(user: AuthUser, planId: string, action: 'publish'
   plan.version += 1
   plan.updatedAt = new Date().toISOString()
   writeState(state)
-  return { kind: 'OK' as const, plan: clone(plan) }
+  return { kind: 'OK' as const, ...getPlan(user, planId)! }
 }
 
 export function batchPublishPlans(user: AuthUser, planIds: string[]) {

@@ -715,6 +715,10 @@ body {
   .filters {
     display: none;
   }
+  .course-tools { flex-wrap: wrap; }
+  .course-tools .search { flex: 1 1 170px; min-width: 0; }
+  .course-tools .select { flex: 1 1 96px; min-width: 0; }
+  .course-tools .blue-btn { flex: 1 1 calc(50% - 5px); min-width: 0; white-space: normal; }
   .dashboard {
     grid-template-columns: 54px 1fr;
   }
@@ -1343,7 +1347,7 @@ tr:last-child td { border-bottom: 0; }
   .product-mark { min-height: 62px; }
   .sidebar-foot { display: none; }
   .workspace-nav { grid-template-columns: repeat(5, minmax(0, 1fr)); padding: 10px 0 0; gap: 6px; overflow-x: auto; }
-  .nav-item { justify-content: center; min-width: 72px; min-height: 42px; padding: 0 8px; font-size: 12px; }
+  .nav-item { justify-content: center; min-width: 0; min-height: 42px; padding: 0 4px; font-size: 11px; }
   .nav-symbol { display: none; }
   .workspace-topbar { position: static; height: auto; flex-wrap: wrap; gap: 8px; padding: 10px 14px; }
   .context-title, .workspace-context { flex: 1 1 150px; }
@@ -1407,7 +1411,7 @@ tr:last-child td { border-bottom: 0; }
 .state-panel-forbidden > .practicum-icon { color:var(--practicum-orange); }
 .practicum-home .student-welcome,.practicum-home .learning-card,.practicum-home .award-card,.practicum-home .review-card,.practicum-home .management-card,.practicum-home .audit-card,.practicum-home .activity-card,.practicum-home .module-card,.practicum-home .admin-metrics article{border-radius:var(--practicum-radius-sm)!important;box-shadow:none!important}
 .practicum-home .student-welcome{background:#fff!important;border-color:var(--practicum-border)!important}.practicum-home .admin-layout>.management-card{order:-1}.practicum-home .admin-layout>.admin-side-stack:not(.admin-side-stack-refresh){display:none}.practicum-home .admin-metrics-refresh{margin-top:14px}
-.workspace-context { display: none; }
+.workspace-context { display: flex; }
 .workspace-content { padding: 30px 32px 44px; background:#f6f8fa; }
 .metric-strip, .metric-row { gap: 14px; overflow: visible; background: transparent; border: 0; border-radius: 0; }
 .metric { min-height: 120px; padding: 18px; background: #fff; border: 1px solid var(--practicum-border); border-radius: 6px; box-shadow: none; }
@@ -2015,7 +2019,7 @@ tr:last-child td { border-bottom: 0; }
 .member-management-identity { min-width:0; }
 .member-management-identity strong, .member-group-overview strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .member-management-actions { align-items:center; margin-top:0; }
-.member-management-actions input { width:180px; }
+.member-management-actions input { width:180px; height:32px; padding:0 10px; color:var(--practicum-ink); background:#fff; border:1px solid #e9edf0; border-radius:4px; font-size:13px; }
 .member-remove-button { color:#a53a32; }
 .member-group-section { margin-top:24px; }
 .member-group-overview { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px; }

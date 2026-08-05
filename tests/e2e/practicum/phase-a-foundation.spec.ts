@@ -78,11 +78,11 @@ test('[PHASE-A-03] STUDENT sees limited navigation and is blocked from admin pag
   await page.locator('[data-role-option="STUDENT"]').click()
   await expect(page).toHaveURL('/practicum')
 
-  // Check navigation items - only 4 for student
+  // Student navigation stays compact while exposing the shop sandbox.
   const navItems = page.locator('[data-practicum-sidebar] [data-nav-item]')
-  await expect(navItems).toHaveCount(4)
+  await expect(navItems).toHaveCount(5)
   const navKeys = await navItems.evaluateAll(items => items.map(i => i.getAttribute('data-nav-key')))
-  expect(navKeys).toEqual(['workspace', 'cases', 'tasks', 'progress'])
+  expect(navKeys).toEqual(['workspace', 'plans', 'tasks', 'shop', 'progress'])
 
   // STUDENT cannot access admin pages
   const adminRoutes = [
@@ -206,8 +206,8 @@ test('[PHASE-A-05] student sidebar hides all admin navigation entries', async ({
   await loginAsStudent(page)
   await page.goto('/practicum')
 
-  // No admin entries in sidebar
-  await expect(page.locator('[data-nav-key="plans"]')).toHaveCount(0)
+  // Student can enter published courses, but management-only routes stay hidden.
+  await expect(page.locator('[data-nav-key="plans"]')).toHaveCount(1)
   await expect(page.locator('[data-nav-key="reviews"]')).toHaveCount(0)
   await expect(page.locator('[data-nav-key="data-center"]')).toHaveCount(0)
 
@@ -328,7 +328,7 @@ test('[PHASE-A-PERSIST] student role persists after refresh', async ({ page }) =
 
   // Student nav should still be 4 items
   const navItems = page.locator('[data-practicum-sidebar] [data-nav-item]')
-  await expect(navItems).toHaveCount(4)
+  await expect(navItems).toHaveCount(5)
 })
 
 // ── 重复点击保护 ──────────────────────────────────────────

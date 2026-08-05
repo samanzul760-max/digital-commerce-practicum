@@ -91,12 +91,16 @@ test('[ORIGINAL-S7-001] owner sees teaching guidance and student does not', asyn
   await page.locator('[data-confirm-submit-case]').click()
 
   await loginAsOwner(page)
+  await page.goto('/practicum/profile')
+  await page.locator('[data-role-option="OWNER"]').click()
   await page.goto('/practicum/cases/case-review-reply')
   await expect(page.locator('[data-owner-case-guidance]')).toBeVisible()
   await expect(page.locator('[data-owner-case-rubric]')).toBeVisible()
   await expect(page.locator('[data-case-submission-overview]')).toContainText('1')
 
   await loginAsStudent(page)
+  await page.goto('/practicum/profile')
+  await page.locator('[data-role-option="STUDENT"]').click()
   await page.goto('/practicum/cases/case-review-reply')
   await expect(page.locator('[data-owner-case-guidance]')).toHaveCount(0)
   await expect(page.locator('[data-owner-case-rubric]')).toHaveCount(0)

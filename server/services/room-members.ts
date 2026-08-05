@@ -35,10 +35,13 @@ function asPlanProgress(value: Prisma.JsonValue): PlanProgress[] {
   })
 }
 
-async function ensureDemoMembers(roomId: string) {
-  if (!demoEnabled()) return
-  if (await prisma.roomMember.count({ where: { roomId } })) return
+function isUniqueViolation(error: unknown) {
+  return typeof error === 'object' && error !== null && (error as { code?: string }).code === 'P2002'
+}
 
+const demoSeeding = new Map<string, Promise<void>>()
+
+async function seedDemoMembers(roomId: string) {
   await prisma.organization.upsert({ where: { id: 'org-demo' }, update: {}, create: { id: 'org-demo', name: '演示职业学院' } })
   await prisma.trainingRoom.upsert({ where: { id: roomId }, update: {}, create: { id: roomId, organizationId: 'org-demo', name: '数字商贸实训室' } })
 
@@ -55,7 +58,9 @@ async function ensureDemoMembers(roomId: string) {
       })
       const ordinal = String(index + 1).padStart(2, '0')
       await prisma.roomMember.create({ data: {
-        id: groupIndex === 0 && index === 0 ? 'member-001' : `demo-member-${group.key}-${ordinal}`,
+        id: groupIndex === 0 && index === 0
+          ? (roomId === 'room-001' ? 'member-001' : `demo-member-${roomId}-001`)
+          : `demo-member-${roomId}-${group.key}-${ordinal}`,
         roomId,
         displayName: groupIndex === 0 && index === 0 ? '学生 001' : `${group.name} ${ordinal}号学员`,
         role: 'STUDENT',
@@ -69,6 +74,25 @@ async function ensureDemoMembers(roomId: string) {
       } })
     }
   }
+}
+
+function ensureDemoMembers(roomId: string): Promise<void> {
+  if (!demoEnabled()) return Promise.resolve()
+  const pending = demoSeeding.get(roomId)
+  if (pending) return pending
+  const task = (async () => {
+    try {
+      if (await prisma.roomMember.count({ where: { roomId } })) return
+      await seedDemoMembers(roomId)
+    } catch (error) {
+      if (isUniqueViolation(error) && (await prisma.roomMember.count({ where: { roomId } }))) return
+      throw error
+    } finally {
+      demoSeeding.delete(roomId)
+    }
+  })()
+  demoSeeding.set(roomId, task)
+  return task
 }
 
 export async function listRoomMembers(roomId: string, input: { page: number; pageSize: number; keyword: string }) {
