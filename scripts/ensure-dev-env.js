@@ -34,8 +34,9 @@ function log(message) {
   console.log(`[ensure-dev-env] ${message}`)
 }
 
-function isHealthy() {
-  return { dev: checkTcp(devPort, 800), db: checkTcp(dbPort, 800) }
+async function isHealthy() {
+  const [dev, db] = await Promise.all([checkTcp(devPort, 800), checkTcp(dbPort, 800)])
+  return { dev, db }
 }
 
 function checkTcp(targetPort, timeoutMs) {
