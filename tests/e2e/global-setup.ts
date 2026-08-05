@@ -14,6 +14,14 @@ export default async function globalSetup() {
   if (!response.ok()) {
     throw new Error(`E2E global login failed with status ${response.status()}`)
   }
+  // Initialize every persisted room used by the E2E suite through the same server path as member analytics.
+  // This seeds the TrainingRoom rows (room-001, room-002) without forcing prisma migrate reset.
+  for (const roomId of ['room-001', 'room-002']) {
+    const members = await context.get(`/api/practicum/members?roomId=${roomId}&pageSize=1`)
+    if (!members.ok()) {
+      throw new Error(`E2E room fixture for ${roomId} failed with status ${members.status()}`)
+    }
+  }
   await context.storageState({ path: authStatePath })
   await context.dispose()
 }
