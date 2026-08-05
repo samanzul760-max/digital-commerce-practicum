@@ -75,14 +75,21 @@ pm2 save
 "@
 
 Write-Host "[4/6] Installing, building, and restarting PM2 on server..."
-ssh.exe $remote $remoteCommand
+$remoteScript = Join-Path $env:TEMP "deploy-remote-$stamp.sh"
+$lfScript = ($remoteCommand -replace "`r`n", "`n")
+[System.IO.File]::WriteAllText($remoteScript, $lfScript, [System.Text.UTF8Encoding]::new($false))
+Get-Content -Raw -LiteralPath $remoteScript | ssh.exe $remote "bash -s"
+if ($LASTEXITCODE -ne 0) {
+  throw "Remote deploy command failed with exit code $LASTEXITCODE."
+}
+Remove-Item -LiteralPath $remoteScript -Force
 
 Write-Host "[5/6] Checking deployed URL..."
-$url = "http://$HostName:3000/practicum"
+$url = "http://${HostName}:3000/practicum"
 $response = Invoke-WebRequest -UseBasicParsing $url -TimeoutSec 20
 if ($response.StatusCode -ne 200) {
   throw "Deployment finished, but $url returned HTTP $($response.StatusCode)."
 }
 
 Write-Host "[6/6] Done. $url returned HTTP 200."
-Write-Host "Deployment target: $remote:$RemoteDir"
+Write-Host "Deployment target: ${remote}:${RemoteDir}"
