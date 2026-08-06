@@ -71,3 +71,14 @@ Missing, expired, or mismatched tokens return `403 CSRF_INVALID` with `{ data: {
 上传允许 PDF、PNG、JPEG、纯文本，单文件上限 5 MiB；服务端使用随机存储键和安全文件名，不向客户端返回本地路径。登录失败按来源地址做基础窗口限流。
 
 当前数据层是项目 `.data/practicum-data.json`，适合单机部署验证；多实例生产环境仍需迁移到数据库和对象存储。
+## 学生真实学习闭环合同
+
+| 方法 | 路径 | 合同 |
+|---|---|---|
+| GET | `/api/practicum/student/tasks` | 按当前学生和授权实训室返回任务、状态、可用性、活动、来源和时间字段；不得返回其他学生数据。 |
+| GET | `/api/practicum/student-tasks/:taskId` | 返回当前学生任务详情、提交版本、反馈和评分；越权统一返回 `404/TASK_NOT_FOUND`。 |
+| POST | `/api/practicum/student-tasks/:taskId/submissions` | 要求 `Idempotency-Key` 和非空成果；成功生成新版本，重复键重放原结果；锁定/非法状态返回 `409`。 |
+| POST | `/api/practicum/teacher/student-tasks/:taskId/return` | 仅授权教师/管理员可用，必须填写退回反馈，只允许 `SUBMITTED` 转为 `RETURNED`。 |
+| POST | `/api/practicum/teacher/student-tasks/:taskId/grade` | 仅授权教师/管理员可用，必须填写合法分数和反馈，保存评分修订并将任务转为 `GRADED`。 |
+
+状态转换：`LOCKED -> AVAILABLE -> IN_PROGRESS -> SUBMITTED -> RETURNED -> SUBMITTED -> GRADED`；截止后进入 `CLOSED`，非法转换必须拒绝且不得产生部分写入。
