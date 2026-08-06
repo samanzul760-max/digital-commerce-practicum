@@ -9,12 +9,17 @@ export default defineEventHandler(async event => {
   if (!text) throw createError({ statusCode: 422, statusMessage: 'SUBMISSION_INVALID', data: { code: 'SUBMISSION_INVALID' } })
   const task = await prisma.studentTask.findFirst({ where: { id: taskId, studentId: user.id }, include: { planAssignment: true } })
   if (!task) throw createError({ statusCode: 404, statusMessage: 'TASK_NOT_FOUND', data: { code: 'TASK_NOT_FOUND' } })
-  if (task.status === 'LOCKED') throw createError({ statusCode: 409, statusMessage: 'TASK_LOCKED', data: { code: 'TASK_LOCKED' } })
-  if (!['AVAILABLE', 'RETURNED'].includes(task.status)) throw createError({ statusCode: 409, statusMessage: 'TASK_STATE_INVALID', data: { code: 'TASK_STATE_INVALID' } })
-  if (task.availableAt > new Date() || (task.dueAt && task.dueAt < new Date() && !task.planAssignment.lateAllowed)) throw createError({ statusCode: 409, statusMessage: 'TASK_UNAVAILABLE', data: { code: 'TASK_UNAVAILABLE' } })
   const key = getHeader(event, 'idempotency-key')?.trim()
   if (!key) throw createError({ statusCode: 422, statusMessage: 'IDEMPOTENCY_KEY_REQUIRED', data: { code: 'IDEMPOTENCY_KEY_REQUIRED' } })
   const path = `/api/practicum/student-tasks/${task.id}/submissions`
+  const replay = await prisma.submissionIdempotencyKey.findUnique({
+    where: { userId_method_path_key: { userId: user.id, method: 'POST', path, key } },
+    include: { submission: { include: { versions: { orderBy: { version: 'desc' } }, grade: true } } },
+  })
+  if (replay) return { task: { id: task.id, status: task.status }, submission: replay.submission }
+  if (task.status === 'LOCKED') throw createError({ statusCode: 409, statusMessage: 'TASK_LOCKED', data: { code: 'TASK_LOCKED' } })
+  if (!['AVAILABLE', 'RETURNED'].includes(task.status)) throw createError({ statusCode: 409, statusMessage: 'TASK_STATE_INVALID', data: { code: 'TASK_STATE_INVALID' } })
+  if (task.availableAt > new Date() || (task.dueAt && task.dueAt < new Date() && !task.planAssignment.lateAllowed)) throw createError({ statusCode: 409, statusMessage: 'TASK_UNAVAILABLE', data: { code: 'TASK_UNAVAILABLE' } })
   const submission = await prisma.$transaction(async tx => {
     const existing = await tx.submissionIdempotencyKey.findUnique({
       where: { userId_method_path_key: { userId: user.id, method: 'POST', path, key } },

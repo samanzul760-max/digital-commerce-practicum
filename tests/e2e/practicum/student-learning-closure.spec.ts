@@ -34,7 +34,7 @@ test('[C-STUDENT-001] student task rows come from the assigned server task after
       planId: 'plan-wdds',
       title: `服务端学生任务 ${nonce}`,
       activityIds: [`activity-closure-${nonce}`],
-      availableAt: '2026-08-01T00:00:00.000Z',
+      availableAt: '2026-08-06T00:00:00.000Z',
       dueAt: '2026-12-31T00:00:00.000Z',
       lateAllowed: false,
     },
@@ -50,6 +50,7 @@ test('[C-STUDENT-001] student task rows come from the assigned server task after
 
   const row = student.locator('[data-student-task-row]').filter({ hasText: `服务端学生任务 ${nonce}` })
   await expect(row).toHaveCount(1)
+  await expect(row).toHaveAttribute('data-task-id', expect.any(String))
   await expect(row.locator('[data-task-status]')).toHaveText('待提交')
   await student.reload()
   await expect(row).toHaveCount(1)

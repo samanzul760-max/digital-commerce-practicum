@@ -199,7 +199,7 @@ export function usePracticumServer() {
   }
 
   async function listStudentTasks() {
-    return await $fetch<{ items: Array<{ id: string; activityId: string; status: string; availableAt: string; dueAt: string | null; planAssignment: { id: string; title: string; lateAllowed: boolean } }> }>('/api/practicum/student/tasks')
+    return await $fetch<{ items: Array<{ id: string; planAssignmentId: string; activityId: string; status: string; availability: string; availableAt: string; dueAt: string | null; source: { id: string; title: string; status: string } }> }>('/api/practicum/student/tasks')
   }
 
   async function listClasses(organizationId: string, roomId: string) {

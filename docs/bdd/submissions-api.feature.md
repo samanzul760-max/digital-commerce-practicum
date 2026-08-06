@@ -30,6 +30,47 @@ Then 状态变为 `GRADED`，保存评分人、分数、反馈和时间
 
 ### 审核队列只使用服务端结果
 
+### C-STUDENT-007 任务列表按学生和实训室隔离
+
+```gherkin
+场景: 学生任务列表只返回当前学生可见任务
+  假如 当前学生属于当前实训室
+  当 学生请求 GET /api/practicum/student/tasks
+  那么 每项都包含 status、availability、activity、source、availableAt 和 dueAt
+  并且 不包含其他学生的任务
+```
+
+### C-STUDENT-008 任务详情按归属隔离
+
+```gherkin
+场景: 学生读取任务详情
+  假如 任务属于当前学生
+  当 学生请求 GET /api/practicum/student-tasks/:taskId
+  那么 响应只包含当前学生自己的 draft、versions、feedback 和 grade
+  但任务不存在或不属于当前学生时返回 404/TASK_NOT_FOUND
+```
+
+### C-STUDENT-009 提交校验和幂等
+
+```gherkin
+场景: 学生提交任务结果
+  假如 任务状态为 AVAILABLE 或 RETURNED
+  当 请求携带 Idempotency-Key 和非空 text 提交
+  那么 返回 SUBMITTED 并创建一个新版本
+  但空内容返回 422/SUBMISSION_INVALID，LOCKED、CLOSED、GRADED 返回 409
+  并且 相同幂等键重试不会创建第二个版本
+```
+
+### C-STUDENT-010 教师退回和评分使用现有审核合同
+
+```gherkin
+场景: 教师审核学生提交
+  假如 提交状态为 SUBMITTED 且教师拥有对应班级权限
+  当 教师请求 POST /api/practicum/submissions/:activityId/return 或 /grade
+  那么 服务端校验反馈、量表分数、班级范围和当前状态
+  并且 事务失败时不写入半条状态、版本或评分记录
+```
+
 **BDD-SUBMISSION-005**
 
 Given OWNER 已进入审核中心，浏览器本地仍残留一条旧提交记录

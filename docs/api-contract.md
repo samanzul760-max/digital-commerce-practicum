@@ -14,6 +14,15 @@ Submission states are `NOT_STARTED`, `IN_PROGRESS`, `SUBMITTED`, `RETURNED`, and
 
 ## CSRF write protection
 
+### Student closure route clarification
+
+The canonical teacher review routes used by the existing review UI and tests are:
+
+- `POST /api/practicum/submissions/:activityId/return`
+- `POST /api/practicum/submissions/:activityId/grade`
+
+The task-scoped `/api/practicum/teacher/student-tasks/:taskId/{return,grade}` routes are a separate class-task API. They must not be substituted for the activity submission contract without an explicit adapter and matching tests.
+
 Every `POST`, `PUT`, `PATCH`, and `DELETE` request below `/api/practicum/` requires an authenticated `practicum_session` and the current session's `x-csrf-token` header. Login and first-owner bootstrap issue a same-site, non-HttpOnly `practicum_csrf` cookie only so the first-party client can copy it into that header; the session cookie remains HttpOnly.
 
 Missing, expired, or mismatched tokens return `403 CSRF_INVALID` with `{ data: { code: 'CSRF_INVALID' } }` before any business data is changed. Requests without a session continue to endpoint authentication and retain the existing `401 AUTH_REQUIRED` contract.
@@ -78,7 +87,7 @@ Missing, expired, or mismatched tokens return `403 CSRF_INVALID` with `{ data: {
 | GET | `/api/practicum/student/tasks` | 按当前学生和授权实训室返回任务、状态、可用性、活动、来源和时间字段；不得返回其他学生数据。 |
 | GET | `/api/practicum/student-tasks/:taskId` | 返回当前学生任务详情、提交版本、反馈和评分；越权统一返回 `404/TASK_NOT_FOUND`。 |
 | POST | `/api/practicum/student-tasks/:taskId/submissions` | 要求 `Idempotency-Key` 和非空成果；成功生成新版本，重复键重放原结果；锁定/非法状态返回 `409`。 |
-| POST | `/api/practicum/teacher/student-tasks/:taskId/return` | 仅授权教师/管理员可用，必须填写退回反馈，只允许 `SUBMITTED` 转为 `RETURNED`。 |
-| POST | `/api/practicum/teacher/student-tasks/:taskId/grade` | 仅授权教师/管理员可用，必须填写合法分数和反馈，保存评分修订并将任务转为 `GRADED`。 |
+| POST | `/api/practicum/submissions/:activityId/return` | 仅授权教师/管理员可用，必须填写退回反馈，只允许 `SUBMITTED` 转为 `RETURNED`；审核按活动提交合同执行。 |
+| POST | `/api/practicum/submissions/:activityId/grade` | 仅授权教师/管理员可用，必须填写合法分数和反馈，保存评分修订并将活动提交转为 `GRADED`。 |
 
 状态转换：`LOCKED -> AVAILABLE -> IN_PROGRESS -> SUBMITTED -> RETURNED -> SUBMITTED -> GRADED`；截止后进入 `CLOSED`，非法转换必须拒绝且不得产生部分写入。
