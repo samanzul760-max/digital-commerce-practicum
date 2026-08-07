@@ -72,6 +72,12 @@ model TrainingRoom {
   virtualGroups  VirtualGroup[]
   members        RoomMember[]
   stores         Store[]
+  setting        TrainingRoomSetting?
+  joinApplications JoinApplication[]
+  memberInvites  MemberInvite[]
+  auditEvents    AuditEvent[]
+  templates      PracticumTemplate[]
+  competitions   Competition[]
 
   @@index([organizationId])
 }
@@ -155,6 +161,9 @@ model VirtualGroup {
   name      String
   room      TrainingRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
   members   RoomMember[]
+  announcements ClassAnnouncement[]
+  joinApplications JoinApplication[]
+  memberInvites MemberInvite[]
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
@@ -176,6 +185,8 @@ model RoomMember {
   planProgress      Json           @default("[]")
   room              TrainingRoom   @relation(fields: [roomId], references: [id], onDelete: Cascade)
   group             VirtualGroup?  @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  activityExecutions ActivityExecution[]
+  competitionEntries CompetitionEntry[]
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
@@ -207,6 +218,8 @@ model Class {
   cohort          Cohort            @relation(fields: [cohortId], references: [id])
   enrollments     ClassEnrollment[]
   planAssignments PlanAssignment[]
+  announcements   ClassAnnouncement[]
+  teachingSessions TeachingSession[]
 
   @@unique([cohortId, name])
   @@index([roomId])
@@ -386,4 +399,185 @@ model GradeItem {
   grade        Grade   @relation(fields: [gradeId], references: [id], onDelete: Cascade)
 
   @@unique([gradeId, rubricItemId])
+}
+
+model TrainingRoomSetting {
+  id             String       @id @default(cuid())
+  trainingRoomId String       @unique
+  description    String       @default("")
+  coverUrl       String?
+  teachingMode   String       @default("STANDARD")
+  visibility     String       @default("PRIVATE")
+  version        Int          @default(1)
+  publishedAt    DateTime?
+  trainingRoom   TrainingRoom @relation(fields: [trainingRoomId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model ClassAnnouncement {
+  id            String        @id @default(cuid())
+  classId       String
+  targetGroupId String?
+  authorId      String
+  idempotencyKey String
+  title         String
+  body          String
+  status        String        @default("DRAFT")
+  publishedAt   DateTime?
+  closedAt      DateTime?
+  class         Class         @relation(fields: [classId], references: [id], onDelete: Cascade)
+  targetGroup   VirtualGroup? @relation(fields: [targetGroupId], references: [id], onDelete: SetNull)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@unique([classId, authorId, idempotencyKey])
+  @@index([classId, status])
+  @@index([targetGroupId])
+}
+
+model TeachingSession {
+  id                String              @id @default(cuid())
+  classId           String
+  startedById       String
+  currentActivityId String?
+  status            String              @default("ACTIVE")
+  idempotencyKey    String
+  startedAt         DateTime            @default(now())
+  endedAt           DateTime?
+  class             Class               @relation(fields: [classId], references: [id], onDelete: Cascade)
+  activityExecutions ActivityExecution[]
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@unique([classId, idempotencyKey])
+  @@index([classId, status])
+}
+
+model ActivityExecution {
+  id                String          @id @default(cuid())
+  teachingSessionId String
+  memberId          String
+  activityId        String
+  status            String          @default("NOT_STARTED")
+  startedAt         DateTime?
+  completedAt       DateTime?
+  teachingSession   TeachingSession @relation(fields: [teachingSessionId], references: [id], onDelete: Cascade)
+  member            RoomMember      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@unique([teachingSessionId, memberId, activityId])
+  @@index([memberId, status])
+}
+
+model JoinApplication {
+  id             String        @id @default(cuid())
+  trainingRoomId String
+  targetGroupId  String?
+  applicantId    String
+  status         String        @default("PENDING")
+  idempotencyKey String
+  decidedById    String?
+  decidedAt      DateTime?
+  trainingRoom   TrainingRoom  @relation(fields: [trainingRoomId], references: [id], onDelete: Cascade)
+  targetGroup    VirtualGroup? @relation(fields: [targetGroupId], references: [id], onDelete: SetNull)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([trainingRoomId, applicantId, idempotencyKey])
+  @@index([trainingRoomId, status])
+  @@index([targetGroupId])
+}
+
+model MemberInvite {
+  id             String        @id @default(cuid())
+  trainingRoomId String
+  targetGroupId  String?
+  invitedById    String
+  invitee        String
+  inviteCode     String        @unique
+  status         String        @default("ACTIVE")
+  idempotencyKey String
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  usedAt         DateTime?
+  trainingRoom   TrainingRoom  @relation(fields: [trainingRoomId], references: [id], onDelete: Cascade)
+  targetGroup    VirtualGroup? @relation(fields: [targetGroupId], references: [id], onDelete: SetNull)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([trainingRoomId, invitedById, idempotencyKey])
+  @@index([trainingRoomId, status])
+  @@index([targetGroupId])
+  @@index([expiresAt])
+}
+
+model AuditEvent {
+  id             String       @id @default(cuid())
+  trainingRoomId String
+  actorId        String
+  actorRole      String
+  entityType     String
+  entityId       String
+  eventType      String
+  metadata       Json         @default("{}")
+  occurredAt     DateTime     @default(now())
+  trainingRoom   TrainingRoom @relation(fields: [trainingRoomId], references: [id], onDelete: Cascade)
+
+  @@index([trainingRoomId, occurredAt])
+  @@index([trainingRoomId, entityType, entityId])
+}
+
+model PracticumTemplate {
+  id             String        @id @default(cuid())
+  trainingRoomId String
+  templateKey    String
+  name           String
+  enabled        Boolean       @default(true)
+  configuration  Json          @default("{}")
+  trainingRoom   TrainingRoom  @relation(fields: [trainingRoomId], references: [id], onDelete: Cascade)
+  competitions   Competition[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([trainingRoomId, templateKey])
+  @@index([trainingRoomId, enabled])
+}
+
+model Competition {
+  id             String             @id @default(cuid())
+  trainingRoomId String
+  templateId     String?
+  createdById    String
+  name           String
+  description    String             @default("")
+  status         String             @default("DRAFT")
+  startsAt       DateTime?
+  endsAt         DateTime?
+  publishedAt    DateTime?
+  trainingRoom   TrainingRoom       @relation(fields: [trainingRoomId], references: [id], onDelete: Cascade)
+  template       PracticumTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  entries        CompetitionEntry[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@index([trainingRoomId, status])
+  @@index([templateId])
+}
+
+model CompetitionEntry {
+  id            String      @id @default(cuid())
+  competitionId String
+  memberId      String
+  status        String      @default("REGISTERED")
+  registeredAt  DateTime    @default(now())
+  submittedAt   DateTime?
+  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  member        RoomMember  @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([competitionId, memberId])
+  @@index([memberId, status])
 }
