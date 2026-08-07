@@ -1,6 +1,6 @@
 # 教师课堂 BDD 契约
 
-状态：BLOCKED_BY_MISSING_SCHEMA。此文件及关联 Playwright 契约先于生产代码创建；按本轮约束，命令仅登记，不执行。生产实现必须等待数据基础切片提交 `ClassAnnouncement`、`TeachingSession` 和 `ActivityExecution` 后才能开始。
+状态：IMPLEMENTED_UNVERIFIED。此文件及关联 Playwright 契约先于生产代码创建；数据基础提交 `3256d3f` 已提供 `ClassAnnouncement`、`TeachingSession` 和 `ActivityExecution`。按本轮约束，命令仅登记，不执行。
 
 ## API 契约
 
