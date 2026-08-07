@@ -89,7 +89,7 @@ async function ensureRoomTemplates(roomIds: string[]) {
 
 async function roomIdsWithTemplates(user: AuthUser) {
   const roomIds = await authorizedRoomIds(user)
-  await ensureRoomTemplates(roomIds)
+  if (isOwner(user)) await ensureRoomTemplates(roomIds)
   return roomIds
 }
 

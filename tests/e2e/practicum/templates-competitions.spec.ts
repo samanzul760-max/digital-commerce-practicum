@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { prisma } from '../../../server/db/client'
 import { csrfHeaders } from './csrf'
 import { loginAsOwner, loginAsStudent } from './auth-helpers'
 
@@ -56,6 +57,15 @@ test.describe('templates and competitions API contract', () => {
     expect(response.status()).toBe(401)
     expect((await response.json()).data.code).toBe('AUTH_REQUIRED')
     await context.close()
+  })
+
+  test('[BDD-TEMPLATE-COMPETITION-007] student template reads do not bootstrap or mutate room template records', async ({ page }) => {
+    const before = await prisma.practicumTemplate.count({ where: { trainingRoomId: 'room-001' } })
+    await loginAsStudent(page)
+    const response = await page.request.get('/api/practicum/templates')
+    expect(response.status()).toBe(200)
+    expect((await response.json()).items).toEqual(expect.any(Array))
+    await expect.poll(() => prisma.practicumTemplate.count({ where: { trainingRoomId: 'room-001' } })).toBe(before)
   })
 
   test('[BDD-TEMPLATE-COMPETITION-004/005] owner publishes and closes a competition; student enters once', async ({ page, browser }) => {
