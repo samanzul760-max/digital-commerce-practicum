@@ -11,9 +11,9 @@
         </div>
 
         <p v-if="isLoading" data-loading class="empty-state">正在加载资源列表...</p>
-        <p v-else-if="!canManageResources(store.state.activeRole)" data-forbidden class="empty-state">只有管理员可以管理资源。</p>
+        <p v-else-if="loadError" data-resource-error class="empty-state">资源加载失败，请重新加载。</p>
 
-        <p v-else-if="loadError" data-resource-error class="empty-state">Resource loading failed. Please retry.</p>
+        <p v-else-if="!canManageResources(store.state.activeRole)" data-forbidden class="empty-state">只有管理员可以管理资源。</p>
 
         <template v-else>
           <div class="section-heading">
@@ -98,16 +98,21 @@ const isLoading = ref(true)
 const loadError = ref(false)
 const isSaving = ref(false)
 const serverResources = ref<SupportingResource[]>([])
-onMounted(async () => {
+onMounted(loadResources)
+
+async function loadResources() {
+  isLoading.value = true
+  loadError.value = false
   try {
     const result = await $fetch<{ items: SupportingResource[] }>('/api/practicum/resources?page=1&pageSize=50')
     serverResources.value = result.items
   } catch {
+    serverResources.value = []
     loadError.value = true
   } finally {
     isLoading.value = false
   }
-})
+}
 const showForm = ref(false)
 const name = ref('')
 const url = ref('')
