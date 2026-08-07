@@ -65,7 +65,13 @@ export function canAccessRoute(role: PracticumRole | null, routePath: string): b
   }
 
   if (role === 'TEACHER' || role === 'MENTOR') {
-    return routePath === '/practicum' || routePath.startsWith('/practicum/profile') || routePath.startsWith('/practicum/cases') || routePath.startsWith('/practicum/classes')
+    return routePath === '/practicum' ||
+      routePath.startsWith('/practicum/profile') ||
+      routePath.startsWith('/practicum/cases') ||
+      routePath.startsWith('/practicum/classes') ||
+      routePath.startsWith('/practicum/progress') ||
+      routePath.startsWith('/practicum/reviews') ||
+      routePath.startsWith('/practicum/submissions')
   }
 
   return false
@@ -112,7 +118,7 @@ export function canManageMembers(role: PracticumRole | null): boolean {
  * 覆盖：操作按钮权限。
  */
 export function canReview(role: PracticumRole | null): boolean {
-  return role === 'OWNER'
+  return role === 'OWNER' || role === 'TEACHER' || role === 'MENTOR'
 }
 
 /**
@@ -132,7 +138,22 @@ export function canAccessLearning(role: PracticumRole | null): boolean {
 }
 
 export function canViewProgress(role: PracticumRole | null): boolean {
-  return role === 'OWNER' || role === 'STUDENT'
+  return role === 'OWNER' || role === 'TEACHER' || role === 'MENTOR' || role === 'STUDENT'
+}
+
+/** 教师可以查看自己负责班级的课堂工作台，具体范围由服务端校验。 */
+export function canViewClassroom(role: PracticumRole | null): boolean {
+  return role === 'OWNER' || role === 'TEACHER' || role === 'MENTOR'
+}
+
+/** 班级作业发布必须进一步校验教师是否被分配到该班级。 */
+export function canManageClassAssignment(role: PracticumRole | null): boolean {
+  return role === 'OWNER' || role === 'TEACHER'
+}
+
+/** 审核入口允许教师进入，提交范围和写操作由服务端按班级校验。 */
+export function canReviewScopedSubmission(role: PracticumRole | null): boolean {
+  return role === 'OWNER' || role === 'TEACHER' || role === 'MENTOR'
 }
 
 /**
@@ -210,7 +231,7 @@ export const NAV_ITEMS: NavItemDef[] = [
     label: '教学管理',
     icon: 'clipboard-check',
     to: '/practicum/reviews',
-    roles: ['OWNER'],
+    roles: ['OWNER', 'TEACHER'],
     activeMatch: (path) =>
       path.startsWith('/practicum/reviews') ||
       path.startsWith('/practicum/submissions') ||
@@ -246,7 +267,7 @@ export const NAV_ITEMS: NavItemDef[] = [
     label: '成长数据',
     icon: 'trending-up',
     to: '/practicum/progress',
-    roles: ['STUDENT'],
+    roles: ['OWNER', 'TEACHER', 'STUDENT'],
     activeMatch: (path) => path === '/practicum/progress',
   },
 ]
