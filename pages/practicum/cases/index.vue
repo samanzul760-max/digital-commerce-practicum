@@ -48,6 +48,11 @@
           </article>
         </div>
 
+        <section v-if="store.state.activeRole === 'OWNER' || store.state.activeRole === 'STUDENT'" data-case-operations class="case-operations">
+          <NuxtLink v-if="store.state.activeRole === 'OWNER'" to="/practicum/templates" data-open-practicum-templates class="secondary-button">管理实训模板</NuxtLink>
+          <NuxtLink to="/practicum/competitions" data-open-practicum-competitions class="secondary-button">进入实训比赛</NuxtLink>
+        </section>
+
         <section data-case-group="submittable" class="case-group">
           <div class="case-group-heading">
             <div>
@@ -187,6 +192,12 @@ const readOnlyCount = computed(() => readOnlyCases.value.length)
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
+}
+
+.case-operations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .case-brief,

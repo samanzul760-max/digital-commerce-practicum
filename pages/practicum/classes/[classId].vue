@@ -4,6 +4,7 @@
       <PracticumStatePanel v-if="!canManageClass" data-forbidden state="forbidden" title="无法访问班级管理" description="班级管理仅向教学人员开放。" />
       <section v-else class="class-detail" data-class-detail>
         <header class="page-heading"><div><p class="eyebrow">班级教学</p><h1>班级工作台</h1><p>学生、任务与批改进度都从当前班级的服务端数据读取。</p></div><NuxtLink to="/practicum/classes" class="secondary-button">返回班级列表</NuxtLink></header>
+        <NuxtLink :to="`/practicum/teaching/${classId}`" data-open-teaching-workbench class="secondary-button">进入课堂</NuxtLink>
         <p v-if="loading" class="empty-state">正在加载班级数据...</p>
         <template v-else>
           <div class="class-workbench-grid">

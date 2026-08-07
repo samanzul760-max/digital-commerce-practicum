@@ -33,6 +33,7 @@ const OWNER_ONLY_PREFIXES = [
   '/practicum/resources',
   '/practicum/members',
   '/practicum/room-settings',
+  '/practicum/templates',
   '/practicum/reviews',
   '/practicum/data-center',
   '/practicum/submissions',
@@ -69,6 +70,7 @@ export function canAccessRoute(role: PracticumRole | null, routePath: string): b
       routePath.startsWith('/practicum/profile') ||
       routePath.startsWith('/practicum/cases') ||
       routePath.startsWith('/practicum/classes') ||
+      routePath.startsWith('/practicum/teaching') ||
       routePath.startsWith('/practicum/progress') ||
       routePath.startsWith('/practicum/reviews') ||
       routePath.startsWith('/practicum/submissions')
