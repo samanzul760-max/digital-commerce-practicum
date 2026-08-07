@@ -4,7 +4,7 @@ import { requireAuthenticatedUser } from '../../../utils/auth-session'
 
 export default defineEventHandler(async (event) => {
   const body = await readBody<{ roomId?: string; title?: string; description?: string }>(event)
-  const result = createCompetition(requireAuthenticatedUser(event), {
+  const result = await createCompetition(requireAuthenticatedUser(event), {
     roomId: body?.roomId?.trim() ?? '',
     title: body?.title?.trim() ?? '',
     description: body?.description?.trim() ?? '',

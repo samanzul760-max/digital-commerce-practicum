@@ -1,227 +1,207 @@
-import { randomUUID } from 'node:crypto'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
 import { commerceCases } from '../../data/practicum/commerce-case-seed'
+import { prisma } from '../db/client'
 import type { AuthUser } from '../utils/auth-store'
 
 export type TemplateStatus = 'ENABLED' | 'DISABLED'
 export type CompetitionStatus = 'DRAFT' | 'PUBLISHED' | 'CLOSED'
 export type CompetitionEntryStatus = 'SUBMITTED'
 
-export interface PracticumTemplate {
-  id: string
-  key: 'commerce-cases'
-  roomId: string
-  title: string
-  description: string
-  status: TemplateStatus
-  enabled: boolean
-  caseCount: number
-  updatedAt: string
+type TemplateCompetitionClient = {
+  trainingRoom: any
+  roomMember: any
+  practicumTemplate: any
+  competition: any
+  competitionEntry: any
+  $transaction: <T>(fn: (client: TemplateCompetitionClient) => Promise<T>) => Promise<T>
 }
 
-export interface Competition {
-  id: string
-  roomId: string
-  title: string
-  description: string
-  status: CompetitionStatus
-  createdBy: string
-  createdAt: string
-  publishedAt?: string
-  closedAt?: string
-}
-
-export interface CompetitionEntry {
-  id: string
-  competitionId: string
-  roomId: string
-  studentId: string
-  statement: string
-  status: CompetitionEntryStatus
-  submittedAt: string
-}
-
-interface StoredState {
-  version: 1
-  templates: PracticumTemplate[]
-  competitions: Competition[]
-  entries: CompetitionEntry[]
-}
-
-const dataRoot = process.env.PRACTICUM_DATA_DIR || join(process.cwd(), '.data')
-const dataPath = join(dataRoot, 'template-competition-data.json')
-const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T
-
-function emptyState(): StoredState {
-  return { version: 1, templates: [], competitions: [], entries: [] }
-}
-
-function readState(): StoredState {
-  try {
-    const state = JSON.parse(readFileSync(dataPath, 'utf8')) as StoredState
-    if (state.version === 1 && Array.isArray(state.templates) && Array.isArray(state.competitions) && Array.isArray(state.entries)) return state
-  } catch {
-    // The development data store is created on the first authorized request.
-  }
-  return emptyState()
-}
-
-function writeState(state: StoredState) {
-  mkdirSync(dirname(dataPath), { recursive: true })
-  writeFileSync(dataPath, JSON.stringify(state, null, 2), 'utf8')
-}
+const db = prisma as unknown as TemplateCompetitionClient
+const templateKey = 'commerce-cases'
+const templateName = '电商教学案例'
+const templateDescription = '引用当前案例库的匿名教学案例，不在浏览器复制案例数据。'
 
 function isOwner(user: AuthUser) {
   return user.role === 'OWNER'
 }
 
-function canAccessRoom(user: AuthUser, roomId: string) {
-  return user.roomIds.includes(roomId)
+function iso(value: Date | null | undefined) {
+  return value?.toISOString()
 }
 
-function ensureRoomTemplates(state: StoredState, roomIds: string[]) {
-  let changed = false
-  for (const roomId of roomIds) {
-    if (state.templates.some(template => template.roomId === roomId && template.key === 'commerce-cases')) continue
-    state.templates.push({
-      id: `template-commerce-cases-${roomId}`,
-      key: 'commerce-cases',
-      roomId,
-      title: '电商教学案例',
-      description: '引用当前案例库的匿名教学案例，不在浏览器复制案例数据。',
-      status: 'ENABLED',
-      enabled: true,
-      caseCount: commerceCases.length,
-      updatedAt: new Date().toISOString(),
-    })
-    changed = true
+function templateDto(template: any) {
+  return {
+    id: template.id,
+    key: template.templateKey,
+    roomId: template.trainingRoomId,
+    title: template.name,
+    description: templateDescription,
+    status: template.enabled ? 'ENABLED' as TemplateStatus : 'DISABLED' as TemplateStatus,
+    enabled: template.enabled,
+    caseCount: commerceCases.length,
+    updatedAt: iso(template.updatedAt) ?? new Date().toISOString(),
   }
-  return changed
 }
 
-function templateForUser(state: StoredState, user: AuthUser, templateId: string) {
-  const template = state.templates.find(item => item.id === templateId)
-  return template && canAccessRoom(user, template.roomId) ? template : null
+function entryDto(entry: any) {
+  return {
+    id: entry.id,
+    competitionId: entry.competitionId,
+    memberId: entry.memberId,
+    status: entry.status as CompetitionEntryStatus,
+    registeredAt: iso(entry.registeredAt) ?? new Date().toISOString(),
+    submittedAt: iso(entry.submittedAt),
+  }
 }
 
-export function listTemplates(user: AuthUser) {
-  const state = readState()
-  if (ensureRoomTemplates(state, user.roomIds)) writeState(state)
-  const items = state.templates
-    .filter(template => canAccessRoom(user, template.roomId))
-    .filter(template => isOwner(user) || template.enabled)
-    .sort((left, right) => left.title.localeCompare(right.title, 'zh-CN'))
-  return { items: clone(items) }
+function competitionDto(competition: any, entry?: any) {
+  return {
+    id: competition.id,
+    roomId: competition.trainingRoomId,
+    title: competition.name,
+    description: competition.description,
+    status: competition.status as CompetitionStatus,
+    createdBy: competition.createdById,
+    createdAt: iso(competition.createdAt) ?? new Date().toISOString(),
+    publishedAt: iso(competition.publishedAt),
+    myEntry: entry ? entryDto(entry) : null,
+  }
 }
 
-export function getTemplate(user: AuthUser, templateId: string) {
-  const state = readState()
-  if (ensureRoomTemplates(state, user.roomIds)) writeState(state)
-  const template = templateForUser(state, user, templateId)
+async function authorizedRoomIds(user: AuthUser) {
+  if (!user.roomIds.length) return []
+  const rooms = await db.trainingRoom.findMany({ where: { id: { in: user.roomIds } }, select: { id: true } })
+  return rooms.map((room: { id: string }) => room.id)
+}
+
+async function ensureRoomTemplates(roomIds: string[]) {
+  await Promise.all(roomIds.map(trainingRoomId => db.practicumTemplate.upsert({
+    where: { trainingRoomId_templateKey: { trainingRoomId, templateKey } },
+    update: {},
+    create: {
+      trainingRoomId,
+      templateKey,
+      name: templateName,
+      enabled: true,
+      configuration: { source: 'commerce-case-seed', caseCount: commerceCases.length },
+    },
+  })))
+}
+
+async function roomIdsWithTemplates(user: AuthUser) {
+  const roomIds = await authorizedRoomIds(user)
+  await ensureRoomTemplates(roomIds)
+  return roomIds
+}
+
+async function currentStudentMembers(user: AuthUser, roomIds: string[]) {
+  if (!roomIds.length) return []
+  return await db.roomMember.findMany({
+    where: { roomId: { in: roomIds }, displayName: user.displayName, role: 'STUDENT' },
+    select: { id: true, roomId: true },
+  })
+}
+
+export async function listTemplates(user: AuthUser) {
+  const roomIds = await roomIdsWithTemplates(user)
+  const templates = await db.practicumTemplate.findMany({
+    where: { trainingRoomId: { in: roomIds }, ...(isOwner(user) ? {} : { enabled: true }) },
+    orderBy: { name: 'asc' },
+  })
+  return { items: templates.map(templateDto) }
+}
+
+export async function getTemplate(user: AuthUser, templateId: string) {
+  const roomIds = await roomIdsWithTemplates(user)
+  const template = await db.practicumTemplate.findFirst({ where: { id: templateId, trainingRoomId: { in: roomIds } } })
   if (!template) return { kind: 'NOT_FOUND' as const }
   if (!template.enabled) return { kind: 'DISABLED' as const }
-  return { kind: 'OK' as const, template: clone(template) }
+  return { kind: 'OK' as const, template: templateDto(template) }
 }
 
-export function setTemplateEnabled(user: AuthUser, templateId: string, enabled: boolean) {
-  const state = readState()
-  if (ensureRoomTemplates(state, user.roomIds)) writeState(state)
-  const template = templateForUser(state, user, templateId)
+export async function setTemplateEnabled(user: AuthUser, templateId: string, enabled: boolean) {
+  const roomIds = await roomIdsWithTemplates(user)
+  const template = await db.practicumTemplate.findFirst({ where: { id: templateId, trainingRoomId: { in: roomIds } } })
   if (!template) return { kind: 'NOT_FOUND' as const }
   if (!isOwner(user)) return { kind: 'FORBIDDEN' as const }
-  template.enabled = enabled
-  template.status = enabled ? 'ENABLED' : 'DISABLED'
-  template.updatedAt = new Date().toISOString()
-  writeState(state)
-  return { kind: 'OK' as const, template: clone(template) }
+  const updated = await db.practicumTemplate.update({ where: { id: template.id }, data: { enabled } })
+  return { kind: 'OK' as const, template: templateDto(updated) }
 }
 
-function competitionForUser(state: StoredState, user: AuthUser, competitionId: string) {
-  const competition = state.competitions.find(item => item.id === competitionId)
-  return competition && canAccessRoom(user, competition.roomId) ? competition : null
+export async function listCompetitions(user: AuthUser) {
+  const roomIds = await authorizedRoomIds(user)
+  const members = await currentStudentMembers(user, roomIds)
+  const memberIds = members.map((member: { id: string }) => member.id)
+  const competitions = await db.competition.findMany({
+    where: { trainingRoomId: { in: roomIds }, ...(isOwner(user) ? {} : { status: 'PUBLISHED' }) },
+    include: { entries: { where: { memberId: { in: memberIds } } } },
+    orderBy: { createdAt: 'desc' },
+  })
+  return { items: competitions.map((competition: any) => competitionDto(competition, competition.entries[0])) }
 }
 
-function serializeCompetition(competition: Competition, entry?: CompetitionEntry) {
-  return { ...clone(competition), myEntry: entry ? clone(entry) : null }
-}
-
-export function listCompetitions(user: AuthUser) {
-  const state = readState()
-  const items = state.competitions
-    .filter(competition => canAccessRoom(user, competition.roomId))
-    .filter(competition => isOwner(user) || competition.status === 'PUBLISHED')
-    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
-    .map(competition => serializeCompetition(competition, state.entries.find(entry => entry.competitionId === competition.id && entry.studentId === user.id)))
-  return { items }
-}
-
-export function getCompetition(user: AuthUser, competitionId: string) {
-  const state = readState()
-  const competition = competitionForUser(state, user, competitionId)
+export async function getCompetition(user: AuthUser, competitionId: string) {
+  const roomIds = await authorizedRoomIds(user)
+  const members = await currentStudentMembers(user, roomIds)
+  const competition = await db.competition.findFirst({
+    where: { id: competitionId, trainingRoomId: { in: roomIds } },
+    include: { entries: { where: { memberId: { in: members.map((member: { id: string }) => member.id) } } } },
+  })
   if (!competition) return { kind: 'NOT_FOUND' as const }
   if (!isOwner(user) && competition.status !== 'PUBLISHED') return { kind: 'UNAVAILABLE' as const }
-  return {
-    kind: 'OK' as const,
-    competition: serializeCompetition(competition, state.entries.find(entry => entry.competitionId === competition.id && entry.studentId === user.id)),
-  }
+  return { kind: 'OK' as const, competition: competitionDto(competition, competition.entries[0]) }
 }
 
-export function createCompetition(user: AuthUser, input: { roomId: string; title: string; description: string }) {
+export async function createCompetition(user: AuthUser, input: { roomId: string; title: string; description: string }) {
   if (!isOwner(user)) return { kind: 'FORBIDDEN' as const }
-  if (!canAccessRoom(user, input.roomId)) return { kind: 'NOT_FOUND' as const }
+  const roomIds = await authorizedRoomIds(user)
+  if (!roomIds.includes(input.roomId)) return { kind: 'NOT_FOUND' as const }
   const title = input.title.trim()
   const description = input.description.trim()
   if (!title || !description || title.length > 120 || description.length > 2000) return { kind: 'VALIDATION' as const }
-  const state = readState()
-  const competition: Competition = {
-    id: `competition-${randomUUID()}`,
-    roomId: input.roomId,
-    title,
-    description,
-    status: 'DRAFT',
-    createdBy: user.id,
-    createdAt: new Date().toISOString(),
-  }
-  state.competitions.push(competition)
-  writeState(state)
-  return { kind: 'OK' as const, competition: serializeCompetition(competition) }
+  const competition = await db.competition.create({
+    data: { trainingRoomId: input.roomId, createdById: user.id, name: title, description, status: 'DRAFT' },
+  })
+  return { kind: 'OK' as const, competition: competitionDto(competition) }
 }
 
-export function transitionCompetition(user: AuthUser, competitionId: string, action: 'publish' | 'close') {
-  const state = readState()
-  const competition = competitionForUser(state, user, competitionId)
+export async function transitionCompetition(user: AuthUser, competitionId: string, action: 'publish' | 'close') {
+  const roomIds = await authorizedRoomIds(user)
+  const competition = await db.competition.findFirst({ where: { id: competitionId, trainingRoomId: { in: roomIds } } })
   if (!competition) return { kind: 'NOT_FOUND' as const }
   if (!isOwner(user)) return { kind: 'FORBIDDEN' as const }
   if (action === 'publish' && competition.status !== 'DRAFT') return { kind: 'STATE' as const }
   if (action === 'close' && competition.status !== 'PUBLISHED') return { kind: 'STATE' as const }
-  const now = new Date().toISOString()
-  competition.status = action === 'publish' ? 'PUBLISHED' : 'CLOSED'
-  if (action === 'publish') competition.publishedAt = now
-  else competition.closedAt = now
-  writeState(state)
-  return { kind: 'OK' as const, competition: serializeCompetition(competition) }
+  const updated = await db.competition.update({
+    where: { id: competition.id },
+    data: action === 'publish' ? { status: 'PUBLISHED', publishedAt: new Date() } : { status: 'CLOSED' },
+  })
+  return { kind: 'OK' as const, competition: competitionDto(updated) }
 }
 
-export function enterCompetition(user: AuthUser, competitionId: string, statement: string) {
-  const state = readState()
-  const competition = competitionForUser(state, user, competitionId)
+export async function enterCompetition(user: AuthUser, competitionId: string) {
+  if (user.role !== 'STUDENT') return { kind: 'FORBIDDEN' as const }
+  const roomIds = await authorizedRoomIds(user)
+  const competition = await db.competition.findFirst({ where: { id: competitionId, trainingRoomId: { in: roomIds } } })
   if (!competition) return { kind: 'NOT_FOUND' as const }
-  if (isOwner(user) || user.role !== 'STUDENT') return { kind: 'FORBIDDEN' as const }
   if (competition.status !== 'PUBLISHED') return { kind: 'STATE' as const }
-  const normalizedStatement = statement.trim()
-  if (!normalizedStatement || normalizedStatement.length > 4000) return { kind: 'VALIDATION' as const }
-  if (state.entries.some(entry => entry.competitionId === competition.id && entry.studentId === user.id)) return { kind: 'EXISTS' as const }
-  const entry: CompetitionEntry = {
-    id: `competition-entry-${randomUUID()}`,
-    competitionId: competition.id,
-    roomId: competition.roomId,
-    studentId: user.id,
-    statement: normalizedStatement,
-    status: 'SUBMITTED',
-    submittedAt: new Date().toISOString(),
+
+  try {
+    return await db.$transaction(async (client) => {
+      const member = await client.roomMember.upsert({
+        where: { roomId_displayName: { roomId: competition.trainingRoomId, displayName: user.displayName } },
+        update: {},
+        create: { roomId: competition.trainingRoomId, displayName: user.displayName, role: 'STUDENT' },
+      })
+      if (member.role !== 'STUDENT') return { kind: 'FORBIDDEN' as const }
+      const existing = await client.competitionEntry.findUnique({ where: { competitionId_memberId: { competitionId: competition.id, memberId: member.id } } })
+      if (existing) return { kind: 'EXISTS' as const }
+      const entry = await client.competitionEntry.create({
+        data: { competitionId: competition.id, memberId: member.id, status: 'SUBMITTED', submittedAt: new Date() },
+      })
+      return { kind: 'OK' as const, entry: entryDto(entry) }
+    })
+  } catch (error: unknown) {
+    if ((error as { code?: string })?.code === 'P2002') return { kind: 'EXISTS' as const }
+    throw error
   }
-  state.entries.push(entry)
-  writeState(state)
-  return { kind: 'OK' as const, entry: clone(entry) }
 }

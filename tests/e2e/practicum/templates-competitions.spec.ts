@@ -76,24 +76,17 @@ test.describe('templates and competitions API contract', () => {
     await loginAsStudent(student)
     const firstEntry = await student.request.post(`/api/practicum/competitions/${competition.id}/entries`, {
       headers: await csrfHeaders(student),
-      data: { statement: '我会说明目标用户、选品理由与验证方法。' },
     })
     expect(firstEntry.status()).toBe(201)
-    expect((await firstEntry.json()).entry).toEqual(expect.objectContaining({ status: 'SUBMITTED', studentId: expect.any(String) }))
+    expect((await firstEntry.json()).entry).toEqual(expect.objectContaining({ status: 'SUBMITTED', memberId: expect.any(String), submittedAt: expect.any(String) }))
 
-    const duplicate = await student.request.post(`/api/practicum/competitions/${competition.id}/entries`, {
-      headers: await csrfHeaders(student),
-      data: { statement: '重复参赛应被拒绝。' },
-    })
+    const duplicate = await student.request.post(`/api/practicum/competitions/${competition.id}/entries`, { headers: await csrfHeaders(student) })
     expect(duplicate.status()).toBe(409)
     expect((await duplicate.json()).data.code).toBe('COMPETITION_ENTRY_EXISTS')
 
     const closed = await page.request.post(`/api/practicum/competitions/${competition.id}/close`, { headers: await csrfHeaders(page) })
     expect((await closed.json()).competition.status).toBe('CLOSED')
-    const afterClosed = await student.request.post(`/api/practicum/competitions/${competition.id}/entries`, {
-      headers: await csrfHeaders(student),
-      data: { statement: '比赛关闭后不能参赛。' },
-    })
+    const afterClosed = await student.request.post(`/api/practicum/competitions/${competition.id}/entries`, { headers: await csrfHeaders(student) })
     expect(afterClosed.status()).toBe(409)
     expect((await afterClosed.json()).data.code).toBe('COMPETITION_STATE_INVALID')
     await studentContext.close()

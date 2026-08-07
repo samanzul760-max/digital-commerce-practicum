@@ -6,7 +6,7 @@
           <div>
             <p class="eyebrow">实战挑战</p>
             <h1>实训比赛</h1>
-            <p>管理员在授权实训室创建和发布比赛；学生对每场已发布比赛只能提交一次参赛说明。</p>
+            <p>管理员在授权实训室创建和发布比赛；学生对每场已发布比赛只能确认参赛一次。</p>
           </div>
           <button v-if="isOwner" data-open-competition-form class="primary-button" type="button" :disabled="loading" @click="showCreate = !showCreate">
             新建比赛
@@ -39,11 +39,11 @@
               <button v-else-if="competition.status === 'PUBLISHED'" data-close-competition class="danger-button" type="button" :disabled="saving" @click="transitionCompetition(competition.id, 'close')">关闭比赛</button>
             </div>
 
-            <section v-else-if="competition.myEntry" data-competition-entry class="entry-summary"><strong>已参赛</strong><p>{{ competition.myEntry.statement }}</p><small>{{ formatTime(competition.myEntry.submittedAt) }}</small></section>
-            <form v-else-if="competition.status === 'PUBLISHED'" data-competition-entry-form class="entry-form" @submit.prevent="enterCompetition(competition.id)">
-              <label class="field">参赛说明<textarea v-model.trim="entryStatements[competition.id]" rows="4" maxlength="4000" placeholder="说明你的方案、目标和执行思路" required></textarea></label>
-              <button data-enter-competition class="primary-button" type="submit" :disabled="saving">提交参赛</button>
-            </form>
+            <section v-else-if="competition.myEntry" data-competition-entry class="entry-summary"><strong>已确认参赛</strong><p>你的参赛记录已由服务端保存，不能重复提交。</p><small>{{ formatTime(competition.myEntry.submittedAt ?? competition.myEntry.registeredAt) }}</small></section>
+            <div v-else-if="competition.status === 'PUBLISHED'" data-competition-entry-form class="entry-form">
+              <p>确认后会在当前实训室创建一条个人参赛记录，不能重复提交。</p>
+              <button data-enter-competition class="primary-button" type="button" :disabled="saving" @click="enterCompetition(competition.id)">确认参赛</button>
+            </div>
           </article>
         </div>
       </section>
@@ -55,7 +55,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 
 type CompetitionStatus = 'DRAFT' | 'PUBLISHED' | 'CLOSED'
-interface CompetitionEntry { statement: string; submittedAt: string }
+interface CompetitionEntry { registeredAt: string; submittedAt?: string }
 interface CompetitionItem { id: string; roomId: string; title: string; description: string; status: CompetitionStatus; createdAt: string; myEntry: CompetitionEntry | null }
 
 const auth = useAuthSession()
@@ -65,7 +65,6 @@ const saving = ref(false)
 const error = ref(false)
 const formError = ref('')
 const showCreate = ref(false)
-const entryStatements = reactive<Record<string, string>>({})
 const roomIds = computed(() => auth.state.value.user?.roomIds ?? [])
 const isOwner = computed(() => auth.state.value.user?.role === 'OWNER')
 const newCompetition = reactive({ roomId: '', title: '', description: '' })
@@ -114,10 +113,10 @@ async function transitionCompetition(id: string, action: 'publish' | 'close') {
 }
 
 async function enterCompetition(id: string) {
-  if (saving.value || !entryStatements[id]?.trim()) return
+  if (saving.value) return
   saving.value = true
   try {
-    await $fetch(`/api/practicum/competitions/${id}/entries`, { method: 'POST', headers: useCsrfHeaders(), body: { statement: entryStatements[id] } })
+    await $fetch(`/api/practicum/competitions/${id}/entries`, { method: 'POST', headers: useCsrfHeaders() })
     await loadCompetitions()
   } catch {
     error.value = true
