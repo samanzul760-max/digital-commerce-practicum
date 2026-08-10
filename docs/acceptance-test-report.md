@@ -10,6 +10,21 @@
 - 阶段 A 本地 Git 提交：`6b8c4a818ae26f72d67d615ed452d141568b2db4`（`phase-A: auth roles and application shells`）。
 - `node --test tests/runtime/isolated-e2e-fixtures-contract.test.mjs`: 2/3 通过；未通过项是测试仍断言旧的全局初始化班级查询，但当前初始化已改为管理员登录建会话。该过期断言未改动，不作为本阶段账号闭环的通过证据。
 
+## 2026-08-07 Compilation Repair Verification
+
+- `npx.cmd prisma generate`: passed; regenerated the local client without a database migration or database write.
+- `npm.cmd run typecheck`: passed in 14.6 s.
+- `$env:NUXT_IGNORE_LOCK='1'; npm.cmd run build`: passed in 36.5 s.
+- `npx.cmd playwright test tests/e2e/practicum/three-role-integrated-closure.spec.ts --list`: passed; 3 tests discovered.
+- Runtime Playwright scenarios remain `UNVERIFIED`: their current global setup deletes `.data-e2e` and invokes persistent server APIs, which is outside this repair pass's no-data-change boundary.
+
+## 2026-08-07 Isolated E2E Setup
+
+- Added `scripts/run-isolated-e2e.mjs`: each run uses a unique `.artifacts/practicum-e2e/<run-id>/` directory, rejects non-loopback PostgreSQL URLs and shared database names, and uses port `4186` without clearing shared ports.
+- Added `tests/runtime/isolated-e2e-contract.test.mjs`: 3/3 passed.
+- One runtime attempt, `npm.cmd run test:e2e:isolated`, stopped before browser startup because Docker Compose could not infer a project name from the Chinese workspace directory. The runner now supplies an explicit ASCII project name. The browser flow was not retried under the single-run rule.
+- No test database was created and no migration was executed by that failed runtime attempt. Runtime user-flow acceptance remains `UNVERIFIED`.
+
 ## 验收范围
 
 本报告覆盖当前已实现切片：阶段 A 基础工作台能力、既有学习与管理原型，以及本次新增的服务端账号认证与 session。测试针对本地环境，不代表多实例生产存储或完整业务 API 已完成。
@@ -107,6 +122,28 @@ TDD 证据：`npx.cmd playwright test tests/e2e/practicum/auth-bootstrap.spec.ts
 
 ## 本轮全量回归
 
+## 2026-08-07 Isolated three-role browser verification
+
+`npm.cmd run test:e2e:isolated` was run once for `tests/e2e/practicum/three-role-integrated-closure.spec.ts`. It stopped with exit code `1` after 2.4 seconds, before it could create the isolated test database, apply migrations, start Nuxt on port `4186`, or run a browser case. The runner's Docker Compose command conflicts with the existing healthy local container name `digital-commerce-practicum-postgres`.
+
+Post-run read-only checks found no `practicum_e2e_*` database and no listeners on ports `3001` or `4186`. The existing PostgreSQL container stayed healthy. The run artifacts remain in `.artifacts/practicum-e2e/run-2026-08-07t05-18-45-480z/`; its Compose-created network and volume were retained rather than deleted. Under the single-run rule, there was no retry. Result: the student, teacher, and administrator integrated browser flows are `UNVERIFIED`.
+
+### Runner repair evidence
+
+The failed command exposed a test-runner defect rather than a business-flow defect. A new contract assertion first failed because `scripts/run-isolated-e2e.mjs` still called Compose and did not verify the existing container state. After the minimal repair, `node --test tests/runtime/isolated-e2e-contract.test.mjs` passed `3/3`, and `node --check scripts/run-isolated-e2e.mjs` passed. The runner now reads the existing container's running state and then uses `pg_isready`; it does not call Compose. No browser test was rerun in this repair step, so the three-role journey remains `UNVERIFIED`.
+
+### Second isolated execution window
+
+The repaired command was run once. It created the isolated local database `practicum_e2e_run_2026_08_07t05_24_32_490z`, applied all 9 migrations, and completed Nuxt's client and server build. It then stopped after the `/practicum` SSR readiness probe timed out at 90 seconds, before Playwright started. The server process released port `4186`; the test database and `.artifacts/practicum-e2e/run-2026-08-07t05-24-32-490z/` evidence remain retained.
+
+A second TDD repair changed the readiness probe to `/api/auth/session`, accepting the expected unauthenticated `401` as proof that Nuxt is responding. The updated runner contract passed `3/3`, and its syntax check passed. The browser flow was not rerun after this repair, so student, teacher, and administrator integrated browser acceptance remains `UNVERIFIED`.
+
+### Dedicated isolation hardening
+
+The later safety review found that the runner still used the shared local PostgreSQL container and lacked deterministic empty-database fixtures. The runner now provisions only a run-labelled dedicated PostgreSQL container, uses a random loopback port, creates the run-matched database before migrations, seeds deterministic organization, room, member, teacher-class, enabled-template, and published-competition records, rejects retry flags, and retains test evidence. The combined runtime and fixture contract suite passes `8/8`; `npm.cmd run typecheck` passes.
+
+One new single browser-validation window was attempted with the dedicated runner. It stopped after 23.5 seconds while Docker attempted to start `postgres:16-alpine`, which is not available in the local image cache; no dedicated container, database, migration, Nuxt server, or Playwright browser case was created. The runner was corrected to use the project image `postgres:17`, and the contracts remain `8/8` passing. The command was not retried under the one-run rule. Student, teacher, and administrator browser acceptance remains `UNVERIFIED`.
+
 `npx.cmd playwright test tests/e2e/practicum --reporter=list` 于 2026-07-28 完成，结果为 145 passed、5 failed，耗时约 4.7 分钟，故全量门禁为 `FAILED`。
 
 - `student-activities-s3-010.spec.ts`：等待瞬时 `[data-loading]` 状态失败。
@@ -167,6 +204,22 @@ Quality gate: `npm.cmd run typecheck` passed. The complete Playwright suite and 
 
 `teacher-review.spec.ts` first timed out while an OWNER session attempted to render student-only local practice controls. The queue field scenario now creates an authenticated STUDENT submission through `/api/practicum/submissions`, then verifies the OWNER review queue from a separate authenticated context. `npx.cmd playwright test tests/e2e/practicum/teacher-review.spec.ts --grep "owner sees complete submission fields" --reporter=list` passed 1/1. The remaining review filter, return, revision, and grading legacy cases are still being migrated and are not marked as complete.
 
+## 2026-08-10 LearnEC 阶段 D：批阅、评分与学情闭环
+
+验收范围严格限定为阶段 D：ADMIN 在授权班级内查看提交证据、按 70/30 权重评分并保存不可变评分修订、带反馈退回、学生重新提交新版本、班级学情聚合和服务端 `.xlsx` 成绩导出。未实现阶段 E 的公共实训中心、赛考业务或其它占位模块；任务、提交、成绩、权限与导出审计均以 Prisma/PostgreSQL 为事实来源。
+
+| 验收项 | 命令或路径 | 结果 |
+|---|---|---|
+| 阶段 D 隔离闭环 | `npm.cmd run test:e2e:isolated -- tests/e2e/practicum/phase-d-review-data.spec.ts` | PASS；13 个迁移成功，Playwright 5/5 通过 |
+| 评分与审计 | 自动/人工加权、两次评分修订、必填退回反馈、`.xlsx` ZIP 头和导出 AuditEvent | PASS |
+| 权限与并发 | STUDENT 管理端 API 拒绝、同实训室非本班教职 ADMIN 队列隔离、评分/退回竞态返回单一 200 和单一 409 | PASS |
+| 版本与响应式 | 退回后重提生成版本 2；`/admin/reviews`、`/admin/data` 在 390x844 下 `scrollWidth - clientWidth = 0` | PASS |
+| 类型门禁 | `npm.cmd run typecheck` | PASS |
+| 生产构建 | `$env:NUXT_IGNORE_LOCK='1'; npm.cmd run build` | PASS；Nuxt 3.21.8 / Nitro 2.13.4 构建成功 |
+| 4310 服务 | `node .output/server/index.mjs` with `PORT/NITRO_PORT=4310`；`http://127.0.0.1:4310/admin/reviews` | PASS；HTTP 200 |
+
+残余风险：本轮没有运行历史全量 Playwright 套件，也没有部署生产环境；两者不属于阶段 D 的本地验收范围。Prisma 7 配置弃用与 Node 模块 exports 弃用警告不影响本次门禁结果。阶段 D 本地提交标签为 `phase-D: review grading and learning analytics closure`。
+
 ## 2026-08-01 Task dependency unlock slice
 
 | BDD | RED | GREEN | Result |
@@ -184,6 +237,20 @@ Focused verification: `npx.cmd playwright test tests/e2e/practicum/task-dependen
 | `SB-SUB-002` repeated submission key | A second request with the same `Idempotency-Key` created version `2`; the test expected the original version `1`. | The API now records the first submission in `SubmissionIdempotencyKey` under a database uniqueness constraint and returns that submission on retry. | A retry produces no additional immutable version. |
 
 Migration: `20260801090000_submission_idempotency` adds `SubmissionIdempotencyKey`, its scoped unique index, and a cascading foreign key to `Submission`. `npx.cmd prisma migrate deploy` applied the migration; `npx.cmd prisma migrate status` then reported the database schema up to date. Focused verification: `npx.cmd playwright test tests/e2e/practicum/task-dependency-api.spec.ts --reporter=list` passed 4/4 and `npm.cmd run typecheck` passed. Broader regression, build, concurrent duplicate-request coverage, and a rollback script remain `PARTIAL`.
+
+## 2026-08-07 Isolated Three-Role Browser Acceptance
+
+The Windows Nuxt development server was reproducibly able to listen while timing out every HTTP request. The isolated runner now builds the current workspace and starts the generated local Nitro server instead. A RED runtime contract first failed because the runner still invoked `nuxi dev`; the updated contract passed with the production-server requirement.
+
+`npm.cmd run test:e2e:isolated` then passed once in 79.4 seconds. The run created only a labelled loopback PostgreSQL container, a random local port, and database `practicum_e2e_run_2026_08_07t06_33_31_852z`; it applied 9 migrations, seeded deterministic fixtures, built Nuxt, and passed all three Playwright cases:
+
+- `J-TEACHER-01`: teacher enters an assigned classroom workbench.
+- `J-ADMIN-01`: owner reaches room settings, templates, and competitions.
+- `J-STUDENT-01`: student reaches only server-granted competition and template surfaces.
+
+The run evidence is retained in `.artifacts/practicum-e2e/run-2026-08-07t06-33-31-852z/`. After completion, the labelled temporary container and the test listener were removed. Read-only post-run checks found no listener on 3001 or 4186; the default `digital-commerce-practicum-postgres` container remained healthy. No deployment, SSH, production-server operation, or default-database operation was performed.
+
+Verification also passed: `node --test tests/runtime/isolated-e2e-contract.test.mjs tests/runtime/isolated-e2e-fixtures-contract.test.mjs` (8/8) and `npm.cmd run typecheck`.
 
 ## 2026-08-01 Progress, audit and frontend bridge slice
 
@@ -214,3 +281,23 @@ Database migrations `20260801103000_grade_revisions` and `20260801110000_learnin
 阶段 B 实现提交为 `0a173eb6d17370929c3c31b854a59a1f5ee64d93`（`phase-B: work-order authoring and publication`）。
 
 残余风险：本轮没有执行历史全量 Playwright 套件，也没有部署生产环境；这两项不属于本次阶段 B 本地验收范围。Prisma 命令提示 `package.json#prisma` 将在 Prisma 7 弃用，但不影响当前 Prisma 6.19.0 验收结果。阶段 B 本地服务验收地址为 `http://127.0.0.1:4310`。
+
+## 2026-08-10 LearnEC 阶段 C：学生作业与多子沙盘
+
+验收范围严格限定为阶段 C：STUDENT 读取本人 `StudentTask`、按状态筛选、进入左侧指导书/右侧工作台、切换五类受控沙盘、保存数据库草稿与证据快照、由服务端拦截缺项，并将最终结果幂等写入 `Submission`、`SubmissionVersion` 与 `SubmissionPart`。未实现阶段 D 的批阅与学情分析，也未实现阶段 E 的赛考引擎。
+
+| 验收项 | 命令或路径 | 结果 |
+|---|---|---|
+| Prisma 合同 | `npx.cmd prisma format`、`npx.cmd prisma validate`、`npx.cmd prisma generate` | PASS；新增沙盘会话、快照与分区提交模型 |
+| 阶段 C 隔离闭环 | `npm.cmd run test:e2e:isolated -- tests/e2e/practicum/phase-c-student-sandbox.spec.ts` | PASS；12 个迁移成功，Playwright 4/4 通过 |
+| 权限与数据隔离 | STUDENT 本人任务、ADMIN 越权、他人任务 404、`studentTaskId` 快照断言 | PASS |
+| 提交门禁 | 五模块缺项汇总、完整提交、相同幂等键重放 | PASS；首次版本保持 `1` |
+| 类型门禁 | `npm.cmd run typecheck` | PASS |
+| 生产构建 | `$env:NUXT_IGNORE_LOCK='1'; npm.cmd run build` | PASS；Nuxt 3.21.8 / Nitro 2.13.4 构建成功 |
+| 默认本地数据库 | `npx.cmd prisma migrate deploy`、`npm.cmd run db:seed` | PASS；阶段 C migration 与五沙盘 Seed 工单已应用 |
+| 4310 真实浏览器 | `student1` 登录后访问 `/center/assignments` 与 `/center/tasks/:id/sandbox` | PASS；Seed 工单 1 条、沙盘页签 5 个 |
+| 响应式 | 390x844 真实页面与 Playwright 溢出断言 | PASS；`scrollWidth - clientWidth = 0` |
+
+验收截图：`output/playwright/phase-c-assignment-center.png`、`output/playwright/phase-c-sandbox-desktop.png`、`output/playwright/phase-c-sandbox-mobile.png`。阶段 C 本地验收地址为 `http://127.0.0.1:4310`；实现提交将在用户验收通过后单独创建。
+
+残余风险：本轮只执行阶段 C 专项 Playwright 套件，没有宣称历史全量 Playwright 套件通过，也未部署生产环境。Prisma 7 的 seed 配置弃用提示不影响当前 Prisma 6.19.0 结果。

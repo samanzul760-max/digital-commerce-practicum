@@ -620,6 +620,10 @@ model Grade {
   submissionId String          @unique
   reviewerId   String
   feedback     String
+  autoScore    Decimal         @default(0) @db.Decimal(6, 2)
+  manualScore  Decimal         @default(0) @db.Decimal(6, 2)
+  autoWeight   Decimal         @default(70) @db.Decimal(5, 2)
+  manualWeight Decimal         @default(30) @db.Decimal(5, 2)
   score        Decimal         @db.Decimal(6, 2)
   gradedAt     DateTime        @default(now())
   submission   Submission      @relation(fields: [submissionId], references: [id], onDelete: Cascade)
@@ -628,14 +632,18 @@ model Grade {
 }
 
 model GradeRevision {
-  id         String   @id @default(cuid())
-  gradeId    String
-  revision   Int
-  reviewerId String
-  feedback   String
-  score      Decimal  @db.Decimal(6, 2)
-  createdAt  DateTime @default(now())
-  grade      Grade    @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  id           String   @id @default(cuid())
+  gradeId      String
+  revision     Int
+  reviewerId   String
+  feedback     String
+  autoScore    Decimal  @default(0) @db.Decimal(6, 2)
+  manualScore  Decimal  @default(0) @db.Decimal(6, 2)
+  autoWeight   Decimal  @default(70) @db.Decimal(5, 2)
+  manualWeight Decimal  @default(30) @db.Decimal(5, 2)
+  score        Decimal  @db.Decimal(6, 2)
+  createdAt    DateTime @default(now())
+  grade        Grade    @relation(fields: [gradeId], references: [id], onDelete: Cascade)
 
   @@unique([gradeId, revision])
   @@index([gradeId, createdAt])
