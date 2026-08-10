@@ -1,5 +1,5 @@
 import { randomBytes, scryptSync } from 'node:crypto'
-import { PrismaClient, UserRole } from '@prisma/client'
+import { PrismaClient, ResourceSource, UserRole } from '@prisma/client'
 import { fileURLToPath } from 'node:url'
 
 const loopbackHosts = new Set(['127.0.0.1', 'localhost', '::1'])
@@ -87,6 +87,16 @@ async function seedFixtures(prisma) {
       name: 'E2E Teacher Class',
     },
   })
+  const foreignRoom = await prisma.trainingRoom.upsert({
+    where: { id: 'room-e2e-foreign' },
+    update: { organizationId: organization.id, name: 'E2E 未授权实训室' },
+    create: { id: 'room-e2e-foreign', organizationId: organization.id, name: 'E2E 未授权实训室' },
+  })
+  await prisma.class.upsert({
+    where: { id: 'class-e2e-foreign' },
+    update: { organizationId: organization.id, roomId: foreignRoom.id, cohortId: cohort.id, name: 'E2E 未授权班级' },
+    create: { id: 'class-e2e-foreign', organizationId: organization.id, roomId: foreignRoom.id, cohortId: cohort.id, name: 'E2E 未授权班级' },
+  })
 
   const adminPassword = process.env.SEED_ADMIN_PASSWORD
   const studentPassword = process.env.SEED_STUDENT1_PASSWORD
@@ -117,6 +127,24 @@ async function seedFixtures(prisma) {
     where: { classId_userId: { classId: classroom.id, userId: student.id } },
     update: { role: 'STUDENT', active: true },
     create: { classId: classroom.id, userId: student.id, role: 'STUDENT', active: true },
+  })
+
+  const resources = [
+    { id: 'resource-e2e-software', source: ResourceSource.SOFTWARE_CENTER, title: 'E2E 网店开通', summary: '软件中心测试资源', capabilityTags: ['开店'], configuration: { sectionType: 'SANDBOX', sandboxType: 'STORE_BASICS', appKey: 'store-basics' } },
+    { id: 'resource-e2e-camp', source: ResourceSource.SKILL_CAMP, title: 'E2E 店铺基础训练', summary: '技能训练营测试资源', capabilityTags: ['设置'], configuration: { sectionType: 'SANDBOX', sandboxType: 'STORE_BASICS', appKey: 'store-basics' } },
+    { id: 'resource-e2e-enterprise', source: ResourceSource.ENTERPRISE_TASK_LIBRARY, title: 'E2E 企业经营任务', summary: '企业任务库测试资源', capabilityTags: ['分析'], configuration: { sectionType: 'SANDBOX', sandboxType: 'BUSINESS_ANALYTICS', appKey: 'business-analytics' } },
+  ]
+  for (const resource of resources) {
+    await prisma.resourceCatalogItem.upsert({ where: { id: resource.id }, update: resource, create: resource })
+  }
+
+  await prisma.workOrderTemplate.upsert({
+    where: { id: 'template-e2e-work-order' },
+    update: { organizationId: organization.id, title: 'E2E 预置工单', description: '隔离测试模板', createdById: admin.id },
+    create: {
+      id: 'template-e2e-work-order', organizationId: organization.id, title: 'E2E 预置工单', description: '隔离测试模板', createdById: admin.id,
+      sectionsSnapshot: [{ clientKey: 'work-order', type: 'WORK_ORDER', title: 'E2E 预置工单', description: '隔离测试区块', sort: 0, required: true, weightPercent: 0 }],
+    },
   })
 
   for (const member of fixture.members) {

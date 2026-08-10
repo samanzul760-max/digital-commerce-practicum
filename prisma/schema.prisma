@@ -59,6 +59,49 @@ enum FreightChargeType {
   WEIGHT
 }
 
+enum ResourceSource {
+  SOFTWARE_CENTER
+  SKILL_CAMP
+  ENTERPRISE_TASK_LIBRARY
+}
+
+enum SandboxType {
+  STORE_BASICS
+  PRODUCT_MANAGEMENT
+  STORE_DECORATION
+  MARKETING
+  BUSINESS_ANALYTICS
+}
+
+enum TrainingRoomType {
+  TEACHING
+  COMPETITION
+  CERTIFICATION
+}
+
+enum TaskSectionType {
+  WORK_ORDER
+  MEDIA
+  QUIZ
+  SANDBOX
+}
+
+enum MediaKind {
+  PPT
+  VIDEO
+  PDF
+  IMAGE
+  LINK
+}
+
+enum QuestionType {
+  SINGLE
+  MULTIPLE
+  TRUE_FALSE
+  FILL_BLANK
+  SHORT_ANSWER
+}
+
 model Organization {
   id        String         @id @default(cuid())
   name      String
@@ -69,20 +112,21 @@ model Organization {
 }
 
 model TrainingRoom {
-  id             String         @id @default(cuid())
-  organizationId String
-  name           String
-  organization   Organization   @relation(fields: [organizationId], references: [id])
-  classes        Class[]
-  virtualGroups  VirtualGroup[]
-  members        RoomMember[]
-  stores         Store[]
-  setting        TrainingRoomSetting?
+  id               String               @id @default(cuid())
+  organizationId   String
+  name             String
+  type             TrainingRoomType     @default(TEACHING)
+  organization     Organization         @relation(fields: [organizationId], references: [id])
+  classes          Class[]
+  virtualGroups    VirtualGroup[]
+  members          RoomMember[]
+  stores           Store[]
+  setting          TrainingRoomSetting?
   joinApplications JoinApplication[]
-  memberInvites  MemberInvite[]
-  auditEvents    AuditEvent[]
-  templates      PracticumTemplate[]
-  competitions   Competition[]
+  memberInvites    MemberInvite[]
+  auditEvents      AuditEvent[]
+  templates        PracticumTemplate[]
+  competitions     Competition[]
 
   @@index([organizationId])
 }
@@ -161,39 +205,39 @@ model FreightTemplate {
 }
 
 model VirtualGroup {
-  id        String       @id @default(cuid())
-  roomId    String
-  name      String
-  room      TrainingRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  members   RoomMember[]
-  announcements ClassAnnouncement[]
+  id               String              @id @default(cuid())
+  roomId           String
+  name             String
+  room             TrainingRoom        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  members          RoomMember[]
+  announcements    ClassAnnouncement[]
   joinApplications JoinApplication[]
-  memberInvites MemberInvite[]
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  memberInvites    MemberInvite[]
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
 
   @@unique([roomId, name])
   @@index([roomId])
 }
 
 model RoomMember {
-  id                String         @id @default(cuid())
-  roomId            String
-  displayName       String
-  role              RoomMemberRole @default(STUDENT)
-  groupId           String?
-  isDemo            Boolean        @default(false)
-  completionPercent Int            @default(0)
-  gradedCount       Int            @default(0)
-  avgScore          Int            @default(0)
-  skillMetrics      Json           @default("[]")
-  planProgress      Json           @default("[]")
-  room              TrainingRoom   @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  group             VirtualGroup?  @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  id                 String              @id @default(cuid())
+  roomId             String
+  displayName        String
+  role               RoomMemberRole      @default(STUDENT)
+  groupId            String?
+  isDemo             Boolean             @default(false)
+  completionPercent  Int                 @default(0)
+  gradedCount        Int                 @default(0)
+  avgScore           Int                 @default(0)
+  skillMetrics       Json                @default("[]")
+  planProgress       Json                @default("[]")
+  room               TrainingRoom        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  group              VirtualGroup?       @relation(fields: [groupId], references: [id], onDelete: SetNull)
   activityExecutions ActivityExecution[]
   competitionEntries CompetitionEntry[]
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 
   @@unique([roomId, displayName])
   @@index([roomId, role])
@@ -213,17 +257,17 @@ model Cohort {
 }
 
 model Class {
-  id              String            @id @default(cuid())
-  organizationId  String
-  roomId          String
-  cohortId        String
-  name            String
-  organization    Organization      @relation(fields: [organizationId], references: [id])
-  room            TrainingRoom      @relation(fields: [roomId], references: [id])
-  cohort          Cohort            @relation(fields: [cohortId], references: [id])
-  enrollments     ClassEnrollment[]
-  planAssignments PlanAssignment[]
-  announcements   ClassAnnouncement[]
+  id               String              @id @default(cuid())
+  organizationId   String
+  roomId           String
+  cohortId         String
+  name             String
+  organization     Organization        @relation(fields: [organizationId], references: [id])
+  room             TrainingRoom        @relation(fields: [roomId], references: [id])
+  cohort           Cohort              @relation(fields: [cohortId], references: [id])
+  enrollments      ClassEnrollment[]
+  planAssignments  PlanAssignment[]
+  announcements    ClassAnnouncement[]
   teachingSessions TeachingSession[]
 
   @@unique([cohortId, name])
@@ -243,20 +287,163 @@ model ClassEnrollment {
 }
 
 model PlanAssignment {
-  id              String                         @id @default(cuid())
-  classId         String
-  planId          String
-  title           String
-  status          AssignmentStatus               @default(DRAFT)
-  availableAt     DateTime
-  dueAt           DateTime?
-  lateAllowed     Boolean                        @default(false)
-  class           Class                          @relation(fields: [classId], references: [id], onDelete: Cascade)
-  tasks           StudentTask[]
-  dependencies    TaskDependency[]
-  idempotencyKeys PlanAssignmentIdempotencyKey[]
+  id                String                         @id @default(cuid())
+  classId           String
+  planId            String
+  title             String
+  description       String                         @default("")
+  templateId        String?
+  status            AssignmentStatus               @default(DRAFT)
+  availableAt       DateTime
+  dueAt             DateTime?
+  lateAllowed       Boolean                        @default(false)
+  autoScoreWeight   Decimal                        @default(70) @db.Decimal(5, 2)
+  manualScoreWeight Decimal                        @default(30) @db.Decimal(5, 2)
+  timeLimitMinutes  Int?
+  assignmentVersion Int                            @default(1)
+  publishedSnapshot Json                           @default("{}")
+  publishedAt       DateTime?
+  class             Class                          @relation(fields: [classId], references: [id], onDelete: Cascade)
+  template          WorkOrderTemplate?             @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  tasks             StudentTask[]
+  sections          TaskSection[]
+  dependencies      TaskDependency[]
+  idempotencyKeys   PlanAssignmentIdempotencyKey[]
 
   @@index([classId, status])
+  @@index([templateId])
+}
+
+model ResourceCatalogItem {
+  id             String         @id @default(cuid())
+  source         ResourceSource
+  title          String
+  summary        String         @default("")
+  capabilityTags Json           @default("[]")
+  version        Int            @default(1)
+  enabled        Boolean        @default(true)
+  configuration  Json           @default("{}")
+  taskSections   TaskSection[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([source, enabled])
+}
+
+model WorkOrderTemplate {
+  id                  String           @id @default(cuid())
+  organizationId      String
+  title               String
+  description         String           @default("")
+  defaultAutoWeight   Decimal          @default(70) @db.Decimal(5, 2)
+  defaultManualWeight Decimal          @default(30) @db.Decimal(5, 2)
+  sectionsSnapshot    Json
+  createdById         String
+  idempotencyKey      String?
+  assignments         PlanAssignment[]
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  @@unique([createdById, idempotencyKey])
+  @@index([organizationId, title])
+}
+
+model TaskSection {
+  id            String               @id @default(cuid())
+  assignmentId  String
+  type          TaskSectionType
+  parentId      String?
+  resourceId    String?
+  title         String
+  description   String               @default("")
+  sort          Int
+  required      Boolean              @default(true)
+  weightPercent Decimal              @default(0) @db.Decimal(5, 2)
+  config        Json                 @default("{}")
+  assignment    PlanAssignment       @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  parent        TaskSection?         @relation("TaskSectionTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children      TaskSection[]        @relation("TaskSectionTree")
+  resource      ResourceCatalogItem? @relation(fields: [resourceId], references: [id], onDelete: SetNull)
+  mediaItems    MediaResource[]
+  questions     TaskQuestion[]
+  sandboxSpec   SandboxSpec?
+
+  @@unique([assignmentId, sort])
+  @@index([assignmentId, type])
+  @@index([parentId])
+  @@index([resourceId])
+}
+
+model MediaResource {
+  id          String      @id @default(cuid())
+  sectionId   String
+  kind        MediaKind
+  title       String
+  url         String?
+  storageKey  String?
+  mimeType    String?
+  durationSec Int?
+  sort        Int
+  metadata    Json        @default("{}")
+  section     TaskSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@unique([sectionId, sort])
+}
+
+model TaskQuestion {
+  id          String       @id @default(cuid())
+  sectionId   String
+  type        QuestionType
+  prompt      String
+  options     Json         @default("[]")
+  answerKey   Json         @default("{}")
+  explanation String       @default("")
+  points      Decimal      @db.Decimal(6, 2)
+  sort        Int
+  required    Boolean      @default(true)
+  section     TaskSection  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@unique([sectionId, sort])
+  @@index([sectionId, type])
+}
+
+model SandboxSpec {
+  id          String              @id @default(cuid())
+  sectionId   String              @unique
+  sandboxType SandboxType
+  appKey      String
+  version     Int                 @default(1)
+  config      Json                @default("{}")
+  steps       SandboxStep[]
+  rubricItems SandboxRubricItem[]
+  section     TaskSection         @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+}
+
+model SandboxStep {
+  id          String      @id @default(cuid())
+  sandboxId   String
+  title       String
+  instruction String
+  sort        Int
+  required    Boolean     @default(true)
+  fields      Json        @default("[]")
+  evidenceKey String?
+  sandbox     SandboxSpec @relation(fields: [sandboxId], references: [id], onDelete: Cascade)
+
+  @@unique([sandboxId, sort])
+}
+
+model SandboxRubricItem {
+  id          String      @id @default(cuid())
+  sandboxId   String
+  title       String
+  description String
+  points      Decimal     @db.Decimal(6, 2)
+  stepId      String?
+  sort        Int
+  sandbox     SandboxSpec @relation(fields: [sandboxId], references: [id], onDelete: Cascade)
+
+  @@unique([sandboxId, sort])
 }
 
 model PlanAssignmentIdempotencyKey {
@@ -434,18 +621,18 @@ model UserRoleGrant {
 }
 
 model AuthSession {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   userId         String
-  tokenHash      String   @unique
+  tokenHash      String    @unique
   csrfTokenHash  String
   activeRole     UserRole
   organizationId String?
   roomId         String?
   expiresAt      DateTime
   revokedAt      DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, expiresAt])
   @@index([expiresAt])
@@ -466,20 +653,20 @@ model TrainingRoomSetting {
 }
 
 model ClassAnnouncement {
-  id            String        @id @default(cuid())
-  classId       String
-  targetGroupId String?
-  authorId      String
+  id             String        @id @default(cuid())
+  classId        String
+  targetGroupId  String?
+  authorId       String
   idempotencyKey String
-  title         String
-  body          String
-  status        String        @default("DRAFT")
-  publishedAt   DateTime?
-  closedAt      DateTime?
-  class         Class         @relation(fields: [classId], references: [id], onDelete: Cascade)
-  targetGroup   VirtualGroup? @relation(fields: [targetGroupId], references: [id], onDelete: SetNull)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  title          String
+  body           String
+  status         String        @default("DRAFT")
+  publishedAt    DateTime?
+  closedAt       DateTime?
+  class          Class         @relation(fields: [classId], references: [id], onDelete: Cascade)
+  targetGroup    VirtualGroup? @relation(fields: [targetGroupId], references: [id], onDelete: SetNull)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   @@unique([classId, authorId, idempotencyKey])
   @@index([classId, status])
@@ -487,18 +674,18 @@ model ClassAnnouncement {
 }
 
 model TeachingSession {
-  id                String              @id @default(cuid())
-  classId           String
-  startedById       String
-  currentActivityId String?
-  status            String              @default("ACTIVE")
-  idempotencyKey    String
-  startedAt         DateTime            @default(now())
-  endedAt           DateTime?
-  class             Class               @relation(fields: [classId], references: [id], onDelete: Cascade)
+  id                 String              @id @default(cuid())
+  classId            String
+  startedById        String
+  currentActivityId  String?
+  status             String              @default("ACTIVE")
+  idempotencyKey     String
+  startedAt          DateTime            @default(now())
+  endedAt            DateTime?
+  class              Class               @relation(fields: [classId], references: [id], onDelete: Cascade)
   activityExecutions ActivityExecution[]
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 
   @@unique([classId, idempotencyKey])
   @@index([classId, status])

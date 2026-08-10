@@ -3,7 +3,7 @@
     <header class="learnec-header">
       <NuxtLink :to="home" class="learnec-brand">LearnEC <span>高校电商教学实训平台</span></NuxtLink>
       <nav class="learnec-nav" :aria-label="role === 'ADMIN' ? '管理端主导航' : '学生端主导航'">
-        <NuxtLink v-for="item in menu" :key="item.key" :to="item.to" data-learnec-menu :data-menu-key="item.key" :class="{ active: route.path === item.to }">
+        <NuxtLink v-for="item in menu" :key="item.key" :to="item.to" data-learnec-menu :data-menu-key="item.key" :class="{ active: isActive(item) }">
           {{ item.label }}
         </NuxtLink>
       </nav>
@@ -35,6 +35,12 @@ const menu = computed(() => props.role === 'ADMIN'
       { key: 'practicum', label: '实训中心', to: '/center/practicum' },
       { key: 'data', label: '数据中心', to: '/center/data' },
     ])
+
+function isActive(item: { key: string; to: string }) {
+  if (route.path === item.to) return true
+  if (props.role === 'ADMIN' && item.key === 'tasks') return route.path.startsWith('/admin/tasks/') || route.path === '/admin/assignments'
+  return item.to !== home.value && route.path.startsWith(`${item.to}/`)
+}
 
 async function logout() {
   await auth.logout()
