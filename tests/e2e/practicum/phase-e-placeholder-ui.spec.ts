@@ -45,6 +45,22 @@ test.describe('LearnEC Phase E placeholder, compatibility, and visual closure', 
     await expect(page).toHaveURL(/\/center$/)
   })
 
+  test('ADMIN dashboard keeps rendering when class analytics cannot be read', async ({ page }) => {
+    await login(page, 'ADMIN')
+    await page.goto('/admin')
+    const classPicker = page.locator('[data-admin-dashboard] select')
+    await expect(classPicker).toBeVisible()
+    await classPicker.evaluate(node => {
+      const option = document.createElement('option')
+      option.value = 'not-an-authorized-class'
+      node.append(option)
+      ;(node as HTMLSelectElement).value = option.value
+      node.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    await expect(page.locator('[data-admin-analytics-error]')).toHaveText('班级学情暂时无法读取，请稍后重试。')
+    await expect(page.locator('[data-admin-dashboard]')).toBeVisible()
+  })
+
   test('unauthenticated legacy links still require login', async ({ page }) => {
     await page.context().clearCookies()
     await page.goto('/practicum/competitions')
