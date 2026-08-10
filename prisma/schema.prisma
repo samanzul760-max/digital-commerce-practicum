@@ -102,6 +102,14 @@ enum QuestionType {
   SHORT_ANSWER
 }
 
+enum SubmissionPartStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  NEEDS_REVIEW
+  GRADED
+}
+
 model Organization {
   id        String         @id @default(cuid())
   name      String
@@ -471,15 +479,17 @@ model TaskDependency {
 }
 
 model StudentTask {
-  id               String         @id @default(cuid())
+  id               String            @id @default(cuid())
   planAssignmentId String
   studentId        String
   activityId       String
-  status           TaskStatus     @default(LOCKED)
+  status           TaskStatus        @default(LOCKED)
   availableAt      DateTime
   dueAt            DateTime?
-  planAssignment   PlanAssignment @relation(fields: [planAssignmentId], references: [id], onDelete: Cascade)
+  planAssignment   PlanAssignment    @relation(fields: [planAssignmentId], references: [id], onDelete: Cascade)
   submissions      Submission[]
+  sandboxSession   SandboxSession?
+  sandboxSnapshots SandboxSnapshot[]
 
   @@unique([planAssignmentId, studentId, activityId])
   @@index([studentId, status])
@@ -546,15 +556,63 @@ model SubmissionIdempotencyKey {
 }
 
 model SubmissionVersion {
-  id           String     @id @default(cuid())
-  submissionId String
-  version      Int
-  text         String
-  links        Json       @default("[]")
-  submittedAt  DateTime   @default(now())
-  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  id               String           @id @default(cuid())
+  submissionId     String
+  version          Int
+  text             String           @default("")
+  links            Json             @default("[]")
+  artifact         Json             @default("{}")
+  operationSummary Json             @default("{}")
+  submittedAt      DateTime         @default(now())
+  submission       Submission       @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  parts            SubmissionPart[]
 
   @@unique([submissionId, version])
+}
+
+model SubmissionPart {
+  id             String               @id @default(cuid())
+  versionId      String
+  sectionId      String
+  status         SubmissionPartStatus @default(NOT_STARTED)
+  answer         Json                 @default("{}")
+  evidence       Json                 @default("{}")
+  autoScore      Decimal?             @db.Decimal(6, 2)
+  teacherScore   Decimal?             @db.Decimal(6, 2)
+  teacherComment String               @default("")
+  version        SubmissionVersion    @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@unique([versionId, sectionId])
+  @@index([sectionId, status])
+}
+
+model SandboxSession {
+  id            String            @id @default(cuid())
+  studentTaskId String            @unique
+  state         Json              @default("{}")
+  startedAt     DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  studentTask   StudentTask       @relation(fields: [studentTaskId], references: [id], onDelete: Cascade)
+  snapshots     SandboxSnapshot[]
+
+  @@index([studentTaskId, updatedAt])
+}
+
+model SandboxSnapshot {
+  id               String         @id @default(cuid())
+  sandboxSessionId String
+  studentTaskId    String
+  sectionId        String?
+  sandboxType      SandboxType?
+  stepId           String?
+  artifact         Json           @default("{}")
+  createdAt        DateTime       @default(now())
+  sandboxSession   SandboxSession @relation(fields: [sandboxSessionId], references: [id], onDelete: Cascade)
+  studentTask      StudentTask    @relation(fields: [studentTaskId], references: [id], onDelete: Cascade)
+
+  @@index([studentTaskId, createdAt])
+  @@index([sandboxSessionId, createdAt])
 }
 
 model Grade {

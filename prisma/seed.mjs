@@ -85,6 +85,77 @@ async function main() {
       ],
     },
   })
+
+  const sandboxDefinitions = [
+    { id: 'phase-c-demo-store', sandboxType: 'STORE_BASICS', title: '店铺基础', description: '完成店铺设置、提现账号与运费模板配置。', appKey: 'store-basics' },
+    { id: 'phase-c-demo-product', sandboxType: 'PRODUCT_MANAGEMENT', title: '商品管理', description: '完成商品、库存预警与评价回复配置。', appKey: 'product-management' },
+    { id: 'phase-c-demo-decoration', sandboxType: 'STORE_DECORATION', title: '店铺装修', description: '完成移动端或 PC 端装修组件编排。', appKey: 'store-decoration' },
+    { id: 'phase-c-demo-marketing', sandboxType: 'MARKETING', title: '营销活动', description: '创建优惠券、秒杀、拼团或砍价活动。', appKey: 'marketing' },
+    { id: 'phase-c-demo-analytics', sandboxType: 'BUSINESS_ANALYTICS', title: '经营分析', description: '阅读模拟趋势与排行榜并形成分析结论。', appKey: 'business-analytics' },
+  ]
+  const rootSection = {
+    clientKey: 'phase-c-demo-root', type: 'WORK_ORDER', title: '电商五模块综合实训', description: '依次完成五个受控电商子业务沙盘。', sort: 0, required: true, weightPercent: 0,
+  }
+  const demoSections = [rootSection, ...sandboxDefinitions.map((item, index) => ({
+    clientKey: item.id,
+    parentClientKey: rootSection.clientKey,
+    type: 'SANDBOX',
+    title: item.title,
+    description: item.description,
+    sort: index + 1,
+    required: true,
+    weightPercent: 20,
+    sandbox: {
+      sandboxType: item.sandboxType,
+      appKey: item.appKey,
+      version: 1,
+      config: {},
+      steps: [{ title: `完成${item.title}`, instruction: `根据左侧指导书完成${item.title}配置并保存。`, sort: 0, required: true, fields: [{ key: 'result', label: '完成结果', required: true }], evidenceKey: `${item.appKey}-result` }],
+      rubricItems: [{ title: `${item.title}配置完整`, description: '必填字段完整且步骤已留证。', points: 20, sort: 0 }],
+    },
+  }))]
+  const demoAvailableAt = new Date('2026-01-01T00:00:00.000Z')
+  const demoDueAt = new Date('2027-12-31T23:59:59.000Z')
+  const demoAssignment = await prisma.planAssignment.upsert({
+    where: { id: 'phase-c-demo-assignment' },
+    update: {
+      classId: classroom.id, title: '电商五模块综合实训', description: '店铺基础、商品管理、店铺装修、营销活动与经营分析完整工单。',
+      status: 'PUBLISHED', availableAt: demoAvailableAt, dueAt: demoDueAt, autoScoreWeight: 70, manualScoreWeight: 30, timeLimitMinutes: 120,
+      publishedSnapshot: { assignmentVersion: 1, autoScoreWeight: 70, manualScoreWeight: 30, timeLimitMinutes: 120, sections: demoSections },
+    },
+    create: {
+      id: 'phase-c-demo-assignment', classId: classroom.id, planId: 'learnec-work-order', title: '电商五模块综合实训',
+      description: '店铺基础、商品管理、店铺装修、营销活动与经营分析完整工单。', status: 'PUBLISHED', availableAt: demoAvailableAt, dueAt: demoDueAt,
+      autoScoreWeight: 70, manualScoreWeight: 30, timeLimitMinutes: 120, publishedAt: new Date(),
+      publishedSnapshot: { assignmentVersion: 1, autoScoreWeight: 70, manualScoreWeight: 30, timeLimitMinutes: 120, sections: demoSections },
+    },
+  })
+  await prisma.taskSection.upsert({
+    where: { id: rootSection.clientKey },
+    update: { assignmentId: demoAssignment.id, title: rootSection.title, description: rootSection.description },
+    create: { id: rootSection.clientKey, assignmentId: demoAssignment.id, type: 'WORK_ORDER', title: rootSection.title, description: rootSection.description, sort: 0, required: true, weightPercent: 0 },
+  })
+  for (const [index, definition] of sandboxDefinitions.entries()) {
+    await prisma.taskSection.upsert({
+      where: { id: definition.id },
+      update: { assignmentId: demoAssignment.id, parentId: rootSection.clientKey, title: definition.title, description: definition.description, sort: index + 1, weightPercent: 20 },
+      create: { id: definition.id, assignmentId: demoAssignment.id, parentId: rootSection.clientKey, type: 'SANDBOX', title: definition.title, description: definition.description, sort: index + 1, required: true, weightPercent: 20 },
+    })
+    await prisma.sandboxSpec.upsert({
+      where: { sectionId: definition.id },
+      update: { sandboxType: definition.sandboxType, appKey: definition.appKey, version: 1 },
+      create: {
+        sectionId: definition.id, sandboxType: definition.sandboxType, appKey: definition.appKey, version: 1,
+        steps: { create: { title: `完成${definition.title}`, instruction: `根据左侧指导书完成${definition.title}配置并保存。`, sort: 0, required: true, fields: [{ key: 'result', label: '完成结果', required: true }], evidenceKey: `${definition.appKey}-result` } },
+        rubricItems: { create: { title: `${definition.title}配置完整`, description: '必填字段完整且步骤已留证。', points: 20, sort: 0 } },
+      },
+    })
+  }
+  await prisma.studentTask.upsert({
+    where: { planAssignmentId_studentId_activityId: { planAssignmentId: demoAssignment.id, studentId: student.id, activityId: demoAssignment.id } },
+    update: { availableAt: demoAvailableAt, dueAt: demoDueAt },
+    create: { id: 'phase-c-demo-student-task', planAssignmentId: demoAssignment.id, studentId: student.id, activityId: demoAssignment.id, status: 'AVAILABLE', availableAt: demoAvailableAt, dueAt: demoDueAt },
+  })
 }
 
 main().finally(async () => { await prisma.$disconnect() })
