@@ -1,5 +1,15 @@
 # 智能体阶段 A 验收报告
 
+## 2026-08-10 LearnEC 阶段 A 账号管理闭环
+
+- `npm.cmd run test:e2e:isolated -- tests/e2e/practicum/phase-a-v2.spec.ts`: 4/4 通过。覆盖 `admin` 登录、学生访问管理端拒绝、管理端五项固定菜单，以及管理员生成学生账号并重置密码。
+- 账号生成接口对留空的临时密码由服务端安全生成，并返回 `201 Created`；账号、会话撤销和审计记录均通过 Prisma/PostgreSQL 写入。
+- `npm.cmd run typecheck`: 通过，退出码 `0`。
+- `$env:NUXT_IGNORE_LOCK='1'; npm.cmd run build`: 通过，退出码 `0`。
+- 已强制终止本项目 4310/`.output` 相关 Node 进程并清理 `.output`，随后从零重跑上述 E2E、typecheck 与 build，结果保持通过。
+- 阶段 A 本地 Git 提交：`6b8c4a818ae26f72d67d615ed452d141568b2db4`（`phase-A: auth roles and application shells`）。
+- `node --test tests/runtime/isolated-e2e-fixtures-contract.test.mjs`: 2/3 通过；未通过项是测试仍断言旧的全局初始化班级查询，但当前初始化已改为管理员登录建会话。该过期断言未改动，不作为本阶段账号闭环的通过证据。
+
 ## 验收范围
 
 本报告覆盖当前已实现切片：阶段 A 基础工作台能力、既有学习与管理原型，以及本次新增的服务端账号认证与 session。测试针对本地环境，不代表多实例生产存储或完整业务 API 已完成。
