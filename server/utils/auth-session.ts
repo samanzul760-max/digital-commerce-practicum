@@ -1,8 +1,8 @@
-import { createError, getCookie, type H3Event } from 'h3'
-import { AUTH_COOKIE, getSessionUser } from './auth-store'
+import { createError, type H3Event } from 'h3'
+import type { AuthUser, SessionContext } from './auth-store'
 
 export function getAuthenticatedUser(event: H3Event) {
-  return getSessionUser(getCookie(event, AUTH_COOKIE))
+  return (event.context.learnecAuth as SessionContext | undefined)?.user ?? null
 }
 
 export function requireAuthenticatedUser(event: H3Event) {

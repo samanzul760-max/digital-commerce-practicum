@@ -7,11 +7,12 @@ export default defineConfig({
   globalSetup: './tests/e2e/global-setup.ts',
   timeout: 45_000,
   expect: { timeout: 10_000 },
+  retries: 0,
   workers: 1,
   reporter: 'list',
   use: {
     baseURL,
-    storageState: 'output/playwright/auth-state.json',
+    storageState: process.env.PLAYWRIGHT_AUTH_STATE_PATH ?? 'output/playwright/auth-state.json',
     channel: 'msedge',
     screenshot: 'only-on-failure',
     trace: 'on-first-retry',

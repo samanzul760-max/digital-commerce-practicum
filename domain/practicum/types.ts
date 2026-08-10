@@ -1,4 +1,6 @@
-export type PracticumRole = 'OWNER' | 'TEACHER' | 'MENTOR' | 'STUDENT'
+// ADMIN/STUDENT are the only persisted LearnEC roles. The remaining values
+// exist only so legacy practicum modules can be redirected during migration.
+export type PracticumRole = 'ADMIN' | 'STUDENT' | 'OWNER' | 'TEACHER' | 'MENTOR'
 export type PlanStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
 export type ActivityType = 'SOFTWARE_ACTION' | 'TRAINING' | 'PRACTICE_ACTIVITY'
 export type SubmissionStatus =

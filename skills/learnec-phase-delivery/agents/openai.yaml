@@ -1,0 +1,4 @@
+interface:
+  display_name: "LearnEC Phase Delivery"
+  short_description: "Enforce phase gates for LearnEC"
+  default_prompt: "Use the LearnEC phase delivery rules for this task."

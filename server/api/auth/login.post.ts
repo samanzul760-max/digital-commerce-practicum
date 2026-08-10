@@ -19,28 +19,28 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 429, statusMessage: 'AUTH_RATE_LIMITED', data: { code: 'AUTH_RATE_LIMITED' } })
   }
   const body = await readBody<LoginBody>(event)
-  const user = verifyCredentials(body?.identifier ?? '', body?.password ?? '')
+  const user = await verifyCredentials(body?.identifier ?? '', body?.password ?? '')
   if (!user) {
     const next = current && current.resetAt > now ? current : { count: 0, resetAt: now + WINDOW_MS }
     attempts.set(address, { count: next.count + 1, resetAt: next.resetAt })
     throw createError({ statusCode: 401, statusMessage: 'AUTH_INVALID_CREDENTIALS', data: { code: 'AUTH_INVALID_CREDENTIALS' } })
   }
   attempts.delete(address)
-  const session = createSession(user)
+  const session = await createSession(user)
   const secure = shouldUseSecureCookies(getRequestProtocol(event, { xForwardedProto: true }))
   setCookie(event, AUTH_COOKIE, session.token, {
     httpOnly: true,
     sameSite: 'lax',
     secure,
     path: '/',
-    maxAge: Math.floor((session.expiresAt - Date.now()) / 1000),
+    maxAge: Math.floor((session.expiresAt.getTime() - Date.now()) / 1000),
   })
   setCookie(event, CSRF_COOKIE, session.csrfToken, {
     httpOnly: false,
     sameSite: 'lax',
     secure,
     path: '/',
-    maxAge: Math.floor((session.expiresAt - Date.now()) / 1000),
+    maxAge: Math.floor((session.expiresAt.getTime() - Date.now()) / 1000),
   })
   return { user }
 })

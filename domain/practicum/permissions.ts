@@ -16,10 +16,11 @@ import type { PracticumRole } from './types'
 // ── 角色定义 ──────────────────────────────────────────────
 
 /** 当前可用的运行时角色。 */
-export const AVAILABLE_ROLES: PracticumRole[] = ['OWNER', 'TEACHER', 'MENTOR', 'STUDENT']
+export const AVAILABLE_ROLES: PracticumRole[] = ['ADMIN', 'STUDENT']
 
 /** 角色中文标签 */
 export const ROLE_LABELS: Record<PracticumRole, string> = {
+  ADMIN: '管理员',
   OWNER: '管理员',
   TEACHER: '教师',
   MENTOR: '导师',
@@ -52,7 +53,7 @@ export function canAccessRoute(role: PracticumRole | null, routePath: string): b
   if (!role) return routePath === '/practicum' || routePath.startsWith('/practicum/profile')
 
   // OWNER 可以访问所有路由
-  if (role === 'OWNER') return true
+  if (role === 'ADMIN' || role === 'OWNER') return true
 
   // STUDENT 权限检查
   if (role === 'STUDENT') {
