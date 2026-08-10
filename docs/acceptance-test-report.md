@@ -195,3 +195,22 @@ Migration: `20260801090000_submission_idempotency` adds `SubmissionIdempotencyKe
 | New student submission route | When an activity maps to a Prisma task, the activity page reads and submits evidence through `/api/practicum/student-tasks/:taskId`, preserving versions and idempotency. | `PARTIAL`: unmapped legacy activity data remains on its compatibility route until the plan/activity ID migration is complete. |
 
 Database migrations `20260801103000_grade_revisions` and `20260801110000_learning_audit_events` were applied. `npx.cmd prisma migrate status`, `npm.cmd run typecheck`, and `npm.cmd run build` passed. `frontend-backend-bridge.spec.ts` passed 4/4 after the progress page race fix; `progress-mobile.spec.ts` passed at 390px with no horizontal overflow. The complete suite, concurrent idempotency test, rollback rehearsal, attachment storage, automatic grading, dependency-cycle validation and the full legacy JSON retirement are still `PARTIAL` or `MISSING`.
+
+## 2026-08-10 LearnEC 阶段 B：工单组课与发布
+
+验收范围严格限定为阶段 B：ADMIN 从三类资源库组建综合工单，编排媒体、五类题型和多模块沙盘定义，设置自动/人工评分权重与区块权重，保存模板、一键复制、学生视角安全预览，并向班级幂等发布且为每名有效学生生成一条 `StudentTask`。阶段 C 的学生作答、沙盘运行与提交，阶段 D 的批阅、成绩与学情分析，以及阶段 E 的赛考引擎均未提前实现。
+
+| 验收项 | 命令或路径 | 结果 |
+|---|---|---|
+| Prisma 合同 | `npx.cmd prisma format`、`npx.cmd prisma validate`、`npx.cmd prisma generate` | PASS；Prisma Client 6.19.0 生成成功 |
+| 隔离业务闭环 | `npm.cmd run test:e2e:isolated -- tests/e2e/practicum/phase-b-work-orders.spec.ts` | PASS；11 个迁移成功，Playwright 4/4 通过 |
+| 类型门禁 | `npm.cmd run typecheck` | PASS |
+| 生产构建 | `$env:NUXT_IGNORE_LOCK='1'; npm.cmd run build` | PASS；Nuxt 3.21.8 / Nitro 2.13.4 构建成功 |
+| 默认本地数据库 | `npx.cmd prisma migrate deploy`、`npm.cmd run db:seed` | PASS；阶段 B migration 已应用，资源和模板 Seed 成功 |
+| 4310 登录页 | `GET http://127.0.0.1:4310/login` | PASS；HTTP 200 |
+| 4310 未登录守卫 | `GET http://127.0.0.1:4310/admin/tasks` | PASS；HTTP 302，跳转 `/login` |
+| 4310 管理员工单页 | `POST /api/auth/login` 后 `GET /admin/tasks` | PASS；HTTP 200，页面包含“实训任务管理” |
+
+阶段 B 实现提交为 `0a173eb6d17370929c3c31b854a59a1f5ee64d93`（`phase-B: work-order authoring and publication`）。
+
+残余风险：本轮没有执行历史全量 Playwright 套件，也没有部署生产环境；这两项不属于本次阶段 B 本地验收范围。Prisma 命令提示 `package.json#prisma` 将在 Prisma 7 弃用，但不影响当前 Prisma 6.19.0 验收结果。阶段 B 本地服务验收地址为 `http://127.0.0.1:4310`。
