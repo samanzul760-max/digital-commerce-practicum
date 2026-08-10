@@ -1,0 +1,1 @@
+<template><LearnecAppShell role="STUDENT"><PlatformCapabilityPlaceholder title="实训中心" description="店铺、商品、装修、营销和经营分析沙盘必须从教师下发的工单进入；其他训练能力会保持诚实说明。" :planned-capabilities="['从已发布工单进入受控沙盘','客服沟通训练（规划中）','跨境平台操作（规划中）']" available-href="/center/assignments" available-label="查看我的实训工单" home-href="/center" /></LearnecAppShell></template>

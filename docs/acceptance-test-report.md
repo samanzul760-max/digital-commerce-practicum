@@ -1,5 +1,21 @@
 # 智能体阶段 A 验收报告
 
+## 2026-08-11 LearnEC 阶段 E：视觉融合、占位能力与兼容迁移
+
+验收范围：仅限 LearnEC 新路由壳层、`/center`、`/admin`、学生任务沙盘、标准能力占位页和 `/practicum/**` 兼容重定向。没有修改 Prisma、服务端业务 API、授权实现或阶段 A-D 的持久化逻辑；任务、提交、成绩和权限仍以 Prisma/PostgreSQL 为唯一事实来源。
+
+| 验收项 | 命令或路径 | 结果 |
+|---|---|---|
+| C/D/E 业务回归 | `npm.cmd run test:e2e:isolated -- tests/e2e/practicum/phase-c-student-sandbox.spec.ts tests/e2e/practicum/phase-d-review-data.spec.ts tests/e2e/practicum/phase-e-placeholder-ui.spec.ts` | PASS，13/13；覆盖学生沙盘、提交/批阅/成绩、角色守卫、旧赛考路由迁移、占位页无写入控件，以及 390px 无横向溢出。 |
+| 全量历史 E2E | `npm.cmd run test:e2e:isolated -- tests/e2e` | 未通过：336 个历史用例在第 23 个后触发 runner 内置 180 秒上限；已运行的旧 `/practicum` 页面断言预期保留旧页面，与本阶段已批准的统一迁移至 `/admin`、`/center` 相冲突。未为了让旧断言变绿而取消迁移。 |
+| 类型门禁 | `npm.cmd run typecheck` | PASS，退出码 0。 |
+| 生产构建 | `$env:NUXT_IGNORE_LOCK='1'; npm.cmd run build` | PASS，退出码 0。 |
+| 本地服务 | `npm.cmd run start`，`GET http://127.0.0.1:4310/api/auth/session` | PASS，4310 正在监听，未登录请求返回 401，守卫生效。 |
+
+阶段 E 交付：引入 Noto Sans SC、Lucide 图标和隔离的视觉 Token；重构新路由顶栏、学生/管理员仪表盘和三栏沙盘；新增赛考与学生实训能力的 `COMING_SOON` 标准占位页；旧 `/practicum/**` 链接按当前角色迁移到对应新入口。公共实训中心继续使用既有的真实读取页，不伪造培训室或赛考数据。
+
+残余风险：历史全量 E2E 需要在后续迁移专项中重写为新路由兼容契约，并调整 180 秒总时限；该工作不属于阶段 E 的“保留旧路由重定向”范围。本阶段不部署生产环境。阶段 D 已提交 `8a2d55d`（`phase-D: review grading and learning analytics closure`）；阶段 E 提交将记录在本节。
+
 ## 2026-08-10 LearnEC 阶段 A 账号管理闭环
 
 - `npm.cmd run test:e2e:isolated -- tests/e2e/practicum/phase-a-v2.spec.ts`: 4/4 通过。覆盖 `admin` 登录、学生访问管理端拒绝、管理端五项固定菜单，以及管理员生成学生账号并重置密码。

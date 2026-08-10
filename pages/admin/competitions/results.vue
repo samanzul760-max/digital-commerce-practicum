@@ -1,0 +1,1 @@
+<template><LearnecAppShell role="ADMIN"><PlatformCapabilityPlaceholder title="成绩发布" description="赛考成绩核验与发布尚未开放，当前不会展示或写入伪造成绩。" :planned-capabilities="['成绩核验','结果发布','成绩单导出']" available-href="/admin/data" available-label="查看真实班级学情" /></LearnecAppShell></template>

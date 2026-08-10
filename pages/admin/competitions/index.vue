@@ -1,0 +1,1 @@
+<template><LearnecAppShell role="ADMIN"><PlatformCapabilityPlaceholder title="赛考管理" description="比赛与考试引擎尚未接入，当前不会创建比赛、报名记录或成绩。" :planned-capabilities="['比赛与考试创建','赛题配置','个人与团队参与','成绩核验与发布']" available-href="/admin/tasks" available-label="管理现有实训工单" /></LearnecAppShell></template>

@@ -1,5 +1,5 @@
 <template>
-  <aside class="guide-panel" data-task-guide>
+  <aside class="outline guide-panel" data-task-guide>
     <div class="guide-eyebrow">任务指导书</div>
     <h1>{{ task.title }}</h1>
     <p class="guide-description">{{ task.description || '按顺序完成所有必做区块，并在右侧工作台保存操作证据。' }}</p>
@@ -9,7 +9,7 @@
     <div class="guide-progress"><span :style="{ width: `${progress}%` }" /></div>
     <div class="progress-caption">已完成 {{ completedCount }}/{{ totalSteps }} 个步骤</div>
     <ol class="steps">
-      <li v-for="step in steps" :key="step.id" :class="{ complete: completedStepIds.includes(step.id) }">
+      <li v-for="step in steps" :key="step.id" :class="{ complete: completedStepIds.includes(step.id), active: !completedStepIds.includes(step.id) }">
         <span class="step-index">{{ completedStepIds.includes(step.id) ? '✓' : step.index }}</span>
         <div><strong>{{ step.title }}</strong><small>{{ step.instruction }}</small></div>
       </li>

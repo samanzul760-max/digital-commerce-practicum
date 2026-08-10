@@ -1,0 +1,1 @@
+<template><LearnecAppShell role="ADMIN"><PlatformCapabilityPlaceholder title="报名与分组" description="报名审核和个人、团队分组尚未开放，当前不会写入报名或分组数据。" :planned-capabilities="['报名审核','个人参赛配置','团队分组']" available-href="/admin/training-centers" available-label="查看公共实训中心" /></LearnecAppShell></template>

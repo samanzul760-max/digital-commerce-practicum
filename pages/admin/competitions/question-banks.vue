@@ -1,0 +1,1 @@
+<template><LearnecAppShell role="ADMIN"><PlatformCapabilityPlaceholder title="赛题与题库" description="题库、组卷与考试安排仍在建设中，页面不会生成题目或试卷。" :planned-capabilities="['赛题维护','试卷组卷','考试安排']" available-href="/admin/tasks" available-label="查看实训任务" /></LearnecAppShell></template>

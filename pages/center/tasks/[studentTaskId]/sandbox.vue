@@ -5,9 +5,10 @@
         <NuxtLink :to="`/center/assignments/${taskId}`">← 指导书概览</NuxtLink>
         <div><span class="save-state">{{ saveState }}</span><button type="button" :disabled="submitting || data.task.status === 'SUBMITTED'" @click="submitTask">{{ data.task.status === 'SUBMITTED' ? '已提交' : submitting ? '正在提交...' : '提交工单' }}</button></div>
       </div>
-      <div class="split-layout">
+      <div class="learning">
         <CenterTaskGuidePanel :task="data.task" :steps="allSteps" :completed-step-ids="completedStepIds" :missing-items="missingItems" :started-at="data.session?.startedAt ?? null" />
-        <CenterSandboxWorkbench :sections="sandboxSections" :student-task-id="taskId" :state="sessionState" :saving="saving" @save="saveDraft" />
+        <div class="sandbox-center"><div class="lesson-card"><CenterSandboxWorkbench :sections="sandboxSections" :student-task-id="taskId" :state="sessionState" :saving="saving" @save="saveDraft" /></div></div>
+        <aside class="sandbox-aside"><h3>提交状态</h3><p>{{ data.task.status === 'SUBMITTED' ? '工单已提交，正在等待教师批阅。' : '保存每个模块的操作证据后，再提交完整工单。' }}</p><div class="lesson-card"><strong>{{ saveState }}</strong></div></aside>
       </div>
       <div v-if="message" class="message" :data-kind="messageKind">{{ message }}</div>
     </section>
@@ -48,5 +49,5 @@ async function submitTask(){
 </script>
 
 <style scoped>
-.sandbox-page{min-width:0}.page-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:14px}.page-toolbar>a{color:#667085;font-size:13px;text-decoration:none}.page-toolbar>div{display:flex;align-items:center;gap:12px}.save-state{color:#7b8494;font-size:12px}.page-toolbar button{min-height:38px;padding:0 16px;border:0;border-radius:6px;background:#1677ff;color:#fff;font-weight:800;cursor:pointer}.page-toolbar button:disabled{background:#98a2b3;cursor:not-allowed}.split-layout{display:grid;grid-template-columns:minmax(280px,32%) minmax(0,1fr);gap:16px;align-items:start;min-width:0}.message{position:fixed;right:24px;bottom:24px;max-width:min(420px,calc(100vw - 32px));padding:12px 16px;border:1px solid #a6f4c5;border-radius:6px;background:#ecfdf3;color:#067647;font-size:13px;box-shadow:0 8px 28px rgba(16,24,40,.14);z-index:10}.message[data-kind="error"]{border-color:#fecdca;background:#fef3f2;color:#b42318}.loading{padding:40px;text-align:center;color:#667085}@media(max-width:840px){.split-layout{grid-template-columns:1fr}.page-toolbar{align-items:flex-start;flex-direction:column}.page-toolbar>div{width:100%;justify-content:space-between}}@media(max-width:430px){.save-state{max-width:150px}.page-toolbar button{padding:0 12px}.message{right:16px;bottom:16px}}
+.sandbox-page{min-width:0}.page-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:14px}.page-toolbar>a{color:var(--muted);font-size:13px;text-decoration:none}.page-toolbar>div{display:flex;align-items:center;gap:12px}.save-state{color:var(--muted);font-size:12px}.page-toolbar button{min-height:38px;padding:0 16px;border:0;border-radius:6px;background:var(--blue);color:#fff;font-weight:800;cursor:pointer}.page-toolbar button:disabled{background:#98a2b3;cursor:not-allowed}.message{position:fixed;right:24px;bottom:24px;max-width:min(420px,calc(100vw - 32px));padding:12px 16px;border:1px solid #a6f4c5;border-radius:6px;background:#ecfdf3;color:#067647;font-size:13px;box-shadow:0 8px 28px rgba(16,24,40,.14);z-index:10}.message[data-kind="error"]{border-color:#fecdca;background:#fef3f2;color:#b42318}.loading{padding:40px;text-align:center;color:#667085}@media(max-width:840px){.page-toolbar{align-items:flex-start;flex-direction:column}.page-toolbar>div{width:100%;justify-content:space-between}}@media(max-width:430px){.save-state{max-width:150px}.page-toolbar button{padding:0 12px}.message{right:16px;bottom:16px}}
 </style>
