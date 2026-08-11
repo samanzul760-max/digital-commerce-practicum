@@ -2,6 +2,8 @@ import { createError } from 'h3'
 import { Prisma, SandboxType, TaskSectionType, TaskStatus } from '@prisma/client'
 import { prisma } from '../db/client'
 import type { AuthUser } from '../utils/auth-store'
+import { studentTaskScopeWhere } from './student-task-scope'
+import { studentGradeView, studentSubmissionView } from './grade-visibility'
 
 type JsonRecord = Record<string, unknown>
 type PublishedSection = JsonRecord & {
@@ -124,7 +126,7 @@ function availability(task: { availableAt: Date; dueAt: Date | null; planAssignm
   return 'AVAILABLE'
 }
 
-function serializeTask(task: { id: string; planAssignmentId: string; activityId: string; status: TaskStatus; availableAt: Date; dueAt: Date | null; planAssignment: { id: string; title: string; description: string; status: string; timeLimitMinutes: number | null; autoScoreWeight: Prisma.Decimal; manualScoreWeight: Prisma.Decimal; publishedSnapshot: Prisma.JsonValue; dueAt: Date | null; lateAllowed: boolean } }, now = new Date()) {
+function serializeTask(task: { id: string; planAssignmentId: string; activityId: string; status: TaskStatus; availableAt: Date; dueAt: Date | null; planAssignment: { id: string; title: string; description: string; status: string; timeLimitMinutes: number | null; autoScoreWeight: Prisma.Decimal; manualScoreWeight: Prisma.Decimal; publishedSnapshot: Prisma.JsonValue; dueAt: Date | null; lateAllowed: boolean }; submissions?: Array<{ grade: { id: string; score: Prisma.Decimal; feedback: string; gradedAt: Date; releasedAt: Date | null } | null }> }, now = new Date()) {
   return {
     id: task.id,
     assignmentId: task.planAssignmentId,
@@ -139,11 +141,12 @@ function serializeTask(task: { id: string; planAssignmentId: string; activityId:
     autoScoreWeight: Number(task.planAssignment.autoScoreWeight),
     manualScoreWeight: Number(task.planAssignment.manualScoreWeight),
     lateAllowed: task.planAssignment.lateAllowed,
+    grade: studentGradeView(task.submissions?.[0]?.grade),
   }
 }
 
-async function ownedTask(studentId: string, taskId: string) {
-  const task = await prisma.studentTask.findFirst({ where: { id: taskId, studentId }, include: { planAssignment: true } })
+async function ownedTask(actor: AuthUser, taskId: string) {
+  const task = await prisma.studentTask.findFirst({ where: await studentTaskScopeWhere(actor, prisma, { id: taskId }), include: { planAssignment: true } })
   if (!task) fail('STUDENT_TASK_NOT_FOUND', 404)
   return task
 }
@@ -239,23 +242,25 @@ export async function listStudentAssignments(actor: AuthUser, status?: string) {
   const allowed = status && Object.values(TaskStatus).includes(status as TaskStatus) ? status as TaskStatus : undefined
   if (status && !allowed) fail('TASK_STATUS_INVALID')
   const now = new Date()
-  const tasks = await prisma.studentTask.findMany({ where: { studentId: actor.id, status: allowed }, include: { planAssignment: true }, orderBy: [{ dueAt: 'asc' }, { availableAt: 'desc' }] })
+  const tasks = await prisma.studentTask.findMany({ where: await studentTaskScopeWhere(actor, prisma, { status: allowed }), include: { planAssignment: true, submissions: { include: { grade: true }, orderBy: { submittedAt: 'desc' } } }, orderBy: [{ dueAt: 'asc' }, { availableAt: 'desc' }] })
   return tasks.map(task => serializeTask(task, now))
 }
 
 export async function getStudentWorkOrder(actor: AuthUser, taskId: string) {
-  const task = await ownedTask(actor.id, taskId)
+  const task = await ownedTask(actor, taskId)
   const session = await prisma.sandboxSession.findUnique({ where: { studentTaskId: task.id } })
+  const submission = await prisma.submission.findUnique({ where: { studentTaskId: task.id }, include: { versions: { orderBy: { version: 'desc' } }, grade: true } })
   const sections = asSections(task.planAssignment.publishedSnapshot).map(sanitizeSection)
-  return { task: serializeTask(task), sections, session: session ? { id: session.id, state: session.state, startedAt: session.startedAt, updatedAt: session.updatedAt } : null }
+  return { task: serializeTask({ ...task, submissions: submission ? [submission] : [] }), sections, session: session ? { id: session.id, state: session.state, startedAt: session.startedAt, updatedAt: session.updatedAt } : null, submission: studentSubmissionView(submission) }
 }
 
 export async function startStudentWorkOrder(actor: AuthUser, taskId: string) {
-  const task = await ownedTask(actor.id, taskId)
+  const task = await ownedTask(actor, taskId)
   ensureTaskCanStart(task)
   const now = new Date()
   const updated = await prisma.$transaction(async tx => {
-    const current = await tx.studentTask.findFirstOrThrow({ where: { id: task.id, studentId: actor.id }, include: { planAssignment: true } })
+    const current = await tx.studentTask.findFirst({ where: await studentTaskScopeWhere(actor, tx, { id: task.id }), include: { planAssignment: true } })
+    if (!current) fail('STUDENT_TASK_NOT_FOUND', 404)
     const session = await tx.sandboxSession.upsert({ where: { studentTaskId: current.id }, create: { studentTaskId: current.id, state: { sections: {}, answers: {}, mediaProgress: {} }, startedAt: now }, update: { startedAt: current.status === TaskStatus.AVAILABLE ? now : undefined } })
     if (current.status === TaskStatus.AVAILABLE) {
       await tx.studentTask.update({ where: { id: current.id }, data: { status: TaskStatus.IN_PROGRESS } })
@@ -267,7 +272,7 @@ export async function startStudentWorkOrder(actor: AuthUser, taskId: string) {
 }
 
 export async function saveStudentDraft(actor: AuthUser, taskId: string, input: { sectionId?: unknown; values?: unknown; completedStepIds?: unknown; answers?: unknown; mediaProgress?: unknown }) {
-  const task = await ownedTask(actor.id, taskId)
+  const task = await ownedTask(actor, taskId)
   ensureTaskCanStart(task)
   if (!['AVAILABLE', 'IN_PROGRESS', 'RETURNED'].includes(task.status)) fail('TASK_STATE_INVALID', 409)
   const sections = asSections(task.planAssignment.publishedSnapshot)
@@ -300,6 +305,8 @@ export async function saveStudentDraft(actor: AuthUser, taskId: string, input: {
   sectionsState[id] = next
   state.sections = sectionsState
   const updatedSession = await prisma.$transaction(async tx => {
+    const scoped = await tx.studentTask.findFirst({ where: await studentTaskScopeWhere(actor, tx, { id: task.id }), select: { id: true } })
+    if (!scoped) fail('STUDENT_TASK_NOT_FOUND', 404)
     const session = await tx.sandboxSession.upsert({ where: { studentTaskId: task.id }, create: { studentTaskId: task.id, state: state as Prisma.InputJsonValue, startedAt: new Date() }, update: { state: state as Prisma.InputJsonValue } })
     await tx.sandboxSnapshot.create({ data: { sandboxSessionId: session.id, studentTaskId: task.id, sectionId: id, sandboxType: section.type === TaskSectionType.SANDBOX ? sandboxType(section) : undefined, artifact: next as Prisma.InputJsonValue } })
     await tx.taskEvent.create({ data: { studentTaskId: task.id, eventType: 'DRAFT_SAVED', payload: { sectionId: id, sandboxType: section.type === TaskSectionType.SANDBOX ? sandboxType(section) : null } } })
@@ -310,18 +317,20 @@ export async function saveStudentDraft(actor: AuthUser, taskId: string, input: {
 }
 
 export async function recordStudentTaskEvent(actor: AuthUser, taskId: string, input: { eventType?: unknown; payload?: unknown }) {
-  const task = await ownedTask(actor.id, taskId)
+  const task = await ownedTask(actor, taskId)
   const eventType = typeof input.eventType === 'string' ? input.eventType.slice(0, 80) : ''
   if (!eventType || ['SUBMITTED', 'DRAFT_SAVED'].includes(eventType)) fail('TASK_EVENT_INVALID')
+  const scoped = await prisma.studentTask.findFirst({ where: await studentTaskScopeWhere(actor, prisma, { id: task.id }), select: { id: true } })
+  if (!scoped) fail('STUDENT_TASK_NOT_FOUND', 404)
   const event = await prisma.taskEvent.create({ data: { studentTaskId: task.id, eventType, payload: asRecord(input.payload) as Prisma.InputJsonValue } })
   return { event: { id: event.id, studentTaskId: task.id, eventType: event.eventType, createdAt: event.createdAt, payload: event.payload } }
 }
 
 export async function submitStudentWorkOrder(actor: AuthUser, taskId: string, idempotencyKey: string, path: string) {
   if (!idempotencyKey) fail('IDEMPOTENCY_KEY_REQUIRED')
-  const task = await ownedTask(actor.id, taskId)
+  const task = await ownedTask(actor, taskId)
   const existingKey = await prisma.submissionIdempotencyKey.findUnique({ where: { userId_method_path_key: { userId: actor.id, method: 'POST', path, key: idempotencyKey } }, include: { submission: { include: { versions: { orderBy: { version: 'desc' } }, grade: true } } } })
-  if (existingKey) return { replayed: true, task: { id: task.id, status: task.status }, submission: existingKey.submission }
+  if (existingKey) return { replayed: true, task: { id: task.id, status: task.status }, submission: studentSubmissionView(existingKey.submission) }
   if (!([TaskStatus.AVAILABLE, TaskStatus.IN_PROGRESS, TaskStatus.RETURNED] as TaskStatus[]).includes(task.status)) fail('TASK_STATE_INVALID', 409)
   if (availability(task) !== 'AVAILABLE') fail('TASK_UNAVAILABLE', 409)
   const session = await prisma.sandboxSession.findUnique({ where: { studentTaskId: task.id } })
@@ -341,6 +350,8 @@ export async function submitStudentWorkOrder(actor: AuthUser, taskId: string, id
   }
   const now = new Date()
   const result = await prisma.$transaction(async tx => {
+    const scoped = await tx.studentTask.findFirst({ where: await studentTaskScopeWhere(actor, tx, { id: task.id }), select: { id: true } })
+    if (!scoped) fail('STUDENT_TASK_NOT_FOUND', 404)
     const replay = await tx.submissionIdempotencyKey.findUnique({ where: { userId_method_path_key: { userId: actor.id, method: 'POST', path, key: idempotencyKey } }, include: { submission: { include: { versions: { orderBy: { version: 'desc' } }, grade: true } } } })
     if (replay) return { replayed: true, submission: replay.submission, task: await tx.studentTask.findUniqueOrThrow({ where: { id: task.id } }) }
     const submission = await tx.submission.upsert({ where: { studentTaskId: task.id }, create: { studentTaskId: task.id, currentVersion: 0 }, update: {} })
@@ -353,5 +364,6 @@ export async function submitStudentWorkOrder(actor: AuthUser, taskId: string, id
     const updatedTask = await tx.studentTask.update({ where: { id: task.id }, data: { status: TaskStatus.SUBMITTED } })
     return { replayed: false, submission: updatedSubmission, task: updatedTask, version }
   })
-  return { replayed: result.replayed, task: { id: result.task.id, status: result.task.status }, submission: { ...result.submission, latestVersion: result.version ?? result.submission.versions[0] } }
+  const submission = studentSubmissionView(result.submission)
+  return { replayed: result.replayed, task: { id: result.task.id, status: result.task.status }, submission: submission ? { ...submission, latestVersion: result.version ?? result.submission.versions[0] } : null }
 }

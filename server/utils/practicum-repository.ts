@@ -794,6 +794,12 @@ function activityContext(state: RepositoryState, activityId: string) {
   return { node, plan, activity }
 }
 
+function studentSafeSubmission(submission: PracticeSubmissionState) {
+  const safe = clone(submission)
+  delete safe.grade
+  return safe
+}
+
 function appendNotification(state: RepositoryState, notification: PracticumNotification) {
   state.notifications.unshift(notification)
 }
@@ -842,7 +848,7 @@ export function getSubmission(user: AuthUser, activityId: string) {
   const context = activityContext(state, activityId)
   if (!submission || !context.node || !context.plan || !canAccessRoom(user, context.plan.roomId)) return { kind: 'NOT_FOUND' as const }
   if (user.role !== 'OWNER' && submission.studentId !== user.id) return { kind: 'FORBIDDEN' as const }
-  return { kind: 'OK' as const, submission: clone(submission), node: clone(context.node), activity: clone(context.activity), auditEvents: clone(state.auditEvents.filter(event => event.submissionId === activityId)) }
+  return { kind: 'OK' as const, submission: user.role === 'STUDENT' ? studentSafeSubmission(submission) : clone(submission), node: clone(context.node), activity: clone(context.activity), auditEvents: clone(state.auditEvents.filter(event => event.submissionId === activityId)) }
 }
 
 export function submitPractice(user: AuthUser, input: { activityId: string; text: string }, idempotencyKey?: string) {
@@ -855,7 +861,7 @@ export function submitPractice(user: AuthUser, input: { activityId: string; text
   if (!text) return { kind: 'VALIDATION' as const }
   if (idempotencyKey) {
     const existing = state.idempotency[`${user.id}:${idempotencyKey}`]
-    if (existing) return { kind: 'OK' as const, replayed: true, submission: clone(state.submissions[existing.entityId]) }
+    if (existing) return { kind: 'OK' as const, replayed: true, submission: studentSafeSubmission(state.submissions[existing.entityId]) }
   }
   const current = state.submissions[input.activityId]
   if (current && !['NOT_STARTED', 'IN_PROGRESS', 'RETURNED'].includes(current.status)) return { kind: 'STATE' as const }
@@ -881,7 +887,7 @@ export function submitPractice(user: AuthUser, input: { activityId: string; text
   if (idempotencyKey) state.idempotency[`${user.id}:${idempotencyKey}`] = { userId: user.id, method: 'POST', path: '/submissions', entityId: input.activityId }
   appendNotification(state, { id: `notification-${randomUUID()}`, type: 'NEW_SUBMISSION', title: '收到新的实践提交', message: `${user.displayName} 提交了“${context.node.title}”。`, targetRole: 'OWNER', targetRoute: `/practicum/submissions/${input.activityId}`, read: false, createdAt: now })
   writeState(state)
-  return { kind: 'OK' as const, replayed: false, submission: clone(submission) }
+  return { kind: 'OK' as const, replayed: false, submission: studentSafeSubmission(submission) }
 }
 
 export function returnSubmission(user: AuthUser, activityId: string, feedback: string) {

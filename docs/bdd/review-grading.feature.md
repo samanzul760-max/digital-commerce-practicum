@@ -24,3 +24,21 @@
     那么 文件为 .xlsx
     并且 列仅包括学号、姓名、工单名、自动分、人工分、总分、提交时间
     并且 导出操作记录为 AuditEvent
+
+  场景: BDD-REVIEW-003 未发布成绩在所有学生接口中不可见
+    假如 ADMIN 已为 STUDENT 的提交保存评分但尚未发布
+    当 STUDENT 刷新首页、作业列表、任务详情、提交详情或重放原提交请求
+    那么 所有响应中的 grade 均为空
+    并且 响应不得包含该 Grade 的分数、评语、修订、评分人或评分时间
+    当 ADMIN 发布该成绩
+    那么 STUDENT 才能读取发布后的分数、评语和发布时间
+
+  场景: BDD-REVIEW-004 成绩撤回和修订遵守发布状态机
+    假如 ADMIN 已发布一个 Grade
+    当 ADMIN 撤回成绩
+    那么 系统在同一事务中清空 releasedAt 和 releasedById 并记录任务事件与审计事件
+    并且 STUDENT 再次读取时 grade 为空
+    当 ADMIN 对已发布成绩进行修订
+    那么 系统自动撤回原发布状态且新成绩保持未发布
+    当 ADMIN 撤回一个未发布成绩
+    那么 系统返回 409 和 GRADE_NOT_RELEASED

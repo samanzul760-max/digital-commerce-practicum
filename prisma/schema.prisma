@@ -626,9 +626,13 @@ model Grade {
   manualWeight Decimal         @default(30) @db.Decimal(5, 2)
   score        Decimal         @db.Decimal(6, 2)
   gradedAt     DateTime        @default(now())
+  releasedAt   DateTime?
+  releasedById String?
   submission   Submission      @relation(fields: [submissionId], references: [id], onDelete: Cascade)
   items        GradeItem[]
   revisions    GradeRevision[]
+
+  @@index([releasedAt])
 }
 
 model GradeRevision {

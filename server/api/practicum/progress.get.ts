@@ -1,11 +1,13 @@
 import { createError, defineEventHandler, getQuery } from 'h3'
 import { prisma } from '../../db/client'
 import { requireAuthenticatedUser } from '../../utils/auth-session'
+import { studentTaskScopeWhere } from '../../services/student-task-scope'
 
 export default defineEventHandler(async (event) => {
   const user = requireAuthenticatedUser(event)
   const roomId = String(getQuery(event).roomId ?? '')
-  const isTeacher = ['OWNER', 'TEACHER', 'MENTOR', 'ASSISTANT', 'HEAD_TEACHER'].includes(user.role)
+  const isTeacher = ['ADMIN', 'OWNER', 'TEACHER', 'MENTOR', 'ASSISTANT', 'HEAD_TEACHER'].includes(user.role)
+  const studentScope = user.role === 'STUDENT' ? await studentTaskScopeWhere(user, prisma) : null
   if (roomId && !user.roomIds.includes(roomId) && user.role !== 'OWNER') {
     throw createError({ statusCode: 403, statusMessage: 'PROGRESS_FORBIDDEN', data: { code: 'PROGRESS_FORBIDDEN' } })
   }
@@ -18,9 +20,9 @@ export default defineEventHandler(async (event) => {
         ? {}
         : isTeacher
         ? { class: { ...(roomId ? { roomId } : {}), enrollments: { some: { userId: user.id, active: true, role: { in: ['TEACHER', 'MENTOR', 'ASSISTANT', 'HEAD_TEACHER'] } } } } }
-        : { tasks: { some: { studentId: user.id } } }),
+        : { tasks: { some: studentScope ?? { studentId: user.id } } }),
     },
-    include: { tasks: isTeacher ? { include: { submissions: { include: { grade: true } } } } : { where: { studentId: user.id }, include: { submissions: { include: { grade: true } } } } },
+    include: { tasks: isTeacher ? { include: { submissions: { include: { grade: true } } } } : { where: studentScope ?? { studentId: user.id }, include: { submissions: { include: { grade: true } } } } },
     orderBy: { availableAt: 'asc' },
   })
 
@@ -29,7 +31,7 @@ export default defineEventHandler(async (event) => {
     const completed = tasks.filter((task) => ['SUBMITTED', 'GRADED', 'CLOSED'].includes(task.status)).length
     const graded = tasks.filter((task) => task.status === 'GRADED' || task.status === 'CLOSED').length
     const percent = tasks.length ? Math.round((completed / tasks.length) * 100) : 0
-    const scores = tasks.flatMap((task) => task.submissions.map((submission) => submission.grade?.score ? Number(submission.grade.score) : null)).filter((score): score is number => score !== null)
+    const scores = tasks.flatMap((task) => task.submissions.map((submission) => submission.grade?.score && (isTeacher || submission.grade.releasedAt) ? Number(submission.grade.score) : null)).filter((score): score is number => score !== null)
     return { id: assignment.id, title: assignment.title, status: assignment.status, total: tasks.length, completed, graded, percent, nextTaskId: tasks.find((task) => !['SUBMITTED', 'GRADED', 'CLOSED'].includes(task.status))?.id ?? null, averageScore: scores.length ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length) : null }
   })
 

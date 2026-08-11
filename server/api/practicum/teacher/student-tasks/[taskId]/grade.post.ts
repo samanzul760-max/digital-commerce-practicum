@@ -13,7 +13,7 @@ export default defineEventHandler(async event => {
   const feedback = body?.feedback?.trim() ?? ''
   if (!Number.isFinite(score) || score < 0 || score > 100 || !feedback) throw createError({ statusCode: 422, statusMessage: 'GRADE_INVALID', data: { code: 'GRADE_INVALID' } })
   const grade = await prisma.$transaction(async tx => {
-    const currentGrade = await tx.grade.upsert({ where: { submissionId: task.submissions[0].id }, create: { submissionId: task.submissions[0].id, reviewerId: user.id, score, feedback }, update: { reviewerId: user.id, score, feedback, gradedAt: new Date() } })
+    const currentGrade = await tx.grade.upsert({ where: { submissionId: task.submissions[0].id }, create: { submissionId: task.submissions[0].id, reviewerId: user.id, score, feedback, releasedAt: null, releasedById: null }, update: { reviewerId: user.id, score, feedback, gradedAt: new Date(), releasedAt: null, releasedById: null } })
     const latestRevision = await tx.gradeRevision.findFirst({ where: { gradeId: currentGrade.id }, orderBy: { revision: 'desc' }, select: { revision: true } })
     await tx.gradeRevision.create({ data: { gradeId: currentGrade.id, revision: (latestRevision?.revision ?? 0) + 1, reviewerId: user.id, score, feedback } })
     await tx.studentTask.update({ where: { id: task.id }, data: { status: 'GRADED' } })

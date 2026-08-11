@@ -317,3 +317,21 @@ Database migrations `20260801103000_grade_revisions` and `20260801110000_learnin
 验收截图：`output/playwright/phase-c-assignment-center.png`、`output/playwright/phase-c-sandbox-desktop.png`、`output/playwright/phase-c-sandbox-mobile.png`。阶段 C 本地验收地址为 `http://127.0.0.1:4310`；实现提交将在用户验收通过后单独创建。
 
 残余风险：本轮只执行阶段 C 专项 Playwright 套件，没有宣称历史全量 Playwright 套件通过，也未部署生产环境。Prisma 7 的 seed 配置弃用提示不影响当前 Prisma 6.19.0 结果。
+
+## 2026-08-11 S2 成绩发布与学生任务范围阻断项
+
+本轮只关闭 S2 的两个共享阻断项：成绩发布可见性与学生任务全链路范围。`Grade` 以 `releasedAt`、`releasedById` 为发布事实源；保存和修订默认未发布，修订已发布成绩会在同一事务中自动撤回。学生任务范围统一校验任务本人、任务所属班级、当前有效 STUDENT enrollment、当前实训室范围，以及班级与实训室的组织一致性。
+
+| 验收项 | 命令或路径 | 结果 |
+|---|---|---|
+| TDD RED：发布字段 | `npm.cmd run test:e2e:isolated -- tests/e2e/practicum/s2-grade-release-scope.spec.ts` | RED；未实现时 `releasedAt` 为 `undefined`，不满足未发布投影合同 |
+| TDD RED：进度聚合隐藏 | 同一专项命令 | RED；未接入投影时 `/api/practicum/progress` 暴露未发布平均分 `94` |
+| S2 专项 GREEN | 同一专项命令（最终运行） | PASS；14 个迁移成功，Playwright 3/3 通过 |
+| 成绩状态机 | 评分未发布、发布、撤回、重复撤回、已发布后修订 | PASS；重复撤回返回 `409/GRADE_NOT_RELEASED`，修订自动撤回 |
+| 学生成绩投影 | center/兼容详情、任务列表、提交详情、幂等重放、progress | PASS；未发布统一返回 `grade: null`，不返回分数、评语或评分内部字段 |
+| 学生任务范围 | 停用所属班级 enrollment、保留同实训室其他 enrollment、班级/实训室组织不一致 | PASS；列表排除，详情和所有写入口拒绝 |
+| Prisma 与类型门禁 | `npx.cmd prisma validate`、`npx.cmd prisma generate`、`npm.cmd run typecheck` | PASS；Prisma Client 6.19.0 生成成功，Nuxt 类型检查通过 |
+| 生产构建 | `$env:NUXT_IGNORE_LOCK='1'; npm.cmd run build` | PASS；Nuxt 3.21.8 / Nitro 2.13.4 构建成功 |
+| 相关联合回归 | S2、phase C、phase D、旧 student/submission 套件联合运行 | PARTIAL；13 个场景通过，旧固定账号套件因独立认证夹具返回 `401/429`，旧活动提交合同返回 `403`，未归因于 S2 范围或成绩断言 |
+
+残余风险：历史兼容套件的固定账号/登录限流隔离仍需单独治理，本报告不宣称全量 Playwright 通过。本轮未部署、未推送，也未操作生产环境。Prisma 7 配置弃用和 Node exports 弃用警告不影响本次 S2 专项结果。

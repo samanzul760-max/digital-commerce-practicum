@@ -66,6 +66,8 @@ function gradeView(grade: NonNullable<ReviewTask['submissions'][number]['grade']
     score: number(grade.score),
     feedback: grade.feedback,
     gradedAt: grade.gradedAt,
+    releasedAt: grade.releasedAt,
+    releasedById: grade.releasedById,
     revisionCount: grade.revisions.length,
     revisions: grade.revisions.map(revision => ({
       revision: revision.revision,
@@ -169,19 +171,62 @@ export async function gradeSubmission(actor: AuthUser, studentTaskId: string, in
     if (transitioned.count !== 1) reviewError(409, 'REVIEW_TASK_STATE_INVALID')
     const liveSubmission = await tx.submission.findUniqueOrThrow({ where: { id: submission.id }, select: { currentVersion: true } })
     if (liveSubmission.currentVersion !== expectedVersion) reviewError(409, 'REVIEW_VERSION_CONFLICT')
+    const previousGrade = await tx.grade.findUnique({ where: { submissionId: submission.id }, select: { id: true, releasedAt: true } })
     const currentGrade = await tx.grade.upsert({
       where: { submissionId: submission.id },
-      create: { submissionId: submission.id, reviewerId: actor.id, feedback, autoScore, manualScore, autoWeight, manualWeight, score },
-      update: { reviewerId: actor.id, feedback, autoScore, manualScore, autoWeight, manualWeight, score, gradedAt: new Date() },
+      create: { submissionId: submission.id, reviewerId: actor.id, feedback, autoScore, manualScore, autoWeight, manualWeight, score, releasedAt: null, releasedById: null },
+      update: { reviewerId: actor.id, feedback, autoScore, manualScore, autoWeight, manualWeight, score, gradedAt: new Date(), releasedAt: null, releasedById: null },
       include: { revisions: { orderBy: { revision: 'desc' } } },
     })
     const revision = (currentGrade.revisions[0]?.revision ?? 0) + 1
     await tx.gradeRevision.create({ data: { gradeId: currentGrade.id, revision, reviewerId: actor.id, feedback, autoScore, manualScore, autoWeight, manualWeight, score } })
     await tx.taskEvent.create({ data: { studentTaskId: task.id, eventType: 'GRADED', payload: { submissionId: submission.id, version: current.version, autoScore, manualScore, score } } })
     await tx.auditEvent.create({ data: { trainingRoomId: task.planAssignment.class.roomId, actorId: actor.id, actorRole: actor.role, entityType: 'StudentTask', entityId: task.id, eventType: 'GRADE_SAVED', metadata: { submissionId: submission.id, version: current.version, autoScore, manualScore, score } } })
+    if (previousGrade?.releasedAt) {
+      await tx.taskEvent.create({ data: { studentTaskId: task.id, eventType: 'GRADE_WITHDRAWN', payload: { gradeId: currentGrade.id, reason: 'GRADE_REVISED' } } })
+      await tx.auditEvent.create({ data: { trainingRoomId: task.planAssignment.class.roomId, actorId: actor.id, actorRole: actor.role, entityType: 'Grade', entityId: currentGrade.id, eventType: 'GRADE_AUTO_WITHDRAWN', metadata: { studentTaskId: task.id, reason: 'GRADE_REVISED' } } })
+    }
     return await tx.grade.findUniqueOrThrow({ where: { id: currentGrade.id }, include: { revisions: { orderBy: { revision: 'desc' } } } })
   })
   return { grade: gradeView(grade) }
+}
+
+export async function releaseGrade(actor: AuthUser, studentTaskId: string) {
+  const task = await scopedTask(actor, studentTaskId)
+  const { submission } = submissionFor(task)
+  const grade = submission.grade
+  if (!grade) reviewError(404, 'GRADE_NOT_FOUND')
+  if (grade.releasedAt) reviewError(409, 'GRADE_ALREADY_RELEASED')
+  const releasedAt = new Date()
+  const updated = await prisma.$transaction(async tx => {
+    const released = await tx.grade.updateMany({
+      where: { id: grade.id, releasedAt: null },
+      data: { releasedAt, releasedById: actor.id },
+    })
+    if (released.count !== 1) reviewError(409, 'GRADE_ALREADY_RELEASED')
+    await tx.taskEvent.create({ data: { studentTaskId: task.id, eventType: 'GRADE_RELEASED', payload: { gradeId: grade.id, releasedAt: releasedAt.toISOString(), releasedById: actor.id } } })
+    await tx.auditEvent.create({ data: { trainingRoomId: task.planAssignment.class.roomId, actorId: actor.id, actorRole: actor.role, entityType: 'Grade', entityId: grade.id, eventType: 'GRADE_RELEASED', metadata: { studentTaskId: task.id, releasedAt: releasedAt.toISOString() } } })
+    return await tx.grade.findUniqueOrThrow({ where: { id: grade.id }, include: { revisions: { orderBy: { revision: 'desc' } } } })
+  })
+  return { grade: gradeView(updated) }
+}
+
+export async function withdrawGrade(actor: AuthUser, studentTaskId: string) {
+  const task = await scopedTask(actor, studentTaskId)
+  const { submission } = submissionFor(task)
+  const grade = submission.grade
+  if (!grade?.releasedAt) reviewError(409, 'GRADE_NOT_RELEASED')
+  const updated = await prisma.$transaction(async tx => {
+    const withdrawn = await tx.grade.updateMany({
+      where: { id: grade.id, releasedAt: { not: null } },
+      data: { releasedAt: null, releasedById: null },
+    })
+    if (withdrawn.count !== 1) reviewError(409, 'GRADE_NOT_RELEASED')
+    await tx.taskEvent.create({ data: { studentTaskId: task.id, eventType: 'GRADE_WITHDRAWN', payload: { gradeId: grade.id, withdrawnById: actor.id } } })
+    await tx.auditEvent.create({ data: { trainingRoomId: task.planAssignment.class.roomId, actorId: actor.id, actorRole: actor.role, entityType: 'Grade', entityId: grade.id, eventType: 'GRADE_WITHDRAWN', metadata: { studentTaskId: task.id } } })
+    return await tx.grade.findUniqueOrThrow({ where: { id: grade.id }, include: { revisions: { orderBy: { revision: 'desc' } } } })
+  })
+  return { grade: gradeView(updated) }
 }
 
 export async function returnSubmission(actor: AuthUser, studentTaskId: string, input: { feedback?: unknown; expectedVersion?: unknown }) {

@@ -1,13 +1,15 @@
 import { createError, defineEventHandler, getHeader, getRouterParam, readBody } from 'h3'
 import { prisma } from '../../../../../db/client'
-import { requireAuthenticatedUser } from '../../../../../utils/auth-session'
+import { requireStudent } from '../../../../../utils/authorization'
+import { studentTaskScopeWhere } from '../../../../../services/student-task-scope'
+import { studentSubmissionView } from '../../../../../services/grade-visibility'
 export default defineEventHandler(async event => {
-  const user = requireAuthenticatedUser(event)
+  const user = requireStudent(event)
   const taskId = getRouterParam(event, 'taskId') ?? ''
   const body = await readBody<{ text?: string; links?: string[] }>(event)
   const text = body?.text?.trim() ?? ''
   if (!text) throw createError({ statusCode: 422, statusMessage: 'SUBMISSION_INVALID', data: { code: 'SUBMISSION_INVALID' } })
-  const task = await prisma.studentTask.findFirst({ where: { id: taskId, studentId: user.id }, include: { planAssignment: true } })
+  const task = await prisma.studentTask.findFirst({ where: await studentTaskScopeWhere(user, prisma, { id: taskId }), include: { planAssignment: true } })
   if (!task) throw createError({ statusCode: 404, statusMessage: 'TASK_NOT_FOUND', data: { code: 'TASK_NOT_FOUND' } })
   const key = getHeader(event, 'idempotency-key')?.trim()
   if (!key) throw createError({ statusCode: 422, statusMessage: 'IDEMPOTENCY_KEY_REQUIRED', data: { code: 'IDEMPOTENCY_KEY_REQUIRED' } })
@@ -16,11 +18,13 @@ export default defineEventHandler(async event => {
     where: { userId_method_path_key: { userId: user.id, method: 'POST', path, key } },
     include: { submission: { include: { versions: { orderBy: { version: 'desc' } }, grade: true } } },
   })
-  if (replay) return { task: { id: task.id, status: task.status }, submission: replay.submission }
+  if (replay) return { task: { id: task.id, status: task.status }, submission: studentSubmissionView(replay.submission) }
   if (task.status === 'LOCKED') throw createError({ statusCode: 409, statusMessage: 'TASK_LOCKED', data: { code: 'TASK_LOCKED' } })
   if (!['AVAILABLE', 'RETURNED'].includes(task.status)) throw createError({ statusCode: 409, statusMessage: 'TASK_STATE_INVALID', data: { code: 'TASK_STATE_INVALID' } })
   if (task.availableAt > new Date() || (task.dueAt && task.dueAt < new Date() && !task.planAssignment.lateAllowed)) throw createError({ statusCode: 409, statusMessage: 'TASK_UNAVAILABLE', data: { code: 'TASK_UNAVAILABLE' } })
   const submission = await prisma.$transaction(async tx => {
+    const scoped = await tx.studentTask.findFirst({ where: await studentTaskScopeWhere(user, tx, { id: task.id }), select: { id: true } })
+    if (!scoped) throw createError({ statusCode: 404, statusMessage: 'TASK_NOT_FOUND', data: { code: 'TASK_NOT_FOUND' } })
     const existing = await tx.submissionIdempotencyKey.findUnique({
       where: { userId_method_path_key: { userId: user.id, method: 'POST', path, key } },
       include: { submission: true },

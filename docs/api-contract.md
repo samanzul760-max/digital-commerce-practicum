@@ -85,9 +85,24 @@ Missing, expired, or mismatched tokens return `403 CSRF_INVALID` with `{ data: {
 | 方法 | 路径 | 合同 |
 |---|---|---|
 | GET | `/api/practicum/student/tasks` | 按当前学生和授权实训室返回任务、状态、可用性、活动、来源和时间字段；不得返回其他学生数据。 |
-| GET | `/api/practicum/student-tasks/:taskId` | 返回当前学生任务详情、提交版本、反馈和评分；越权统一返回 `404/TASK_NOT_FOUND`。 |
+| GET | `/api/practicum/student-tasks/:taskId` | 返回当前学生任务详情、提交版本、退回反馈和已发布成绩；未发布成绩固定投影为 `grade: null`，越权统一返回 `404/TASK_NOT_FOUND`。 |
 | POST | `/api/practicum/student-tasks/:taskId/submissions` | 要求 `Idempotency-Key` 和非空成果；成功生成新版本，重复键重放原结果；锁定/非法状态返回 `409`。 |
 | POST | `/api/practicum/submissions/:activityId/return` | 仅授权教师/管理员可用，必须填写退回反馈，只允许 `SUBMITTED` 转为 `RETURNED`；审核按活动提交合同执行。 |
 | POST | `/api/practicum/submissions/:activityId/grade` | 仅授权教师/管理员可用，必须填写合法分数和反馈，保存评分修订并将活动提交转为 `GRADED`。 |
 
 状态转换：`LOCKED -> AVAILABLE -> IN_PROGRESS -> SUBMITTED -> RETURNED -> SUBMITTED -> GRADED`；截止后进入 `CLOSED`，非法转换必须拒绝且不得产生部分写入。
+
+### 成绩发布与学生可见性
+
+| 方法 | 路径 | 合同 |
+|---|---|---|
+| POST | `/api/admin/reviews/:studentTaskId/grade/release` | 仅授权 ADMIN；要求 Grade 已存在且尚未发布，原子写入 `releasedAt`、`releasedById`、任务事件和审计事件。重复发布返回 `409/GRADE_ALREADY_RELEASED`。 |
+| POST | `/api/admin/reviews/:studentTaskId/grade/withdraw` | 仅授权 ADMIN；要求 Grade 当前已发布，原子清空发布字段并写入任务事件和审计事件。未发布或重复撤回返回 `409/GRADE_NOT_RELEASED`。 |
+
+- 保存或修订成绩不会自动发布。修订已发布成绩时，必须在同一事务中自动清空 `releasedAt` 和 `releasedById`，学生端立即恢复为 `grade: null`，直到管理员再次发布。
+- 学生首页、作业列表、任务详情、提交详情、幂等重放和 `/api/practicum/*` 兼容接口只能返回已发布 Grade；未发布 Grade 的分数、评语、修订、评分人和评分时间均不得出现。
+- `StudentTask.status = GRADED` 表示教师已完成评分，不等同于成绩已发布；学生成绩可见性的唯一事实源是 Grade 发布字段。
+
+### 学生任务共享范围
+
+所有 canonical `/api/center/*` 与 Prisma-backed `/api/practicum/student*` 入口必须复用同一个学生任务范围服务。有效范围同时满足：任务属于当前用户、任务关联的 `PlanAssignment.classId` 存在、该班级存在当前 `active=true` 且 `role=STUDENT` 的本人 `ClassEnrollment`、班级 `roomId` 位于当前认证用户的 `roomIds`、且班级 `organizationId` 与对应 `TrainingRoom.organizationId` 一致。任一条件失效后，列表不再返回任务，详情和写操作统一返回 `404/STUDENT_TASK_NOT_FOUND`（兼容接口可保留外层 `TASK_NOT_FOUND` 文案，但不得泄露对象存在性）。
