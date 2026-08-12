@@ -13,5 +13,5 @@ export default defineEventHandler(async (event) => {
   }
 
   await requireClassRoomManager(user, organizationId, roomId)
-  return { items: listStudentRoster(roomId) }
+  return { items: await listStudentRoster(roomId) }
 })

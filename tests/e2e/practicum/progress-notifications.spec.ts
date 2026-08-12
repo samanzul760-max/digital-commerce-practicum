@@ -59,6 +59,18 @@ test('[ASSUME-S5-001] student progress page shows all required sections', async 
   await expect(page.locator('[data-evidence-timeline]')).toBeVisible()
 })
 
+test('[BDD-PLATFORM-001] progress shows a server error instead of local demo progress', async ({ page }) => {
+  await page.route('**/api/practicum/progress**', async route => {
+    await route.abort('failed')
+  })
+  await page.goto('/practicum/profile')
+  await page.locator('[data-role-option="STUDENT"]').click()
+  await page.waitForURL('**/practicum')
+  await page.goto('/practicum/progress')
+  await expect(page.locator('[data-progress-error]')).toBeVisible()
+  await expect(page.locator('[data-progress-local-fallback]')).toHaveCount(0)
+})
+
 /**
  * Given a teacher has students with varied submission statuses
  * When the teacher opens the progress page
@@ -96,6 +108,19 @@ test('[ASSUME-S5-001] notifications show deep links and support mark read', asyn
 
   // The notifications page should render
   await expect(page.locator('[data-notifications-page]')).toBeVisible()
+})
+
+test('[BDD-PLATFORM-001] notifications show a server error instead of local business fallback', async ({ page }) => {
+  await page.route('**/api/practicum/notifications', async route => {
+    if (route.request().method() === 'GET') await route.abort('failed')
+    else await route.continue()
+  })
+  await page.goto('/practicum/profile')
+  await page.locator('[data-role-option="STUDENT"]').click()
+  await page.waitForURL('**/practicum')
+  await page.goto('/practicum/notifications')
+  await expect(page.locator('[data-notifications-error]')).toBeVisible()
+  await expect(page.locator('[data-notification-item]')).toHaveCount(0)
 })
 
 /**

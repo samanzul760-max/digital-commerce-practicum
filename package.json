@@ -17,6 +17,7 @@
     "test:e2e:ai": "node scripts/warmup-and-test.js",
     "test:e2e:direct": "npm run test:e2e:isolated --",
     "test:e2e:isolated": "node scripts/run-isolated-e2e.mjs",
+    "test:e2e:once": "node scripts/validate-practicum-once.mjs",
     "test:e2e:docker": "powershell -ExecutionPolicy Bypass -File scripts/use-docker-postgres.ps1 -RunE2E",
     "deploy:new-ecs": "python scripts/deploy-new-ecs.py",
     "db:seed": "prisma db seed"

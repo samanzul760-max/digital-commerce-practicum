@@ -41,7 +41,7 @@
             <article v-for="task in paginatedTaskRows" :key="task.id" class="todo-item" data-student-task-row :data-task-id="task.id">
               <div class="todo-type"><span class="status-pill" :class="task.statusClass">{{ task.type }}</span><span data-task-status>{{ task.status }}</span></div>
               <div class="todo-content"><h3>{{ task.title }}</h3><p>来源：{{ task.source }} · 发布时间：{{ task.publishedAt }}</p></div>
-              <NuxtLink :to="`/practicum/activities/${task.id}`" class="blue-btn task-learn-button">{{ task.action === '查看条件' ? '查看条件' : '去学习' }}</NuxtLink>
+              <NuxtLink :to="{ path: `/practicum/activities/${task.activityId}`, query: { taskId: task.id } }" class="blue-btn task-learn-button">{{ task.action === '查看条件' ? '查看条件' : '去学习' }}</NuxtLink>
             </article>
           </div>
           <nav v-if="taskRows.length > pageSize" class="todo-pagination" aria-label="待办分页">
@@ -83,9 +83,6 @@ onMounted(async () => {
     tasksLoading.value = false
   }
 })
-const primaryPlan = computed(() => store.visiblePlansFor('STUDENT')[0] ?? null)
-const nodes = computed(() => primaryPlan.value ? store.getPlanNodes(primaryPlan.value.id) : [])
-const activityNodes = computed(() => nodes.value.filter(node => node.level === 3))
 const nextActivity = computed(() => {
   const next = serverStudentTasks.value.find(task => task.status === 'AVAILABLE' || task.status === 'RETURNED')
   return next ? { id: next.activityId } : null
@@ -95,15 +92,20 @@ const returnedTasks = computed(() => serverStudentTasks.value.filter(task => tas
 const completedCount = computed(() => serverStudentTasks.value.filter(task => ['GRADED', 'CLOSED'].includes(task.status)).length)
 const feedbackCount = computed(() => serverStudentTasks.value.filter(task => ['RETURNED', 'GRADED'].includes(task.status)).length)
 const deadlineLabel = computed(() => {
-  if (!primaryPlan.value) return '暂无'
-  const raw = store.state.planDeadlines[primaryPlan.value.id]
-  if (!raw) return '暂无'
-  const d = new Date(raw)
+  const deadlines = serverStudentTasks.value
+    .map(task => task.dueAt)
+    .filter((value): value is string => Boolean(value))
+    .map(value => new Date(value))
+    .filter(date => !Number.isNaN(date.getTime()))
+    .sort((a, b) => a.getTime() - b.getTime())
+  const d = deadlines[0]
+  if (!d) return '暂无'
   return `${d.getMonth() + 1}月${d.getDate()}日`
 })
 
 const taskRows = computed(() => serverStudentTasks.value.map(task => ({
-  id: task.activityId,
+  id: task.id,
+  activityId: task.activityId,
   title: task.source.title,
   type: '学习活动',
   status: task.status === 'RETURNED' ? '待修改' : task.status === 'GRADED' || task.status === 'CLOSED' ? '已完成' : task.status === 'SUBMITTED' ? '待批阅' : task.status === 'LOCKED' ? '已锁定' : '待提交',

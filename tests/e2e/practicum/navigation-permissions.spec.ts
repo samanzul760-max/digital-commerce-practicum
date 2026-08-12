@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { loginAsStudent } from './auth-helpers'
+import { loginAsStudent, loginAsTeacher } from './auth-helpers'
 
 test('[ORIGINAL-S7-001] workspace sidebar highlights the current route', async ({ page }) => {
   await page.goto('/practicum/profile')
@@ -35,6 +35,27 @@ test('[ORIGINAL-S7-001] student direct URL guards still block administration pag
     await page.goto(route)
     await expect(page.locator('[data-forbidden]')).toBeVisible()
   }
+})
+
+test('[ORIGINAL-S7-001] teacher topbar only exposes accessible entries', async ({ page }) => {
+  await loginAsTeacher(page)
+  await page.goto('/practicum')
+
+  await expect(page.locator('[data-opendesign-primary-nav] a[href="/practicum/cases"]')).toHaveCount(1)
+  await expect(page.locator('[data-opendesign-primary-nav] a[href="/practicum/classes"]')).toHaveCount(1)
+  await expect(page.locator('[data-opendesign-primary-nav] a[href="/practicum/progress"]')).toHaveCount(0)
+  await expect(page.locator('[data-opendesign-primary-nav] a[href="/practicum/reviews"]')).toHaveCount(0)
+})
+
+test('[TASK-4] teacher navigation exposes scoped classroom, progress, and review entries', async ({ page }) => {
+  await loginAsTeacher(page)
+  await page.goto('/practicum')
+
+  await expect(page.locator('[data-opendesign-primary-nav] a[href="/practicum/classes"]')).toHaveCount(1)
+  await expect(page.locator('[data-opendesign-primary-nav] a[href="/practicum/progress"]')).toHaveCount(1)
+  await expect(page.locator('[data-opendesign-primary-nav] a[href="/practicum/reviews"]')).toHaveCount(1)
+  await expect(page.locator('[data-opendesign-primary-nav] a[href="/practicum/plans"]')).toHaveCount(0)
+  await expect(page.locator('[data-opendesign-primary-nav] a[href="/practicum/members"]')).toHaveCount(0)
 })
 
 test('[ORIGINAL-S7-001] commerce case pages fit four approved viewport widths', async ({ browser }) => {

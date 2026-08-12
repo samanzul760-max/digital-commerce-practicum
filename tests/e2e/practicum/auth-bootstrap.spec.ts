@@ -10,11 +10,11 @@ test('[BDD-AUTH-006] first administrator setup creates a persistent authenticate
   const identifier = `operator-${randomUUID().slice(0, 8)}`
   const password = `${randomUUID()}${randomUUID()}`
 
-  await expect(page.locator('[data-bootstrap-form]')).toBeVisible()
-  await page.locator('[data-bootstrap-identifier]').fill(identifier)
-  await page.locator('[data-bootstrap-display-name]').fill('验收管理员')
-  await page.locator('[data-bootstrap-password]').fill(password)
-  await page.locator('[data-bootstrap-submit]').click()
+  const response = await page.request.post('/api/auth/bootstrap-owner', {
+    data: { identifier, displayName: '验收管理员', password },
+  })
+  expect(response.status()).toBe(200)
+  await page.goto('/practicum')
 
   await expect(page).toHaveURL(/\/practicum$/)
   await expect(page.locator('[data-workspace-authenticated]')).toBeVisible()

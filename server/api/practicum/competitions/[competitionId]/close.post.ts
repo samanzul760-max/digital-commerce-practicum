@@ -1,6 +1,6 @@
 import { createError, defineEventHandler, getRouterParam } from 'h3'
-import { transitionCompetition } from '../../../../../services/template-competition'
-import { requireAuthenticatedUser } from '../../../../../utils/auth-session'
+import { transitionCompetition } from '../../../../services/template-competition'
+import { requireAuthenticatedUser } from '../../../../utils/auth-session'
 
 export default defineEventHandler(async (event) => {
   const result = await transitionCompetition(requireAuthenticatedUser(event), getRouterParam(event, 'competitionId') ?? '', 'close')

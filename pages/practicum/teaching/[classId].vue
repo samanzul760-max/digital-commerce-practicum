@@ -48,7 +48,7 @@
             <form class="compact-form" @submit.prevent="createAnnouncement">
               <label>公告标题<input v-model.trim="announcementTitle" maxlength="120" required></label>
               <label>公告内容<textarea v-model.trim="announcementBody" maxlength="4000" rows="3" required /></label>
-              <button class="primary-button" type="submit" :disabled="busy || !announcementTitle || !announcementBody">
+              <button class="primary-button" type="submit" :disabled="Boolean(busy) || !announcementTitle || !announcementBody">
                 {{ busy === 'announcement' ? '保存中...' : '保存草稿' }}
               </button>
             </form>
@@ -57,8 +57,8 @@
               <article v-for="announcement in announcements" :key="announcement.id" class="record-row" data-announcement-row>
                 <div class="record-content"><strong>{{ announcement.title }}</strong><p>{{ announcement.body }}</p><small>{{ announcementStatus(announcement.status) }}</small></div>
                 <div class="row-actions">
-                  <button v-if="announcement.status === 'DRAFT'" class="icon-action" type="button" title="发布公告" :disabled="busy" @click="transitionAnnouncement(announcement.id, 'PUBLISH')">发布</button>
-                  <button v-if="announcement.status === 'PUBLISHED'" class="icon-action danger-action" type="button" title="关闭公告" :disabled="busy" @click="transitionAnnouncement(announcement.id, 'CLOSE')">关闭</button>
+                  <button v-if="announcement.status === 'DRAFT'" class="icon-action" type="button" title="发布公告" :disabled="Boolean(busy)" @click="transitionAnnouncement(announcement.id, 'PUBLISH')">发布</button>
+                  <button v-if="announcement.status === 'PUBLISHED'" class="icon-action danger-action" type="button" title="关闭公告" :disabled="Boolean(busy)" @click="transitionAnnouncement(announcement.id, 'CLOSE')">关闭</button>
                 </div>
               </article>
             </div>
@@ -70,11 +70,11 @@
             </div>
             <form v-if="!currentSession" class="compact-form" @submit.prevent="startSession">
               <label>当前活动 ID<input v-model.trim="activityId" required placeholder="输入本次课堂活动 ID"></label>
-              <button class="primary-button" type="submit" :disabled="busy || !activityId">{{ busy === 'session' ? '开始中...' : '开始课堂' }}</button>
+              <button class="primary-button" type="submit" :disabled="Boolean(busy) || !activityId">{{ busy === 'session' ? '开始中...' : '开始课堂' }}</button>
             </form>
             <div v-else class="current-session" data-current-session>
               <div><span class="status-dot" /> <strong>课堂进行中</strong><p>当前活动：{{ currentSession.currentActivityId || '未指定活动' }}</p></div>
-              <button class="secondary-button" type="button" :disabled="busy" @click="endSession">{{ busy === 'session' ? '结束中...' : '结束课堂' }}</button>
+              <button class="secondary-button" type="button" :disabled="Boolean(busy)" @click="endSession">{{ busy === 'session' ? '结束中...' : '结束课堂' }}</button>
             </div>
             <PracticumStatePanel v-if="!sessions.length" data-session-empty state="empty" title="暂无课堂记录" description="开始课堂后，当前活动的执行统计会显示在右侧。" />
             <div v-else class="record-list session-list">

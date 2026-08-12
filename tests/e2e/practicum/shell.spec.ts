@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { loginAsOwner, loginAsStudent } from './auth-helpers'
 
 /**
  * Given a user navigates to the practicum workspace
@@ -13,15 +14,15 @@ test('[ORIGINAL-S1-001] shared workspace shell renders with topbar and content a
   await expect(page.locator('[data-practicum-topbar]')).toBeVisible()
   await expect(page.locator('[data-practicum-content]')).toBeVisible()
 
-  // Approved design tokens are loaded
-  await expect(page.locator('body')).toHaveCSS('font-family', /Microsoft YaHei/)
+  // The LearnEC specification uses the system UI stack with a Chinese fallback.
+  await expect(page.locator('body')).toHaveCSS('font-family', /Noto Sans SC/)
 })
 
 test('[LEARN-EC-001] shared shell uses the compact light workbench treatment', async ({ page }) => {
   await page.goto('/practicum')
 
-  await expect(page.locator('[data-practicum-shell]')).toHaveCSS('background-color', 'rgb(255, 255, 255)')
-  await expect(page.locator('[data-practicum-topbar]')).toHaveCSS('height', '58px')
+  await expect(page.locator('[data-practicum-shell]')).toHaveCSS('background-color', 'oklch(0.99 0.002 240)')
+  await expect(page.locator('[data-practicum-topbar]')).toHaveCSS('height', '64px')
 })
 
 /**
@@ -38,6 +39,26 @@ test('[ORIGINAL-S1-001] topbar has personal entry and no inline role selector', 
   // No inline role selector buttons on the page
   await expect(page.locator('[data-role-options]')).toHaveCount(0)
   await expect(page.locator('[data-role-option]')).toHaveCount(0)
+})
+
+test('[LEARN-EC-002] owner personal menu exposes account, authorized student role, and logout on center', async ({ page }) => {
+  await loginAsOwner(page)
+  await page.goto('/center')
+
+  await page.locator('[data-personal-entry]').click()
+
+  const dropdown = page.locator('[data-profile-dropdown]')
+  await expect(dropdown).toBeVisible()
+  await expect(dropdown.getByText('账号设置', { exact: true })).toBeVisible()
+  await expect(dropdown.locator('[data-profile-role-option="STUDENT"]')).toBeVisible()
+  await expect(dropdown.locator('[data-logout]')).toBeVisible()
+
+  const [roleSwitch] = await Promise.all([
+    page.waitForResponse(response => response.url().includes('/api/auth/switch-role') && response.request().method() === 'POST'),
+    dropdown.locator('[data-profile-role-option="STUDENT"]').click(),
+  ])
+  expect(roleSwitch.status()).toBe(200)
+  await expect(page).toHaveURL('/center')
 })
 
 /**
@@ -92,17 +113,15 @@ test('[ORIGINAL-S1-001] role homes show role-appropriate content and hide unopen
   await page.goto('/practicum/profile')
   await page.locator('[data-role-option="STUDENT"]').click()
   await expect(page).toHaveURL('/practicum')
-  await expect(page.locator('[data-practicum]')).toBeVisible()
-  await expect(page.locator('[data-home-hero-art]')).toBeVisible()
-  await expect(page.locator('[data-home-entry-card]')).toHaveCount(6)
+  await expect(page.locator('[data-student-home]')).toBeVisible()
+  await expect(page.locator('[data-home-learning-paths]')).toBeVisible()
 
   // Owner home
   await page.goto('/practicum/profile')
   await page.locator('[data-role-option="OWNER"]').click()
   await expect(page).toHaveURL('/practicum')
-  await expect(page.locator('[data-practicum]')).toBeVisible()
-  await expect(page.locator('[data-home-hero-art]')).toBeVisible()
-  await expect(page.locator('[data-home-entry-card]')).toHaveCount(6)
+  await expect(page.locator('[data-owner-home]')).toBeVisible()
+  await expect(page.locator('[data-owner-function-entries]')).toBeVisible()
 })
 
 /**
@@ -164,7 +183,7 @@ test('[UI-CLEANUP-001] visible copy stays user-facing and avoids fake entries', 
   await expect(page.locator('[data-dropdown-title]')).toBeVisible()
   await page.keyboard.press('Escape')
   await page.locator('[data-personal-entry]').click()
-  await expect(page.getByText('账号、成员与实训室设置')).toBeVisible()
+  await expect(page.getByText('账号设置', { exact: true })).toBeVisible()
 
   let bodyText = await page.locator('body').innerText()
   for (const copy of forbiddenCopy) {
@@ -179,8 +198,42 @@ test('[UI-CLEANUP-001] visible copy stays user-facing and avoids fake entries', 
   for (const copy of forbiddenCopy) {
     expect(bodyText).not.toContain(copy)
   }
-  await expect(page.getByRole('heading', { name: '功能入口' }).first()).toBeVisible()
+  await expect(page.getByRole('heading', { name: '管理工作入口' })).toBeVisible()
   await expect(page.getByText('配置实训室介绍与宣传信息')).toHaveCount(0)
+})
+
+test('[PROFILE-MENU-003] profile page hides roles that are not authorized for the current account', async ({ page }) => {
+  await loginAsStudent(page)
+  await page.goto('/practicum/profile')
+
+  await expect(page.locator('[data-role-option="STUDENT"]')).toBeVisible()
+  await expect(page.locator('[data-role-option="OWNER"]')).toHaveCount(0)
+  await expect(page.locator('[data-management-group]')).toHaveCount(0)
+})
+
+test('[PROFILE-MENU-001] avatar menu provides profile viewing, editing, authorized role switching, and logout', async ({ page }) => {
+  await page.goto('/practicum/profile')
+  await page.locator('[data-role-option="OWNER"]').click()
+  await page.locator('[data-personal-entry]').click()
+
+  const menu = page.locator('[data-profile-dropdown]')
+  await expect(menu.getByText('查看资料', { exact: true })).toBeVisible()
+  await expect(menu.getByText('编辑资料', { exact: true })).toBeVisible()
+  await expect(menu.locator('[data-profile-role-option="STUDENT"]')).toBeVisible()
+  await expect(menu.locator('[data-logout]')).toBeVisible()
+})
+
+test('[PROFILE-MENU-002] user can edit a display name from the avatar menu', async ({ page }) => {
+  await page.goto('/practicum/profile')
+  await page.locator('[data-role-option="OWNER"]').click()
+  await page.locator('[data-personal-entry]').click()
+  await page.locator('[data-edit-profile]').click()
+
+  await expect(page).toHaveURL(/\/practicum\/profile\?edit=1/)
+  const displayName = `菜单资料${Date.now()}`
+  await page.locator('[data-profile-display-name]').fill(displayName)
+  await page.locator('[data-profile-save]').click()
+  await expect(page.locator('[data-profile-save-success]')).toContainText(displayName)
 })
 
 /**
@@ -211,12 +264,13 @@ test('[UI-ICONS-001] shared navigation uses semantic icons and keeps role naviga
   await page.locator('[data-role-option="OWNER"]').click()
   await expect(page).toHaveURL('/practicum')
 
-  // Owner topbar navigation tabs (same 4 tabs)
+  // Owners retain the management console alongside the shared learning tabs.
   const ownerNav = page.locator('[data-practicum-topbar] .tabs a')
-  await expect(ownerNav).toHaveCount(4)
+  await expect(ownerNav).toHaveCount(5)
   await expect(ownerNav.nth(0)).toContainText('首页')
   await expect(ownerNav.nth(1)).toContainText('课程大厅')
   await expect(ownerNav.nth(2)).toContainText('学员中心')
   await expect(ownerNav.nth(3)).toContainText('实操学习')
+  await expect(ownerNav.nth(4)).toContainText('管理控制台')
   expect((await ownerNav.allTextContents()).every(item => !placeholderGlyphs.test(item))).toBe(true)
 })

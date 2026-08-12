@@ -4,14 +4,15 @@
 node_modules/
 .nuxt/
 .output/
+.output-*/
 test-results/
 playwright-report/
 .artifacts/
 *.log
 .data/
-.data-e2e/
-.data-e2e-*/
-.data-preview-*/
+.data-e2e*/
+.data-preview*/
+.data-role-switch*/
 .playwright-cli/
 output/playwright/auth-state.json
 output/video-audit/
@@ -21,3 +22,6 @@ page.html
 __pycache__/
 *.py[cod]
 .worktrees/
+.output-center*/
+.superpowers/
+*.html.tmp

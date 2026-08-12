@@ -5,6 +5,7 @@ import { loginAsOwner, loginAsStudent } from './auth-helpers'
 interface ReviewFixture {
   activityId: string
   activityTitle: string
+  planTitle: string
   planId: string
   unitId: string
 }
@@ -25,9 +26,10 @@ async function getSubmission(page: Page, activityId: string) {
 async function createReviewFixture(page: Page, browser: Browser, label: string, returned = false): Promise<ReviewFixture> {
   await loginAsOwner(page)
   const key = `review-${label}-${Date.now()}`
+  const planTitle = `Review plan ${label}-${Date.now()}`
   const planResponse = await page.request.post('/api/practicum/plans', {
     headers: await csrfHeaders(page, { 'Idempotency-Key': `${key}-plan` }),
-    data: { roomId: 'room-001', title: `Review plan ${label}`, description: 'Server-backed review fixture.' },
+    data: { roomId: 'room-001', title: planTitle, description: 'Server-backed review fixture.' },
   })
   expect(planResponse.status()).toBe(201)
   const plan = (await planResponse.json()).plan
@@ -48,7 +50,7 @@ async function createReviewFixture(page: Page, browser: Browser, label: string, 
   const unitSnapshot = await unitResponse.json()
   const unit = unitSnapshot.nodes.find((node: { level: number }) => node.level === 2)
 
-  const activityTitle = `Practice ${label}`
+  const activityTitle = `Practice ${label}-${Date.now()}`
   const activityResponse = await page.request.post(`/api/practicum/plans/${plan.id}/activities`, {
     headers: await csrfHeaders(page),
     data: { parentId: unit.id, title: activityTitle, type: 'PRACTICE_ACTIVITY', version: unitSnapshot.plan.version },
@@ -78,7 +80,7 @@ async function createReviewFixture(page: Page, browser: Browser, label: string, 
     expect(returnedResponse.status()).toBe(200)
   }
 
-  return { activityId: activity.id, activityTitle, planId: plan.id, unitId: unit.id }
+  return { activityId: activity.id, activityTitle, planTitle, planId: plan.id, unitId: unit.id }
 }
 
 test('owner sees complete server-backed submission fields in the review queue', async ({ page, browser }) => {
@@ -88,7 +90,7 @@ test('owner sees complete server-backed submission fields in the review queue', 
 
   const row = page.locator('[data-review-row]').filter({ hasText: fixture.activityTitle })
   await expect(row).toHaveCount(1)
-  await expect(row).toContainText('Review plan queue')
+  await expect(row).toContainText(fixture.planTitle)
   await expect(row).toContainText('Unit queue')
   await expect(row).toContainText(fixture.activityTitle)
   await expect(row.locator('[data-submitted-time]')).not.toBeEmpty()

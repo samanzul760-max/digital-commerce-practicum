@@ -12,7 +12,7 @@
  *   3. dev 端口断开 => 自动后台启动 Nuxt dev server 并轮询等待就绪
  *   4. 任何一步失败 => 退出码 1
  *
- * 环境变量: DEV_PORT(默认 3000), DB_PORT(默认 55432), E2E_HARD_TIMEOUT_MS
+ * 环境变量: DEV_PORT(默认 4310), DB_PORT(默认 55432), E2E_HARD_TIMEOUT_MS
  */
 const { spawn, spawnSync } = require('node:child_process')
 const { openSync, rmSync } = require('node:fs')
@@ -24,7 +24,7 @@ const dbOnly = args.includes('--db-only')
 const checkOnly = args.includes('--check')
 
 const host = '127.0.0.1'
-const devPort = Number(process.env.DEV_PORT ?? 3000)
+const devPort = Number(process.env.DEV_PORT ?? 4310)
 const dbPort = Number(process.env.DB_PORT ?? 55432)
 const isWindows = process.platform === 'win32'
 const outLog = 'dev-env.out.log'

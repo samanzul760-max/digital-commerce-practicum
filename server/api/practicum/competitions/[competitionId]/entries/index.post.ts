@@ -8,7 +8,6 @@ export default defineEventHandler(async (event) => {
   if (result.kind === 'FORBIDDEN') throw createError({ statusCode: 403, statusMessage: 'COMPETITION_FORBIDDEN', data: { code: 'COMPETITION_FORBIDDEN' } })
   if (result.kind === 'STATE') throw createError({ statusCode: 409, statusMessage: 'COMPETITION_STATE_INVALID', data: { code: 'COMPETITION_STATE_INVALID' } })
   if (result.kind === 'EXISTS') throw createError({ statusCode: 409, statusMessage: 'COMPETITION_ENTRY_EXISTS', data: { code: 'COMPETITION_ENTRY_EXISTS' } })
-  if (result.kind === 'VALIDATION') throw createError({ statusCode: 422, statusMessage: 'COMPETITION_ENTRY_VALIDATION', data: { code: 'COMPETITION_ENTRY_VALIDATION' } })
   setResponseStatus(event, 201)
   return { entry: result.entry }
 })

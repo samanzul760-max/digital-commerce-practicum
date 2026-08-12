@@ -1,5 +1,59 @@
 # 最终验证队列（一次执行）
 
+## 2026-08-07 FV-13 最新单次验收：PASS
+
+| ID | 命令 / 范围 | 结果 | 证据 |
+| --- | --- | --- | --- |
+| FV-13 | `npm.cmd run test:e2e:isolated` | `PASS` | 79.4 秒内完成：专用本机 PostgreSQL 容器、随机回环端口、唯一数据库、9 个迁移、确定性夹具、Nuxt 生产构建与 3/3 Playwright 角色流程均成功。工件位于 `.artifacts/practicum-e2e/run-2026-08-07t06-33-31-852z/`。 |
+
+运行器缺陷根因已记录：Windows 上 `nuxt dev` 在本工作空间可能“已监听但 HTTP 不响应”。运行器已改为构建当前代码并启动本地 Nitro 产物，同时继续使用独立数据库、独立数据目录和零重试策略。
+
+后检查：4186、3001 及探针端口无残留监听；带本轮标签的临时容器已清理；默认 `digital-commerce-practicum-postgres` 容器保持健康。未执行 SSH、部署、生产服务器操作或默认数据库操作。
+
+## 2026-08-07 One-Time Local Verification Evidence
+
+### Isolated three-role retry window
+
+| ID | Command / scope | Result | Evidence |
+| --- | --- | --- | --- |
+| FV-13 runtime retry | `npm.cmd run test:e2e:isolated` | `UNVERIFIED` | Exit code `1` after 2.4 s. Docker Compose created the isolated project's network and volume, then stopped before database creation because `docker-compose.yml` declares the existing container name `digital-commerce-practicum-postgres`. The existing healthy local container already owns that name. No `practicum_e2e_*` database exists; no migration, Nuxt startup, 4186 listener, or Playwright browser case ran. Per the one-run rule, this command was not retried. |
+
+Post-run checks: the existing `digital-commerce-practicum-postgres` container remained healthy; ports `3001` and `4186` had no listeners. The isolated run artifacts are retained under `.artifacts/practicum-e2e/run-2026-08-07t05-18-45-480z/`. The Compose-created network and volume are intentionally retained for safety. The three-role student/teacher/admin browser journey therefore remains `UNVERIFIED`, not `PASS`.
+
+### Runner repair after the failed retry
+
+| ID | RED | GREEN | Result |
+| --- | --- | --- | --- |
+| Isolated runner container reuse | `node --test tests/runtime/isolated-e2e-contract.test.mjs` failed because the runner still called Compose and did not verify that the existing PostgreSQL container was running. | The same command passed `3/3` after the runner replaced Compose startup with a read-only Docker inspect check, rejects a stopped container, and keeps `pg_isready` as the availability check. `node --check scripts/run-isolated-e2e.mjs` also passed. | `PASS` for the runner safety contract only. No new browser command was run, so FV-13 remains `UNVERIFIED`. |
+
+### Second isolated FV-13 execution window
+
+| ID | Command / scope | Result | Evidence |
+| --- | --- | --- | --- |
+| FV-13 second runtime attempt | `npm.cmd run test:e2e:isolated` | `UNVERIFIED` | Exit code `1` after 102.5 s. A new loopback-only database `practicum_e2e_run_2026_08_07t05_24_32_490z` was created and all 9 migrations applied. Nuxt built successfully and announced port `4186`, but the runner's `/practicum` SSR readiness probe timed out after 90 s. Playwright did not start. Port `4186` was released after the controlled process exit; the isolated database and artifacts were retained. |
+
+Follow-up runner TDD: the runtime contract test first failed because the readiness probe was still `/practicum`. It now probes `/api/auth/session` and treats any response below `500` as Nuxt-ready, while Playwright remains responsible for actual page behavior. `node --test tests/runtime/isolated-e2e-contract.test.mjs` passed `3/3` and `node --check scripts/run-isolated-e2e.mjs` passed. This repair has not been followed by a browser rerun, so FV-13 remains `UNVERIFIED`.
+
+### Dedicated-container hardening and latest FV-13 attempt
+
+The isolated runner now uses a run-labelled PostgreSQL container, a random loopback port, a run-matched database name, deterministic role/class/template/competition fixtures, port ownership checks, zero Playwright retries, and retained database evidence. Its runtime and fixture contracts pass `8/8`; `npm.cmd run typecheck` also passes.
+
+The latest single FV-13 command stopped with exit code `1` after 23.5 s before database creation, migrations, Nuxt, or Playwright. The dedicated image name was `postgres:16-alpine`, which is absent from this local Docker image cache. The runner now uses the project's existing `postgres:17` image; the updated contracts again pass `8/8`. Per the single-run rule this fixed runner has not been retried yet. The three-role browser journey remains `UNVERIFIED`.
+
+Scope: local static verification only. No server was started, stopped, restarted, or replaced. No SSH, deployment, database migration, database reset, or test-data cleanup was performed. The local Prisma client was regenerated without connecting to the database.
+
+| ID | Command / scope | Result | Evidence |
+| --- | --- | --- | --- |
+| FV-01 | `npm.cmd run typecheck` | `PASS` | Exit code `0` after 14.6 s, after regenerating the local Prisma client and correcting the compile errors below. |
+| FV-07 | `$env:NUXT_IGNORE_LOCK='1'; npm.cmd run build` | `PASS` | Exit code `0` after 36.5 s. Nuxt client and Nitro production server output completed. |
+| Compile repair | Local source fixes | `PASS` | Regenerated Prisma Client; corrected classroom disabled bindings; fixed two competition route import depths; removed an unreachable competition-entry branch; corrected `Page.locator` use in the three-role spec. Each root-cause group was fixed in one attempt. |
+| FV-13 discovery | `npx.cmd playwright test tests/e2e/practicum/three-role-integrated-closure.spec.ts --list` | `PASS` | Exit code `0` after 2.1 s; all 3 role-flow test cases loaded. This was discovery only, not browser interaction evidence. |
+| Isolated E2E safety | `node --test tests/runtime/isolated-e2e-contract.test.mjs` | `PASS` | Exit code `0`; 3 contracts verify unique artifact paths, loopback-only database URLs, bounded PostgreSQL readiness, and no shared-directory or shared-port cleanup. |
+| FV-13 runtime attempt | `npm.cmd run test:e2e:isolated` | `UNVERIFIED` | Exit code `1` after 1.7 s, before database creation, migration, Nuxt startup, or browser tests. Docker Compose could not infer a project name from the Chinese workspace path. The runner was corrected to pass the explicit ASCII project name, but this user-flow command was not rerun. |
+| FV-02 to FV-06, FV-08 to FV-13 remaining runtime | Playwright / schema verification | `UNVERIFIED` | Runtime tests now require `scripts/run-isolated-e2e.mjs`, which uses a unique artifact directory and a newly named local loopback database. No remaining browser-flow or schema test command was started in this validation window. |
+
+Preflight facts: port `3001` and `4175` were not listening; the only `node.exe` process was Codex itself and it had no loaded `.output` Prisma query engine module. Pre-existing user changes were preserved, and only the listed compile-repair files plus this record were changed in this repair pass. `git diff --check` found no whitespace errors (only existing CRLF warnings).
+
 日期：2026-08-07  
 状态：`PARTIAL`，不得据此声明整项目完成。
 

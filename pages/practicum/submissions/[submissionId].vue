@@ -21,7 +21,14 @@
           <h2>提交内容</h2>
           <div data-version-history class="plan-list">
             <article v-for="version in submission.versions" :key="version.id" data-history-version class="plan-row">
-              <div><strong>版本 {{ version.version }}</strong><span>{{ version.text }}</span></div>
+              <div>
+                <strong>版本 {{ version.version }}</strong>
+                <span>{{ version.text }}</span>
+                <div v-if="version.links?.length || version.attachments?.length" data-submission-evidence class="evidence-list">
+                  <a v-for="link in version.links" :key="link" :href="link" target="_blank" rel="noreferrer">证据链接：{{ link }}</a>
+                  <span v-for="attachment in version.attachments" :key="attachment.id">附件：{{ attachment.name }}</span>
+                </div>
+              </div>
               <time>{{ formatTime(version.submittedAt) }}</time>
             </article>
           </div>
@@ -150,8 +157,24 @@ async function loadSubmission() {
 onMounted(loadSubmission)
 async function loadNextReview() {
   try {
-    const queue = await server.listSubmissions({ status: 'SUBMITTED', sort: 'oldest' })
-    nextReviewId.value = queue.items.find(item => item.submissionId !== submissionId.value)?.submissionId ?? null
+    const query = (name: string) => {
+      const value = route.query[name]
+      return typeof value === 'string' && value ? value : undefined
+    }
+    const queue = await server.listSubmissions({
+      status: query('status'),
+      planId: query('planId'),
+      unitId: query('unitId'),
+      student: query('student'),
+      sort: query('sort') === 'newest' ? 'newest' : 'oldest',
+    })
+    const reviewScope = query('reviewScope')
+    const processingState = query('processingState')
+    nextReviewId.value = queue.items
+      .filter(item => !reviewScope || item.reviewScope === reviewScope)
+      .filter(item => processingState !== 'PENDING' || item.status === 'SUBMITTED')
+      .filter(item => processingState !== 'REVIEWED' || item.status === 'RETURNED' || item.status === 'GRADED')
+      .find(item => item.submissionId !== submissionId.value)?.submissionId ?? null
   } catch {
     nextReviewId.value = null
   }
@@ -245,6 +268,7 @@ function auditLabel(action: 'RETURNED' | 'GRADED') {
 <style scoped>
 .risk-zone { margin-top: 16px; }
 .rubric-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.evidence-list { display: grid; gap: 4px; margin-top: 8px; min-width: 0; overflow-wrap: anywhere; }
 time { color: var(--practicum-muted); font-size: 12px; }
 
 @media (max-width: 780px) {

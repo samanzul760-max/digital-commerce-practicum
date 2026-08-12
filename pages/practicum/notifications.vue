@@ -15,6 +15,7 @@
         </section>
 
         <div v-if="isLoading" data-loading class="empty-state">正在加载通知…</div>
+        <PracticumStatePanel v-else-if="loadError" data-notifications-error state="error" title="通知加载失败" description="服务端暂时不可用，请重新加载。" @retry="loadNotifications" />
         <template v-else>
           <div v-if="roleNotifications.length" data-notification-history class="notification-list">
             <div v-if="roleNotifications.some(n => !n.read)" class="notification-actions">
@@ -46,6 +47,7 @@ import { usePracticumServer } from '~/composables/usePracticumServer'
 const store = usePracticumStore()
 const server = usePracticumServer()
 const isLoading = ref(true)
+const loadError = ref(false)
 const serverNotifications = ref<PracticumNotification[] | null>(null)
 const composeTitle = ref('')
 const composeMessage = ref('')
@@ -56,7 +58,7 @@ const composeSuccess = ref('')
 
 const roleNotifications = computed(() => {
   if (!store.state.activeRole) return []
-  return (serverNotifications.value ?? store.notificationsForRole(store.state.activeRole))
+  return serverNotifications.value ?? []
 })
 const unreadCount = computed(() => roleNotifications.value.filter(notification => !notification.read).length)
 
@@ -64,11 +66,13 @@ onMounted(loadNotifications)
 
 async function loadNotifications() {
   isLoading.value = true
+  loadError.value = false
   try {
     const response = await server.listNotifications()
     serverNotifications.value = response.items
   } catch {
-    serverNotifications.value = null
+    serverNotifications.value = []
+    loadError.value = true
   } finally {
     isLoading.value = false
   }
@@ -97,9 +101,12 @@ async function sendNotification() {
 }
 
 async function markRead(notification: PracticumNotification) {
-  notification.read = true
-  store.markNotificationRead(notification.id)
-  try { await server.markNotificationRead(notification.id) } catch { /* local state still gives immediate feedback */ }
+  try {
+    await server.markNotificationRead(notification.id)
+    notification.read = true
+  } catch {
+    await loadNotifications()
+  }
 }
 
 async function handleMarkAllRead() {

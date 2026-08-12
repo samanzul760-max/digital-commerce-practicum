@@ -9,6 +9,8 @@ interface WorkspaceContextState {
   loading: boolean
 }
 
+const pendingWorkspaceLoads = new WeakMap<object, Promise<WorkspaceContextState>>()
+
 export function useWorkspaceContext() {
   const state = useState<WorkspaceContextState>('practicum-workspace-context', () => ({
     user: null,
@@ -19,17 +21,27 @@ export function useWorkspaceContext() {
   }))
 
   async function load() {
-    if (state.value.loading) return state.value
+    const pending = pendingWorkspaceLoads.get(state)
+    if (pending) return await pending
+
     state.value.loading = true
+    const request = (async () => {
+      try {
+        const context = await $fetch<Omit<WorkspaceContextState, 'loading'>>('/api/practicum/context', {
+          headers: import.meta.server ? useRequestHeaders(['cookie']) : undefined,
+        })
+        state.value = { ...context, loading: false }
+      } catch {
+        state.value.loading = false
+      }
+      return state.value
+    })()
+    pendingWorkspaceLoads.set(state, request)
     try {
-      const context = await $fetch<Omit<WorkspaceContextState, 'loading'>>('/api/practicum/context', {
-        headers: import.meta.server ? useRequestHeaders(['cookie']) : undefined,
-      })
-      state.value = { ...context, loading: false }
-    } catch {
-      state.value.loading = false
+      return await request
+    } finally {
+      pendingWorkspaceLoads.delete(state)
     }
-    return state.value
   }
 
   async function selectRoom(roomId: string) {

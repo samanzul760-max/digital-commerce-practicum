@@ -17,3 +17,17 @@ test('[LEARN-EC-COURSES-001] student can browse responsive course hall and open 
   await page.locator('[data-course-card]').first().getByRole('link', { name: '查看课程' }).click()
   await expect(page.locator('[data-course-detail]')).toBeVisible()
 })
+
+test('[BDD-PLATFORM-001] course hall shows server error instead of local course fallback', async ({ page }) => {
+  await page.route('**/api/practicum/plans**', async route => {
+    if (route.request().method() === 'GET') await route.abort('failed')
+    else await route.continue()
+  })
+  await page.goto('/practicum/profile')
+  await page.locator('[data-role-option="STUDENT"]').click()
+  await page.goto('/practicum/courses')
+
+  await expect(page.locator('[data-course-hall]')).toBeVisible()
+  await expect(page.locator('[data-course-server-error]')).toBeVisible()
+  await expect(page.locator('[data-course-card]')).toHaveCount(0)
+})

@@ -13,9 +13,29 @@ services:
       interval: 5s
       timeout: 5s
       retries: 12
+      start_period: 10s
     volumes:
       - practicum-postgres-data:/var/lib/postgresql/data
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    shm_size: 128M
+    command: >
+      postgres
+        -c max_connections=100
+        -c shared_buffers=128MB
+        -c effective_cache_size=384MB
+        -c maintenance_work_mem=16MB
+        -c wal_buffers=4MB
+        -c default_statistics_target=50
+        -c random_page_cost=1.1
+        -c effective_io_concurrency=200
+        -c work_mem=4MB
+        -c huge_pages=off
+        -c min_wal_size=80MB
+        -c max_wal_size=1GB
 
 volumes:
   practicum-postgres-data:

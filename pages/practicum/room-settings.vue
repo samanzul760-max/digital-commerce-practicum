@@ -1,7 +1,7 @@
 <template>
   <ClientOnly>
     <PracticumShell context-title="实训室设置" context-meta="介绍与媒体元数据">
-      <section class="profile-page">
+      <section class="profile-page" data-room-settings-page>
         <div class="page-heading"><div><p class="eyebrow">实训室展示</p><h1>实训室设置</h1><p>维护介绍、宣传媒体和教学范围，设置只从服务端读取和保存。</p></div></div>
 
         <p v-if="isLoading" data-loading class="empty-state">正在加载实训室设置...</p>

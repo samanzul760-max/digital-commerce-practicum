@@ -3,11 +3,15 @@
     <PracticumShell :context-title="isPublishedStudentActivity ? activityNode?.title ?? '活动' : '活动不可访问'" :context-meta="isPublishedStudentActivity ? activityTypeLabel(activity?.type) : ''">
       <p v-if="isLoading" data-loading class="empty-state">正在加载活动...</p>
 
-      <p v-else-if="!canSubmitWork(store.state.activeRole) || (activityNode && activity && !isPublishedStudentActivity)" data-forbidden class="empty-state">当前活动不可访问。</p>
+      <p v-else-if="isForbidden || !canSubmitWork(viewerRole) || (activityNode && activity && !isPublishedStudentActivity)" data-forbidden class="empty-state">当前活动不可访问。</p>
+
+      <p v-else-if="loadError" data-server-error class="empty-state" role="alert">{{ loadError }}</p>
 
       <div v-else-if="!activityNode || !activity || !activityPlan" data-empty class="empty-state">活动未找到。</div>
 
       <div v-else-if="isLocked" data-locked class="empty-state">请先完成前置活动，再开始此任务。</div>
+
+      <div v-else-if="isUnavailable" data-unavailable class="empty-state">{{ unavailableMessage }}</div>
 
       <div v-else data-activity-page>
         <div class="plan-header">
@@ -132,6 +136,11 @@
 
           <!-- Submission versions -->
           <p v-if="submissionStatus !== 'NOT_STARTED'" data-submission-status class="status-pill" :class="submissionStatus === 'RETURNED' ? 'status-pill-orange' : ''">{{ submissionStatusLabel }}</p>
+          <p v-if="serverTaskError" data-task-error class="empty-state" role="alert">{{ serverTaskError }}</p>
+          <div v-if="submissionGrade" data-submission-grade class="form-panel" style="margin-top:16px;background:var(--practicum-teal-soft);">
+            <strong>评分：{{ submissionGrade.score }}</strong>
+            <p data-submission-grade-feedback>{{ submissionGrade.feedback }}</p>
+          </div>
           <p v-if="returnedFeedback" data-returned-feedback class="empty-state">退回反馈：{{ returnedFeedback }}</p>
           <div v-if="submissionVersions.length" style="margin-top:16px;">
             <h2>提交记录</h2>
@@ -149,7 +158,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { ActivityType } from '~/domain/practicum/types'
 import { usePracticumStore } from '~/composables/usePracticumStore'
 import { canSubmitWork } from '~/domain/practicum/permissions'
@@ -161,36 +170,65 @@ const store = usePracticumStore()
 const server = usePracticumServer()
 const auth = useAuthSession()
 const isLoading = ref(true)
-const serverSubmission = ref<Awaited<ReturnType<typeof server.getSubmission>>['submission'] | null>(null)
+const serverPlanDetail = ref<Awaited<ReturnType<typeof server.getPlan>> | null>(null)
+const serverTaskDetail = ref<Awaited<ReturnType<typeof server.getStudentTask>> | null>(null)
 const serverTaskId = ref<string | null>(null)
 const serverTaskStatus = ref<string | null>(null)
-const serverTaskSubmission = ref<Awaited<ReturnType<typeof server.getStudentTask>>['submission']>(null)
+type ServerTaskSubmission = {
+  id: string
+  currentVersion: number
+  submittedAt: string | null
+  versions: Array<{ id: string; version: number; text: string; submittedAt: string }>
+  grade?: { score: number | string; feedback: string } | null
+}
+const serverTaskSubmission = ref<ServerTaskSubmission | null>(null)
+const serverTaskLoaded = ref(false)
+const serverTaskError = ref('')
+const loadError = ref('')
+const isForbidden = ref(false)
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null
 onMounted(async () => {
-  if (auth.state.value.user?.role !== 'STUDENT') {
+  resetServerState()
+  const user = await waitForAuthUser()
+  if (user) store.switchRole(user.role)
+  if (user?.role !== 'STUDENT') {
     isLoading.value = false
     return
   }
   try {
-    serverSubmission.value = (await server.getSubmission(route.params.activityId as string)).submission
-  } catch {
-    // A first-time activity has no server submission yet.
+    const requestedTaskId = typeof route.query.taskId === 'string' ? route.query.taskId : null
+    const taskId = requestedTaskId ?? (await server.listStudentTasks()).items.find(task => task.activityId === nodeId.value)?.id
+    if (!taskId) {
+      loadError.value = '当前活动尚未分配给你，无法读取学习内容。'
+      return
+    }
+    const detail = await server.getStudentTask(taskId)
+    if (detail.task.activityId !== nodeId.value) {
+      isForbidden.value = true
+      return
+    }
+    serverTaskId.value = detail.task.id
+    serverTaskDetail.value = detail
+    serverTaskStatus.value = detail.task.status
+    serverTaskSubmission.value = detail.submission as ServerTaskSubmission | null
+    serverPlanDetail.value = await server.getPlan(detail.task.planId)
+    if (!activityNode.value || !activity.value) {
+      loadError.value = '服务端未返回当前活动内容，请联系教师检查任务配置。'
+      return
+    }
+    if (activity.value.config.type !== 'PRACTICE_ACTIVITY') {
+      serverLearningState.value = (await server.getStudentTaskLearningState(detail.task.id)).learningState
+    }
+    serverTaskLoaded.value = true
+    void recordHeartbeat('HEARTBEAT')
+    heartbeatTimer = setInterval(() => void recordHeartbeat('HEARTBEAT'), 60_000)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+  } catch (error) {
+    const statusCode = typeof error === 'object' && error !== null && 'statusCode' in error ? Number(error.statusCode) : 0
+    if (statusCode === 403 || statusCode === 404) isForbidden.value = true
+    else loadError.value = '活动状态暂时无法读取，请刷新后重试。'
   } finally {
     isLoading.value = false
-  }
-  try {
-    const tasks = await server.listStudentTasks()
-    serverTaskId.value = tasks.items.find(task => task.activityId === activity.value?.id)?.id ?? null
-    if (serverTaskId.value) {
-      const detail = await server.getStudentTask(serverTaskId.value)
-      serverTaskStatus.value = detail.task.status
-      serverTaskSubmission.value = detail.submission
-      void recordHeartbeat('HEARTBEAT')
-      heartbeatTimer = setInterval(() => void recordHeartbeat('HEARTBEAT'), 60_000)
-      document.addEventListener('visibilitychange', onVisibilityChange)
-    }
-  } catch {
-    serverTaskId.value = null
   }
 })
 
@@ -207,36 +245,68 @@ async function recordHeartbeat(eventType: 'HEARTBEAT' | 'VISIBILITY_VISIBLE' | '
   if (!serverTaskId.value) return
   try { await server.recordTaskHeartbeat(serverTaskId.value, eventType) } catch { /* Learning telemetry must not block the activity. */ }
 }
+
+async function waitForAuthUser() {
+  if (!auth.state.value.loaded) {
+    if (!auth.state.value.loading) {
+      await auth.load()
+    }
+    if (!auth.state.value.loaded) {
+      await new Promise<void>((resolve) => {
+        const stop = watch(() => auth.state.value.loaded, loaded => {
+          if (loaded) {
+            stop()
+            resolve()
+          }
+        }, { immediate: true })
+      })
+    }
+  }
+  return auth.state.value.user
+}
 const nodeId = computed(() => route.params.activityId as string)
-const activityNode = computed(() => store.state.nodes.find(n => n.id === nodeId.value) ?? null)
+const activityNode = computed(() => serverPlanDetail.value?.nodes.find(node => node.id === nodeId.value) ?? null)
 const activity = computed(() => {
   const node = activityNode.value
   if (!node?.activityId) return null
-  return store.state.activities.find(a => a.id === node.activityId) ?? null
+  return serverPlanDetail.value?.activities.find(item => item.id === node.activityId) ?? null
 })
-const activityPlan = computed(() => activityNode.value ? store.state.plans.find(plan => plan.id === activityNode.value?.planId) ?? null : null)
-const isPublishedStudentActivity = computed(() => store.state.activeRole === 'STUDENT' && activityPlan.value?.status === 'PUBLISHED')
-const isLocked = computed(() => store.state.lockedActivityIds.includes(nodeId.value))
+const activityPlan = computed(() => serverPlanDetail.value?.plan ?? null)
+const viewerRole = computed(() => auth.state.value.user?.role ?? store.state.activeRole)
+const isPublishedStudentActivity = computed(() => viewerRole.value === 'STUDENT' && activityPlan.value?.status === 'PUBLISHED')
+const isLocked = computed(() => serverTaskDetail.value?.task.status === 'LOCKED')
+const isUnavailable = computed(() => ['NOT_YET_AVAILABLE', 'CLOSED'].includes(serverTaskDetail.value?.task.availability ?? ''))
+const unavailableMessage = computed(() => serverTaskDetail.value?.task.availability === 'NOT_YET_AVAILABLE'
+  ? '该任务尚未到开放时间，请在开放后再开始。'
+  : '该任务已超过提交截止时间，当前不能继续操作。')
 
-const completedSteps = computed(() => new Set(store.getSoftwareAttempt(nodeId.value).completedStepIds))
+type ServerLearningState = Awaited<ReturnType<typeof server.getStudentTaskLearningState>>['learningState']
+const serverLearningState = ref<ServerLearningState | null>(null)
+const completedSteps = computed(() => new Set(serverLearningState.value?.type === 'SOFTWARE_ACTION' ? serverLearningState.value.completedStepIds : []))
 const incompleteError = ref('')
-const completionStatus = computed(() => store.getSoftwareAttempt(nodeId.value).completedAt ? 'completed' : 'incomplete')
+const completionStatus = computed(() => serverLearningState.value?.type === 'SOFTWARE_ACTION' && serverLearningState.value.completedAt ? 'completed' : 'incomplete')
 const showResetConfirm = ref(false)
 
-function toggleStep(stepId: string) {
+async function toggleStep(stepId: string) {
   const next = new Set(completedSteps.value)
   if (next.has(stepId)) next.delete(stepId)
   else next.add(stepId)
-  store.saveSoftwareSteps(nodeId.value, [...next])
-  incompleteError.value = ''
+  try {
+    if (!serverTaskId.value) throw new Error('student task unavailable')
+    serverLearningState.value = (await server.saveStudentTaskLearningState(serverTaskId.value, { type: 'SOFTWARE_ACTION', completedStepIds: [...next] })).learningState
+    incompleteError.value = ''
+  } catch {
+    incompleteError.value = '步骤保存失败，请检查网络后重试。'
+  }
 }
 
 const firstCheckbox = ref<HTMLElement | null>(null)
 
-function attemptComplete() {
-  const result = store.completeSoftwareActivity(nodeId.value)
-  if (!result.success) {
-    incompleteError.value = `请先完成必做步骤：${result.missing.join('、')}`
+async function attemptComplete() {
+  if (!activity.value || activity.value.config.type !== 'SOFTWARE_ACTION') return
+  const missing = activity.value.config.steps.filter(step => step.required && !completedSteps.value.has(step.id)).map(step => step.label)
+  if (missing.length) {
+    incompleteError.value = `请先完成必做步骤：${missing.join('、')}`
     // Focus the first checkbox if the error message is shown
     setTimeout(() => {
       const cb = document.querySelector('[data-step-checkbox]') as HTMLElement | null
@@ -244,46 +314,65 @@ function attemptComplete() {
     }, 50)
     return
   }
-  incompleteError.value = ''
+  try {
+    if (!serverTaskId.value) throw new Error('student task unavailable')
+    serverLearningState.value = (await server.saveStudentTaskLearningState(serverTaskId.value, { type: 'SOFTWARE_ACTION', completedStepIds: [...completedSteps.value], complete: true })).learningState
+    incompleteError.value = ''
+  } catch {
+    incompleteError.value = '完成状态保存失败，请检查网络后重试。'
+  }
 }
 
-function handleReset() {
-  store.resetSoftwareActivity(nodeId.value)
-  showResetConfirm.value = false
-  incompleteError.value = ''
+async function handleReset() {
+  try {
+    if (!serverTaskId.value) throw new Error('student task unavailable')
+    serverLearningState.value = (await server.saveStudentTaskLearningState(serverTaskId.value, { type: 'SOFTWARE_ACTION', completedStepIds: [] })).learningState
+    showResetConfirm.value = false
+    incompleteError.value = ''
+  } catch {
+    incompleteError.value = '重置失败，请检查网络后重试。'
+  }
 }
 
 // Training state
 const trainingAnswer = ref('')
 const trainingError = ref('')
-const trainingAttempts = computed(() => store.state.trainingAttempts[nodeId.value] ?? [])
+const trainingAttempts = computed(() => serverLearningState.value?.type === 'TRAINING' ? serverLearningState.value.attempts : [])
 const trainingFeedback = computed(() => trainingAttempts.value.at(-1)?.feedback ?? '')
 
-function submitTrainingAnswer() {
+async function submitTrainingAnswer() {
   if (!activity.value || activity.value.config.type !== 'TRAINING') return
   if (!trainingAnswer.value.trim()) {
     trainingError.value = '请输入答案后再提交。'
     return
   }
-  trainingError.value = ''
-  store.submitTrainingAttempt(nodeId.value, trainingAnswer.value)
-  trainingAnswer.value = ''
+  try {
+    if (!serverTaskId.value) throw new Error('student task unavailable')
+    serverLearningState.value = (await server.saveStudentTaskLearningState(serverTaskId.value, { type: 'TRAINING', answer: trainingAnswer.value })).learningState
+    trainingError.value = ''
+    trainingAnswer.value = ''
+  } catch {
+    trainingError.value = '训练答案提交失败，请检查网络后重试。'
+  }
 }
 
 // Practice state
-const practiceDraft = ref(store.state.practiceDrafts[nodeId.value] ?? '')
+const practiceDraft = ref('')
+const savedPracticeDraft = ref('')
 const draftSaved = ref(false)
 const showSubmitConfirm = ref(false)
 const showUnsavedLeave = ref(false)
-const submissionVersions = computed(() => serverTaskSubmission.value?.versions ?? serverSubmission.value?.versions ?? [])
-const submissionStatus = computed(() => serverTaskStatus.value ?? serverSubmission.value?.status ?? 'NOT_STARTED')
-const returnedFeedback = computed(() => serverSubmission.value?.feedback ?? '')
+const submissionVersions = computed(() => serverTaskLoaded.value ? (serverTaskSubmission.value?.versions ?? []) : [])
+const submissionStatus = computed(() => serverTaskLoaded.value ? (serverTaskStatus.value ?? 'NOT_STARTED') : 'NOT_STARTED')
+const returnedFeedback = computed(() => submissionStatus.value === 'RETURNED' ? (serverTaskDetail.value?.returnedFeedback?.feedback ?? '') : '')
+const submissionGrade = computed(() => serverTaskSubmission.value?.grade ?? null)
 const submissionStatusLabel = computed(() => submissionStatus.value === 'RETURNED' ? '已退回' : submissionStatus.value === 'GRADED' ? '已评分' : '已提交')
 const submissionPending = ref(false)
 const submissionError = ref('')
 
 function saveDraft() {
-  draftSaved.value = store.savePracticeDraft(nodeId.value, practiceDraft.value)
+  savedPracticeDraft.value = practiceDraft.value
+  draftSaved.value = true
   setTimeout(() => { draftSaved.value = false }, 3000)
 }
 
@@ -294,14 +383,14 @@ async function submitPractice() {
   submissionError.value = ''
   try {
     if (auth.state.value.user?.role !== 'STUDENT') throw new Error('student session required')
-    if (serverTaskId.value) {
-      const result = await server.submitStudentTask(serverTaskId.value, practiceDraft.value)
-      serverTaskStatus.value = result.task.status
-      serverTaskSubmission.value = result.submission
-    } else {
-      const result = await server.submitPractice(nodeId.value, practiceDraft.value)
-      serverSubmission.value = result.submission
+    if (!serverTaskId.value) throw new Error('student task unavailable')
+    const result = await server.submitStudentTask(serverTaskId.value, practiceDraft.value)
+    serverTaskStatus.value = result.task.status
+    serverTaskSubmission.value = result.submission
+    if (serverTaskDetail.value) {
+      serverTaskDetail.value = { ...serverTaskDetail.value, task: { ...serverTaskDetail.value.task, status: result.task.status }, submission: result.submission, returnedFeedback: null }
     }
+    savedPracticeDraft.value = practiceDraft.value
     showSubmitConfirm.value = false
     draftSaved.value = false
   } catch {
@@ -312,12 +401,11 @@ async function submitPractice() {
 }
 
 function leaveActivity() {
-  if (activityNode.value) navigateTo(`/practicum/learn/${activityNode.value.planId}`)
+  if (activityPlan.value) navigateTo(`/practicum/learn/${activityPlan.value.id}`)
 }
 
 function requestBack() {
-  const saved = store.state.practiceDrafts[nodeId.value] ?? ''
-  if (activity.value?.config.type === 'PRACTICE_ACTIVITY' && practiceDraft.value !== saved) {
+  if (activity.value?.config.type === 'PRACTICE_ACTIVITY' && practiceDraft.value !== savedPracticeDraft.value) {
     showUnsavedLeave.value = true
     return
   }
@@ -325,13 +413,26 @@ function requestBack() {
 }
 
 function saveAndLeave() {
-  store.savePracticeDraft(nodeId.value, practiceDraft.value)
+  savedPracticeDraft.value = practiceDraft.value
   leaveActivity()
 }
 
 function discardAndLeave() {
-  practiceDraft.value = store.state.practiceDrafts[nodeId.value] ?? ''
+  practiceDraft.value = savedPracticeDraft.value
   leaveActivity()
+}
+
+function resetServerState() {
+  serverPlanDetail.value = null
+  serverTaskDetail.value = null
+  serverTaskId.value = null
+  serverTaskStatus.value = null
+  serverTaskSubmission.value = null
+  serverLearningState.value = null
+  serverTaskLoaded.value = false
+  serverTaskError.value = ''
+  loadError.value = ''
+  isForbidden.value = false
 }
 
 function activityTypeLabel(type?: ActivityType) {

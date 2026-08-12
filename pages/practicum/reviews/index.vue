@@ -75,7 +75,7 @@
                 <td data-label="版本">版本 {{ item.version }}</td>
                 <td data-label="提交时间" data-submitted-time>{{ formatTime(item.submittedAt) }}</td>
                 <td data-label="状态"><span data-review-status class="status-pill">{{ statusLabel(item.status) }}</span></td>
-                <td data-label="操作"><NuxtLink :to="`/practicum/submissions/${item.submissionId}`" class="text-link">打开审核</NuxtLink></td>
+                <td data-label="操作"><NuxtLink :to="submissionHref(item.submissionId)" class="text-link">打开审核</NuxtLink></td>
               </tr>
             </tbody>
           </table>
@@ -97,6 +97,7 @@ const server = usePracticumServer()
 const isLoading = ref(true)
 const loadError = ref(false)
 const serverQueue = ref<Awaited<ReturnType<typeof server.listSubmissions>>['items']>([])
+const serverPlans = ref<Awaited<ReturnType<typeof server.listPlans>>['items']>([])
 const planFilter = ref('')
 const unitFilter = ref('')
 const statusFilter = ref('')
@@ -112,6 +113,7 @@ async function loadQueue() {
       status: statusFilter.value || undefined,
       student: studentFilter.value.trim() || undefined,
       sort: sortOrder.value,
+      pageSize: 50,
     })).items
   } catch {
     loadError.value = true
@@ -126,8 +128,16 @@ function retryQueue() {
 }
 
 onMounted(() => {
-  void loadQueue()
+  void Promise.all([loadQueue(), loadPlans()])
 })
+
+async function loadPlans() {
+  try {
+    serverPlans.value = (await server.listPlans({ status: 'PUBLISHED', page: 1, pageSize: 100, sort: 'updatedAt', direction: 'desc' })).items
+  } catch {
+    serverPlans.value = []
+  }
+}
 
 watch([planFilter, unitFilter, statusFilter, studentFilter, sortOrder], () => {
   void loadQueue()
@@ -136,7 +146,10 @@ watch([planFilter, unitFilter, statusFilter, studentFilter, sortOrder], () => {
 const queue = computed(() => serverQueue.value)
 const reviewScope = ref<'PLAN' | 'CLASSROOM'>('PLAN')
 const processingState = ref<'ALL' | 'PENDING' | 'REVIEWED'>('ALL')
-const planOptions = computed(() => uniqueOptions(queue.value.map(item => ({ id: item.planId, label: item.planTitle }))))
+const planOptions = computed(() => uniqueOptions([
+  ...serverPlans.value.map(plan => ({ id: plan.id, label: plan.title })),
+  ...queue.value.map(item => ({ id: item.planId, label: item.planTitle })),
+]))
 const unitOptions = computed(() => uniqueOptions(queue.value.map(item => ({ id: item.unitId, label: item.unitTitle }))))
 const filteredQueue = computed(() => queue.value
   .filter(item => item.reviewScope === reviewScope.value)
@@ -156,6 +169,19 @@ function uniqueOptions(options: Array<{ id: string; label: string }>) {
 
 function formatTime(value: string) {
   return new Intl.DateTimeFormat('zh-CN', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value))
+}
+
+function submissionHref(submissionId: string) {
+  const query: Record<string, string> = {
+    reviewScope: reviewScope.value,
+    processingState: processingState.value,
+    sort: sortOrder.value,
+  }
+  if (planFilter.value) query.planId = planFilter.value
+  if (unitFilter.value) query.unitId = unitFilter.value
+  if (statusFilter.value) query.status = statusFilter.value
+  if (studentFilter.value.trim()) query.student = studentFilter.value.trim()
+  return { path: `/practicum/submissions/${submissionId}`, query }
 }
 
 function statusLabel(status: SubmissionStatus) {

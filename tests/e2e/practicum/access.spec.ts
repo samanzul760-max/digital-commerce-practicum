@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { loginAsStudent } from './auth-helpers'
+import { loginAsOwner, loginAsStudent, loginAsTeacher } from './auth-helpers'
 
 /**
  * Given a student selects the Student demo role
@@ -13,7 +13,7 @@ test('[CASE-S1-002] student cannot see draft plans or manage plans', async ({ pa
   await expect(page).toHaveURL('/practicum')
 
   // 已发布计划通过学生首页的课程入口可见
-  await expect(page.getByText('网店运营')).toBeVisible()
+  await expect(page.locator('[data-student-home] .current-plan-strip')).toContainText('网店运营')
   await expect(page.locator('[data-course-card]').first()).toBeVisible()
   // 草稿计划不可见
   await expect(page.locator('[data-plan-link][data-plan-id="plan-wdsj"]')).toHaveCount(0)
@@ -107,4 +107,66 @@ test('[ORIGINAL-S2-002] student is blocked from resources members and room-setti
   await expect(page.locator('[data-forbidden]')).toContainText(/管理|设置|实训/)
   await expect(page.locator('[data-room-introduction]')).toHaveCount(0)
   await expect(page.locator('[data-save-room-settings]')).toHaveCount(0)
+})
+
+/**
+ * Given an owner opens the workspace
+ * When the owner clicks the plan list entry
+ * Then the real plan list route opens
+ */
+test('[CASE-S2-003] owner can open the real plan list page from the workspace', async ({ page }) => {
+  await loginAsOwner(page)
+  await page.goto('/practicum')
+
+  await page.locator('[data-owner-home] a[href="/practicum/plans"]').click()
+
+  await expect(page).toHaveURL('/practicum/plans')
+  await expect(page.locator('[data-plan-list-page]')).toBeVisible()
+  expect(await page.locator('[data-plan-row]').count()).toBeGreaterThan(0)
+})
+
+test('[TASK-4] teacher can view scoped classroom, progress, and review entry points', async ({ page }) => {
+  await loginAsTeacher(page)
+
+  await page.goto('/practicum/classes')
+  await expect(page.locator('[data-class-list], [data-class-page]')).toBeVisible()
+  await expect(page.locator('[data-forbidden]')).toHaveCount(0)
+
+  await page.goto('/practicum/progress')
+  await expect(page.locator('[data-student-growth]')).toBeVisible()
+  await expect(page.locator('[data-forbidden]')).toHaveCount(0)
+
+  await page.goto('/practicum/reviews')
+  await expect(page.locator('[data-review-page], [data-review-queue]')).toBeVisible()
+  await expect(page.locator('[data-forbidden]')).toHaveCount(0)
+})
+
+test('[TASK-4] teacher cannot edit plans, manage members, or change room settings', async ({ page }) => {
+  await loginAsTeacher(page)
+
+  for (const route of ['/practicum/plans/plan-wdsj/edit', '/practicum/members', '/practicum/room-settings']) {
+    await page.goto(route)
+    await expect(page.locator('[data-forbidden]')).toBeVisible()
+  }
+})
+
+test('[TASK-4] student cannot view teacher review or admin data', async ({ page }) => {
+  await loginAsStudent(page)
+
+  for (const route of ['/practicum/reviews', '/practicum/classes', '/practicum/members', '/practicum/room-settings']) {
+    await page.goto(route)
+    await expect(page.locator('[data-forbidden]')).toBeVisible()
+  }
+})
+
+test('[TASK-4] unauthorized direct API writes return 403', async ({ page, browser }) => {
+  await loginAsStudent(page)
+  expect((await page.request.post('/api/practicum/plans', { data: { roomId: 'room-001', title: 'blocked' } })).status()).toBe(403)
+
+  const teacherContext = await browser.newContext()
+  const teacher = await teacherContext.newPage()
+  await loginAsTeacher(teacher)
+  expect((await teacher.request.post('/api/practicum/plans', { data: { roomId: 'room-001', title: 'blocked' } })).status()).toBe(403)
+  expect((await teacher.request.patch('/api/practicum/members/member-unknown', { data: { role: 'OWNER' } })).status()).toBe(403)
+  await teacherContext.close()
 })

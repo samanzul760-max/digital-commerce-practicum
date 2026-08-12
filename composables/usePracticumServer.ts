@@ -32,6 +32,7 @@ export interface SubmissionQuery {
   unitId?: string
   student?: string
   sort?: 'oldest' | 'newest'
+  pageSize?: number
 }
 
 export interface PracticumAnalytics {
@@ -132,6 +133,44 @@ export interface ClassAssignment {
   gradedCount: number
 }
 
+export interface TeacherAnnouncement {
+  id: string
+  classId: string
+  title: string
+  body: string
+  status: 'DRAFT' | 'PUBLISHED' | 'CLOSED'
+  publishedAt: string | null
+  closedAt: string | null
+}
+
+export interface TeachingSessionSummary {
+  id: string
+  classId: string
+  currentActivityId: string | null
+  status: 'ACTIVE' | 'ENDED'
+  startedAt: string
+  endedAt: string | null
+}
+
+export interface PracticumTemplateSummary {
+  id: string
+  roomId: string
+  title: string
+  description: string
+  enabled: boolean
+  updatedAt: string
+}
+
+export interface CompetitionSummary {
+  id: string
+  roomId: string
+  title: string
+  description: string
+  status: 'DRAFT' | 'PUBLISHED' | 'CLOSED'
+  createdAt: string
+  myEntry: { registeredAt: string; submittedAt?: string } | null
+}
+
 export function usePracticumServer() {
   async function listPlans(input: { keyword?: string; status?: PlanStatus; page?: number; pageSize?: number; sort?: 'createdAt' | 'updatedAt' | 'title'; direction?: 'asc' | 'desc' } = {}) {
     const query = new URLSearchParams(Object.entries(input)
@@ -199,7 +238,7 @@ export function usePracticumServer() {
   }
 
   async function listStudentTasks() {
-    return await $fetch<{ items: Array<{ id: string; planAssignmentId: string; activityId: string; status: string; availability: string; availableAt: string; dueAt: string | null; source: { id: string; title: string; status: string } }> }>('/api/practicum/student/tasks')
+    return await $fetch<{ items: Array<{ id: string; planAssignmentId: string; planId: string; activityId: string; status: string; availability: string; availableAt: string; dueAt: string | null; activity: { id: string; title: string }; source: { id: string; title: string; status: string } }> }>('/api/practicum/student/tasks')
   }
 
   async function listClasses(organizationId: string, roomId: string) {
@@ -238,16 +277,60 @@ export function usePracticumServer() {
     })
   }
 
+  async function listTeacherAnnouncements(classId: string) {
+    return await $fetch<{ items: TeacherAnnouncement[] }>(`/api/practicum/teacher/classes/${encodeURIComponent(classId)}/announcements`)
+  }
+
+  async function listTeachingSessions(classId: string) {
+    return await $fetch<{ items: TeachingSessionSummary[] }>(`/api/practicum/teacher/classes/${encodeURIComponent(classId)}/sessions`)
+  }
+
+  async function getTeachingExecution(sessionId: string) {
+    return await $fetch<{ session: TeachingSessionSummary; execution: { total: number; notStarted: number; inProgress: number; completed: number } }>(`/api/practicum/teacher/sessions/${encodeURIComponent(sessionId)}/execution`)
+  }
+
+  async function getRoomOverview(roomId: string) {
+    return await $fetch<{ overview: Record<string, number> }>(`/api/practicum/analytics/overview?roomId=${encodeURIComponent(roomId)}`)
+  }
+
+  async function listAuditEvents(roomId: string, input: { eventType?: string; entityType?: string; before?: string; limit?: number } = {}) {
+    const query = new URLSearchParams([
+      ['roomId', roomId],
+      ...Object.entries(input)
+        .filter(([, value]) => value !== undefined && value !== '')
+        .map(([key, value]) => [key, String(value)]),
+    ]).toString()
+    return await $fetch<{ items: Array<{ id: string; eventType: string; entityType: string; entityId: string; occurredAt: string }>; nextBefore: string | null }>(`/api/practicum/audit?${query}`)
+  }
+
+  async function listTemplates() {
+    return await $fetch<{ items: PracticumTemplateSummary[] }>('/api/practicum/templates')
+  }
+
+  async function listCompetitions() {
+    return await $fetch<{ items: CompetitionSummary[] }>('/api/practicum/competitions')
+  }
+
   async function recordTaskHeartbeat(taskId: string, eventType: 'HEARTBEAT' | 'VISIBILITY_VISIBLE' | 'VISIBILITY_HIDDEN') {
     return await $fetch<{ ok: true }>(`/api/practicum/student-tasks/${encodeURIComponent(taskId)}/heartbeat`, { method: 'POST', headers: useCsrfHeaders(), body: { eventType } })
   }
 
-  type StudentTaskSubmission = { id: string; currentVersion: number; submittedAt: string | null; versions: Array<{ id: string; version: number; text: string; submittedAt: string }> }
+  type StudentTaskSubmission = { id: string; currentVersion: number; submittedAt: string | null; versions: Array<{ id: string; version: number; text: string; submittedAt: string }>; grade: { score: string; feedback: string; gradedAt: string } | null }
   async function getStudentTask(taskId: string) {
-    return await $fetch<{ task: { id: string; status: string }; submission: StudentTaskSubmission | null }>(`/api/practicum/student-tasks/${encodeURIComponent(taskId)}`)
+    return await $fetch<{ task: { id: string; planId: string; activityId: string; activity: { id: string; title: string }; status: string; availability: string; availableAt: string; dueAt: string | null; source: { id: string; title: string; status: string } }; submission: StudentTaskSubmission | null; returnedFeedback: { feedback: string; returnedAt: string } | null }>(`/api/practicum/student-tasks/${encodeURIComponent(taskId)}`)
   }
   async function submitStudentTask(taskId: string, text: string) {
     return await $fetch<{ task: { id: string; status: string }; submission: StudentTaskSubmission }>(`/api/practicum/student-tasks/${encodeURIComponent(taskId)}/submissions`, { method: 'POST', headers: useCsrfHeaders({ 'Idempotency-Key': `student-task-${taskId}-${crypto.randomUUID()}` }), body: { text } })
+  }
+
+  type SoftwareLearningState = { type: 'SOFTWARE_ACTION'; completedStepIds: string[]; completedAt: string | null }
+  type TrainingLearningState = { type: 'TRAINING'; maxAttempts: number; attempts: Array<{ answer: string; feedback: string; submittedAt: string }> }
+  type StudentTaskLearningState = SoftwareLearningState | TrainingLearningState
+  async function getStudentTaskLearningState(taskId: string) {
+    return await $fetch<{ learningState: StudentTaskLearningState }>(`/api/practicum/student-tasks/${encodeURIComponent(taskId)}/learning-state`)
+  }
+  async function saveStudentTaskLearningState(taskId: string, input: { type: 'SOFTWARE_ACTION'; completedStepIds: string[]; complete?: boolean } | { type: 'TRAINING'; answer: string }) {
+    return await $fetch<{ learningState: StudentTaskLearningState }>(`/api/practicum/student-tasks/${encodeURIComponent(taskId)}/learning-state`, { method: 'POST', headers: useCsrfHeaders(), body: input })
   }
 
   async function getAnalytics(roomId: string) {
@@ -274,5 +357,15 @@ export function usePracticumServer() {
     return await $fetch<{ ok: true }>(`/api/practicum/members/${encodeURIComponent(memberId)}?roomId=${encodeURIComponent(roomId)}`, { method: 'DELETE', headers: useCsrfHeaders() })
   }
 
-  return { listPlans, getPlan, listNotifications, markNotificationRead, listSubmissions, getSubmission, submitPractice, returnSubmission, gradeSubmission, getStats, getProgress, listStudentTasks, listClasses, listCohorts, createClass, listEnrollments, enrollStudent, listStudentRoster, listClassAssignments, publishClassAssignment, recordTaskHeartbeat, getStudentTask, submitStudentTask, getAnalytics, getMemberAnalytics, listMemberAchievementAnalytics, listRoomMembers, updateRoomMember, removeRoomMember }
+  async function listProducts(storeId?: string) {
+    const q = storeId ? `?storeId=${encodeURIComponent(storeId)}` : ''
+    return await $fetch<{ items: any[] }>(`/api/practicum/shop/products${q}`)
+  }
+
+  async function listFreightTemplates(storeId?: string) {
+    const q = storeId ? `?storeId=${encodeURIComponent(storeId)}` : ''
+    return await $fetch<{ items: any[] }>(`/api/practicum/shop/freight-templates${q}`)
+  }
+
+  return { listPlans, getPlan, listNotifications, markNotificationRead, listSubmissions, getSubmission, submitPractice, returnSubmission, gradeSubmission, getStats, getProgress, listStudentTasks, listClasses, listCohorts, createClass, listEnrollments, enrollStudent, listStudentRoster, listClassAssignments, publishClassAssignment, listTeacherAnnouncements, listTeachingSessions, getTeachingExecution, getRoomOverview, listAuditEvents, listTemplates, listCompetitions, recordTaskHeartbeat, getStudentTask, submitStudentTask, getStudentTaskLearningState, saveStudentTaskLearningState, getAnalytics, getMemberAnalytics, listMemberAchievementAnalytics, listRoomMembers, updateRoomMember, removeRoomMember, listProducts, listFreightTemplates }
 }

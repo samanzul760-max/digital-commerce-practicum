@@ -25,7 +25,7 @@
         <main class="lesson">
           <h2>{{ currentActivity?.title ?? plan.title }}</h2>
           <p>{{ currentModule?.title ?? '课程学习' }} · 预计学习 12 分钟 · {{ progressPercent }}% 完成</p>
-          <div class="video" aria-label="视频或沙箱实操播放器" />
+          <div :class="['video', { playing: videoPlaying }]" aria-label="视频或沙箱实操播放器" @click="toggleVideo" />
 
           <section class="lesson-card">
             <b>课程说明</b><br>
@@ -67,21 +67,32 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
+import { useAuthSession } from '~/composables/useAuthSession'
+import { usePracticumServer } from '~/composables/usePracticumServer'
 import { usePracticumStore } from '~/composables/usePracticumStore'
+import { useWorkspaceContext } from '~/composables/useWorkspaceContext'
 import { canAccessLearning, canViewPlan } from '~/domain/practicum/permissions'
 
 const route = useRoute()
+const auth = useAuthSession()
+const server = usePracticumServer()
 const store = usePracticumStore()
+const workspace = useWorkspaceContext()
 const isLoading = ref(true)
+const loadError = ref('')
+const serverDetail = ref<Awaited<ReturnType<typeof server.getPlan>> | null>(null)
+const serverProgress = ref<Awaited<ReturnType<typeof server.getProgress>> | null>(null)
+const serverFeedback = ref('')
+const videoPlaying = ref(false)
 
-onMounted(() => { isLoading.value = false })
+onMounted(loadLearning)
 
 const planId = computed(() => route.params.planId as string)
-const plan = computed(() => store.state.plans.find(item => item.id === planId.value) ?? null)
-const planNodes = computed(() => store.getPlanNodes(planId.value))
+const plan = computed(() => serverDetail.value?.plan ?? store.state.plans.find(item => item.id === planId.value) ?? null)
+const planNodes = computed(() => serverDetail.value?.nodes ?? store.getPlanNodes(planId.value))
 const modules = computed(() => planNodes.value.filter(node => node.level === 1).sort((a, b) => a.sort - b.sort))
 const activities = computed(() => planNodes.value.filter(node => node.level === 3).sort((a, b) => a.sort - b.sort))
-const progress = computed(() => store.getPlanProgress(planId.value))
+const progress = computed(() => serverProgress.value?.plans.find(item => item.id === planId.value) ?? store.getPlanProgress(planId.value))
 const progressPercent = computed(() => progress.value.percent)
 const learningPosition = computed(() => {
   const saved = store.getLearningPosition(planId.value)
@@ -97,8 +108,43 @@ const planMeta = computed(() => plan.value ? `已发布 · ${modules.value.lengt
 const feedbackText = computed(() => {
   if (!currentActivity.value) return '完成任务后，这里会显示老师的批改建议。'
   const submission = store.state.practiceSubmissions[currentActivity.value.id]
-  return submission?.feedback ?? '选品模板很实用，跟着步骤完成后更知道从哪里开始分析。'
+  return serverFeedback.value || submission?.feedback || '选品模板很实用，跟着步骤完成后更知道从哪里开始分析。'
 })
+
+async function loadLearning() {
+  isLoading.value = true
+  loadError.value = ''
+  serverDetail.value = null
+  const user = await auth.load()
+  if (user) store.switchRole(user.role)
+  try {
+    serverDetail.value = await server.getPlan(planId.value)
+    const activityId = serverDetail.value.nodes.find(node => node.level === 3)?.id
+    if (activityId) {
+      try {
+        const submission = await server.getSubmission(activityId)
+        serverFeedback.value = submission.submission.feedback ?? ''
+      } catch {
+        serverFeedback.value = ''
+      }
+    }
+    try {
+      await workspace.load()
+      const roomId = workspace.state.value.room?.id ?? store.state.room.id
+      if (roomId) serverProgress.value = await server.getProgress(roomId, 'STUDENT')
+    } catch {
+      serverProgress.value = null
+    }
+  } catch {
+    loadError.value = '服务端暂时无法返回课程内容，请稍后重试。'
+  } finally {
+    isLoading.value = false
+  }
+}
+
+function toggleVideo() {
+  videoPlaying.value = !videoPlaying.value
+}
 </script>
 
 <style scoped>

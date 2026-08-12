@@ -11,7 +11,7 @@ test('[PHASE-A-01] unauthenticated workspace redirects to login and hides busine
   await page.context().clearCookies()
   await page.goto('/practicum')
   await expect(page).toHaveURL('/practicum/login')
-  await expect(page.locator('[data-login-form], [data-bootstrap-form]')).toBeVisible()
+  await expect(page.locator('[data-login-form]')).toBeVisible()
   await expect(page.locator('[data-owner-home], [data-student-home]')).toHaveCount(0)
 })
 

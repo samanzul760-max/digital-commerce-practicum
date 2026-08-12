@@ -7,7 +7,7 @@ import { recordRoomAuditEvent, resolveCurrentRoomId } from '../../../services/re
 export default defineEventHandler(async (event) => {
   const user = requireAuthenticatedUser(event)
   const notificationId = getRouterParam(event, 'notificationId') ?? ''
-  const roomId = resolveCurrentRoomId(user, getSessionContext(getCookie(event, AUTH_COOKIE))?.roomId)
+  const roomId = resolveCurrentRoomId(user, (await getSessionContext(getCookie(event, AUTH_COOKIE)))?.roomId)
   if (!roomId) throw createError({ statusCode: 403, statusMessage: 'NOTIFICATION_ROOM_FORBIDDEN', data: { code: 'NOTIFICATION_ROOM_FORBIDDEN' } })
   if (!listNotifications(user).items.some(notification => notification.id === notificationId)) {
     throw createError({ statusCode: 404, statusMessage: 'NOTIFICATION_NOT_FOUND', data: { code: 'NOTIFICATION_NOT_FOUND' } })

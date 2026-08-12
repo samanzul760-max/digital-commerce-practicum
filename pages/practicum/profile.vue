@@ -35,7 +35,19 @@
           <button data-logout class="secondary-button" type="button" :disabled="auth.state.value.loading" @click="handleLogout">退出登录</button>
         </section>
 
-        <section v-if="auth.state.value.user" data-identity-choices class="identity-section">
+        <section v-if="auth.state.value.user && editMode" data-profile-edit-panel class="identity-section">
+          <h2>编辑资料</h2>
+          <form data-profile-edit-form class="form-panel" @submit.prevent="handleProfileSave">
+            <label class="field">显示名称<input v-model.trim="displayName" data-profile-display-name maxlength="40" required type="text"></label>
+            <p v-if="auth.state.value.error" data-profile-save-error class="form-error" role="alert">{{ auth.state.value.error }}</p>
+            <p v-if="profileSaveSuccess" data-profile-save-success class="muted" role="status">已保存：{{ auth.state.value.user.displayName }}</p>
+            <button data-profile-save class="primary-button" type="submit" :disabled="auth.state.value.loading">
+              {{ auth.state.value.loading ? '保存中...' : '保存资料' }}
+            </button>
+          </form>
+        </section>
+
+        <section v-if="auth.state.value.user?.authorizedRoles.includes('STUDENT')" data-identity-choices class="identity-section">
           <h2>工作区视角</h2>
           <p>当前账号的角色权限由服务端确定；这里保留已有原型的视角预览，便于验收学生端和管理端页面。</p>
           <div data-role-options class="identity-list">
@@ -53,19 +65,21 @@
           </div>
         </section>
 
-        <section v-if="auth.state.value.user" data-management-group class="identity-section">
+        <section v-if="managementRoles.length" data-management-group class="identity-section">
           <h2>管理视角</h2>
           <div class="identity-list">
             <button
-              data-role-option="OWNER"
-              :data-role-current="store.state.activeRole === 'OWNER' ? 'true' : undefined"
+              v-for="role in managementRoles"
+              :key="role"
+              :data-role-option="role"
+              :data-role-current="store.state.activeRole === role ? 'true' : undefined"
               class="identity-card"
-              :class="{ 'identity-card-active': store.state.activeRole === 'OWNER' }"
+              :class="{ 'identity-card-active': store.state.activeRole === role }"
               type="button"
-              @click="selectRole('OWNER')"
+              @click="selectRole(role)"
             >
-              <span class="identity-copy"><strong>管理员</strong><span>管理教学计划、成员、资源和审核</span></span>
-              <span class="identity-state">{{ store.state.activeRole === 'OWNER' ? '当前视角' : '进入' }}</span>
+              <span class="identity-copy"><strong>{{ roleLabels[role] }}</strong><span>{{ roleDescriptions[role] }}</span></span>
+              <span class="identity-state">{{ store.state.activeRole === role ? '当前视角' : '进入' }}</span>
             </button>
           </div>
         </section>
@@ -82,13 +96,22 @@ import { usePracticumStore } from '~/composables/usePracticumStore'
 const auth = useAuthSession()
 const store = usePracticumStore()
 const router = useRouter()
+const route = useRoute()
 const identifier = ref('')
 const password = ref('')
+const displayName = ref('')
+const profileSaveSuccess = ref(false)
 
-const roleLabels = { OWNER: '管理员', TEACHER: '教师', MENTOR: '导师', STUDENT: '学生' } as const
+const roleLabels = { ADMIN: '管理员', OWNER: '管理员', TEACHER: '教师', MENTOR: '导师', STUDENT: '学生' } as const
+const roleDescriptions = { ADMIN: '管理教学任务、学生账号与批阅', OWNER: '管理教学计划、成员、资源和审核', TEACHER: '组织课堂教学并查看学生任务', MENTOR: '辅导学生实践并提供反馈', STUDENT: '学习已发布计划并提交实践任务' } as const
+const managementRoles = computed(() => auth.state.value.user?.authorizedRoles.filter(role => role !== 'STUDENT') ?? [])
 const roleLabel = computed(() => auth.state.value.user ? roleLabels[auth.state.value.user.role] : '')
+const editMode = computed(() => route.query.edit === '1')
 
-onMounted(() => auth.load())
+onMounted(async () => {
+  const user = await auth.load()
+  displayName.value = user?.displayName ?? ''
+})
 
 async function handleLogin() {
   const user = await auth.login(identifier.value, password.value)
@@ -103,8 +126,21 @@ async function handleLogout() {
   await router.push('/practicum/login')
 }
 
-function selectRole(role: 'OWNER' | 'STUDENT') {
-  store.switchRole(role)
-  router.push('/practicum')
+async function handleProfileSave() {
+  profileSaveSuccess.value = false
+  const user = await auth.updateProfile(displayName.value)
+  if (!user) return
+  displayName.value = user.displayName
+  profileSaveSuccess.value = true
+}
+
+async function selectRole(role: keyof typeof roleLabels) {
+  const user = auth.state.value.user
+  if (auth.state.value.loading || !user?.authorizedRoles.includes(role)) return
+  if (user.role !== role) {
+    const switchedUser = await auth.switchRole(role)
+    store.switchRole(switchedUser.role)
+  }
+  await router.push('/practicum')
 }
 </script>

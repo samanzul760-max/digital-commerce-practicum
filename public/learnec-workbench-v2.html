@@ -1,0 +1,1497 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>LearnEC · 数字商贸实训工作台</title>
+<script src="https://cdn.jsdelivr.net/npm/vue@3.5.39/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
+<style>
+/* 系统字体栈：用本地字体避免下载5-10MB中文字体文件。
+   Windows: Microsoft YaHei / PingFang; Mac: PingFang SC; Android: Noto Sans SC.
+   JetBrains Mono 仅用于 .num 数字，用 Consolas/Menlo 等系统等宽字体替代即可。 */
+<style>
+/* ══════════════════════════════════════════════════════════════
+   方案 A 精修：轻蓝工作台 — 大气留白 · 学员 4 页 + 管理 5 页
+   此 CSS 块与设计稿一字不差，禁止修改任何规则。
+   ══════════════════════════════════════════════════════════════ */
+:root{
+  --bg: oklch(99% 0.002 240);
+  --surface: #fff;
+  --fg: oklch(18% 0.012 250);
+  --muted: oklch(50% 0.012 250);
+  --border: oklch(91% 0.006 250);
+  --accent: #147bd1;
+  --accent-deep: #0f65ae;
+  --accent-soft: oklch(96% 0.022 240);
+  --success:#16a34a; --warn:#d97706; --danger:#dc2626;
+  --c-orange:#ff9d45; --c-blue:#4d8be5; --c-green:#35ad87; --c-purple:#8671e6;
+  --font-display:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC','Microsoft YaHei',system-ui,sans-serif;
+  --font-body:-apple-system,BlinkMacSystemFont,'SF Pro Text','PingFang SC','Microsoft YaHei',system-ui,sans-serif;
+  --font-mono:'Cascadia Code','Fira Code','JetBrains Mono',ui-monospace,Consolas,Menlo,monospace;
+  --max: 1180px;
+  --r: 12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--fg);font:15px/1.6 var(--font-body);-webkit-font-smoothing:antialiased}
+button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+h1,h2,h3{font-family:var(--font-display);letter-spacing:-0.025em;font-weight:700}
+.num{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+a{color:inherit}
+
+/* —— 顶栏 —— */
+.top{position:sticky;top:0;z-index:40;height:64px;display:flex;align-items:center;gap:28px;padding:0 40px;
+  background:color-mix(in oklab,var(--surface) 88%,transparent);backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--border)}
+.logo{display:flex;align-items:center;gap:10px;font:700 16px/1 var(--font-display);letter-spacing:-0.02em;flex:none;cursor:pointer}
+.logo b{width:28px;height:28px;border-radius:8px;background:var(--accent);color:#fff;display:grid;place-items:center;
+  font:700 14px var(--font-mono);box-shadow:0 2px 6px rgba(20,123,209,.3)}
+.tabs{display:flex;height:100%;gap:4px;flex:1}
+.tabs button{position:relative;height:100%;padding:0 16px;color:var(--muted);font:500 14px var(--font-body)}
+.tabs button:hover{color:var(--fg)}
+.tabs button.active{color:var(--fg);font-weight:600}
+.tabs button.active:after{content:'';position:absolute;left:16px;right:16px;bottom:0;height:2px;background:var(--accent);border-radius:2px}
+.top-right{display:flex;align-items:center;gap:12px;flex:none;position:relative}
+.role{display:flex;padding:3px;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.role button{padding:6px 12px;border-radius:8px;font:500 12px var(--font-body);color:var(--muted)}
+.role button.on{background:var(--fg);color:#fff;font-weight:600}
+.bell{width:38px;height:38px;display:grid;place-items:center;border:1px solid var(--border);border-radius:10px;color:var(--muted);position:relative}
+.bell i{width:16px;height:16px}
+.bell.has-unread:after{content:'';position:absolute;top:9px;right:10px;width:7px;height:7px;border-radius:50%;background:var(--danger);border:2px solid #fff}
+.notification-badge{position:absolute;top:-6px;right:-6px;background:var(--danger);color:#fff;font:600 10px var(--font-mono);padding:1px 5px;border-radius:999px;min-width:18px;text-align:center;line-height:1}
+.avatar{width:36px;height:36px;border-radius:50%;background:oklch(30% 0.03 250);color:#fff;display:grid;place-items:center;font:600 13px var(--font-body);cursor:pointer}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:42px;padding:0 20px;border-radius:10px;font:600 14px var(--font-body)}
+.btn-primary{background:var(--accent);color:#fff;box-shadow:0 1px 2px rgba(16,24,40,.12),inset 0 1px 0 rgba(255,255,255,.15)}
+.btn-primary:hover{background:var(--accent-deep)}
+.btn-primary:disabled{opacity:.55;cursor:not-allowed}
+.btn-ghost{background:var(--surface);border:1px solid var(--border);color:var(--fg)}
+.btn-ghost:hover{border-color:oklch(82% 0.01 250)}
+.btn-sm{height:34px;padding:0 14px;font-size:13px;border-radius:8px}
+.btn-lg{height:48px;padding:0 28px;font-size:15px;border-radius:12px}
+
+/* 下拉菜单 */
+.topbar-dropdown{position:absolute;top:52px;right:0;width:320px;background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:0 16px 40px rgba(16,24,40,.18);z-index:50;overflow:hidden}
+.dropdown-header{display:flex;justify-content:space-between;align-items:flex-start;padding:18px 20px 12px;border-bottom:1px solid var(--border)}
+.dropdown-header strong{display:block;font-size:14px}
+.dropdown-header span{font-size:12px;color:var(--muted)}
+.dropdown-list{list-style:none;max-height:280px;overflow-y:auto}
+.dropdown-link{display:flex;align-items:center;gap:12px;padding:12px 20px;text-decoration:none;color:inherit;font-size:13px;width:100%;text-align:left;border:0;background:none;cursor:pointer}
+.dropdown-link:hover{background:var(--bg)}
+.dropdown-icon{width:20px;height:20px;display:grid;place-items:center;color:var(--muted);flex:none}
+.dropdown-copy strong{display:block;font-size:13px}
+.dropdown-copy span{font-size:11px;color:var(--muted)}
+.dropdown-empty{padding:24px;text-align:center;color:var(--muted);font-size:13px}
+.dropdown-button:disabled{opacity:.45;cursor:default}
+.role-chip{font:600 10px var(--font-mono);padding:3px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent-deep)}
+.profile-role-options{border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:4px 0;margin:4px 0}
+.topbar-backdrop{position:fixed;inset:0;z-index:39}
+
+.shell-s,.shell-a{display:none}
+.shell-s.on,.shell-a.on{display:block}
+.view{display:none}
+.view.active{display:block}
+.wrap{max-width:var(--max);margin:0 auto;padding:0 40px}
+
+/* —— 学员 · 首页 —— */
+.hero{display:grid;grid-template-columns:1fr 1fr;gap:72px;align-items:center;padding:80px 0 64px}
+.eyebrow{font:600 12px var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+.hero h1{margin:18px 0 20px;font-size:clamp(36px,4.2vw,52px);line-height:1.12;letter-spacing:-0.03em}
+.hero .lede{max-width:28em;font-size:17px;line-height:1.7;color:var(--muted)}
+.hero-cta{display:flex;gap:14px;margin-top:32px}
+.hero-scene{position:relative;border-radius:20px;overflow:hidden;aspect-ratio:5/4;
+  box-shadow:0 32px 64px -28px rgba(16,24,40,.28)}
+.hero-scene img{width:100%;height:100%;object-fit:cover;display:block}
+.hero-badge{position:absolute;left:20px;bottom:20px;padding:12px 16px;border-radius:12px;
+  background:rgba(255,255,255,.94);backdrop-filter:blur(10px);box-shadow:0 8px 24px rgba(16,24,40,.12);
+  font:500 13px var(--font-body);display:flex;align-items:center;gap:10px}
+.hero-badge .dot{width:8px;height:8px;border-radius:50%;background:var(--success)}
+
+.resume{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;margin-bottom:72px}
+.resume-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px 32px;
+  display:flex;align-items:center;justify-content:space-between;gap:24px}
+.resume-card h3{font-size:18px;margin:6px 0 8px}
+.resume-card p{font-size:14px;color:var(--muted)}
+.resume-card .lbl{font:600 11px var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.track{height:6px;border-radius:99px;background:var(--bg);overflow:hidden;margin-top:14px;max-width:280px}
+.track i{display:block;height:100%;background:var(--accent);border-radius:99px}
+
+.section{padding:0 0 80px}
+.section-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:28px;gap:24px}
+.section-head h2{font-size:28px;letter-spacing:-0.02em}
+.section-head p{color:var(--muted);font-size:14px;margin-top:6px}
+.link{font:500 14px var(--font-body);color:var(--fg);border-bottom:1px solid var(--border);padding-bottom:2px;cursor:pointer}
+.link:hover{border-color:var(--fg)}
+
+.paths{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:64px}
+.path{padding:28px;border:1px solid var(--border);border-radius:16px;background:var(--surface);transition:border-color .15s,transform .15s;cursor:pointer}
+.path:hover{border-color:color-mix(in oklab,var(--accent) 35%,var(--border));transform:translateY(-2px)}
+.path .n{font:600 12px var(--font-mono);color:var(--accent);letter-spacing:.08em}
+.path h3{font-size:20px;margin:14px 0 8px}
+.path span{font-size:14px;color:var(--muted)}
+
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.course-card{border:1px solid var(--border);border-radius:16px;overflow:hidden;background:var(--surface);
+  transition:transform .18s,box-shadow .18s}
+.course-card:hover{transform:translateY(-4px);box-shadow:0 20px 40px -24px rgba(16,24,40,.22)}
+.course-banner{height:120px;padding:20px 22px;color:#fff;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden}
+.course-banner:after{content:'';position:absolute;right:-40px;top:-40px;width:140px;height:140px;border-radius:40px;background:rgba(255,255,255,.15);transform:rotate(18deg)}
+.course-banner .cat{font:600 11px var(--font-mono);letter-spacing:.12em;text-transform:uppercase;opacity:.9}
+.course-banner h3{position:relative;z-index:1;font-size:22px;letter-spacing:-0.02em}
+.banner-orange{background:var(--c-orange)}.banner-blue{background:var(--c-blue)}
+.banner-green{background:var(--c-green)}.banner-purple{background:var(--c-purple)}
+.course-body{padding:20px 22px 22px}
+.course-body b{font-size:14px;font-weight:600}
+.course-body span{display:block;margin-top:6px;color:var(--muted);font-size:13px}
+.course-meta{display:flex;align-items:center;justify-content:space-between;margin-top:18px;padding-top:16px;border-top:1px solid var(--border)}
+.stars{color:#e8a838;letter-spacing:2px;font-size:12px}
+.tag{font:500 12px var(--font-body);color:var(--accent-deep);background:var(--accent-soft);padding:4px 10px;border-radius:999px}
+
+.foot{border-top:1px solid var(--border);padding:28px 40px;display:flex;justify-content:space-between;color:var(--muted);font-size:13px}
+.foot .num{font-size:11px;letter-spacing:.08em}
+
+/* —— 课程大厅 —— */
+.hall{display:grid;grid-template-columns:200px 1fr;min-height:calc(100vh - 64px)}
+.filters{padding:40px 28px;border-right:1px solid var(--border);background:var(--surface)}
+.filters h4{font:600 11px var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:28px 0 14px}
+.filters h4:first-child{margin-top:0}
+.filter{display:flex;align-items:center;gap:10px;padding:8px 0;font-size:14px;cursor:pointer;color:var(--fg)}
+.filter input{accent-color:var(--accent);width:15px;height:15px}
+.hall-main{padding:40px 48px}
+.hall-tools{display:flex;gap:12px;margin-bottom:28px}
+.search{flex:0 1 320px;height:44px;padding:0 16px;border:1px solid var(--border);border-radius:10px;background:var(--surface);font:14px var(--font-body)}
+.search:focus{outline:2px solid color-mix(in oklab,var(--accent) 28%,transparent);border-color:var(--accent)}
+.select{height:44px;padding:0 16px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--muted);font:500 14px var(--font-body)}
+.hall-main .cards{grid-template-columns:repeat(3,1fr)}
+.hall-main .course-banner{height:100px}
+.hall-main .course-banner h3{font-size:18px}
+.course-card[role="button"]{cursor:pointer}
+.course-card:focus-visible,.outline div[role="button"]:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.course-empty{grid-column:1/-1;padding:36px;border:1px dashed var(--border);border-radius:16px;color:var(--muted);text-align:center}
+.course-result{margin:-12px 0 20px;color:var(--muted);font-size:13px}
+
+/* —— 学员中心 —— */
+.dash{display:grid;grid-template-columns:200px 1fr;min-height:calc(100vh - 64px)}
+.side{padding:28px 16px;border-right:1px solid var(--border);background:var(--surface)}
+.side button{display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;border-radius:10px;color:var(--muted);font:500 14px var(--font-body);text-align:left}
+.side button i{width:18px;height:18px}
+.side button:hover{background:var(--bg);color:var(--fg)}
+.side button.active{background:var(--accent-soft);color:var(--accent-deep);font-weight:600}
+.dash-main{padding:40px 48px;max-width:980px}
+.welcome{padding:36px 40px;border-radius:20px;border:1px solid var(--border);
+  background:linear-gradient(165deg,oklch(97% 0.015 240),var(--surface) 60%);
+  display:flex;justify-content:space-between;align-items:center;gap:32px;margin-bottom:28px}
+.welcome h1{font-size:32px;letter-spacing:-0.025em}
+.welcome p{margin-top:10px;font-size:15px;color:var(--muted)}
+.welcome p b{color:var(--fg)}
+.medals{display:flex;gap:12px}
+.medal{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;border:3px solid #fff;
+  box-shadow:0 4px 12px rgba(0,0,0,.08)}
+.medal.g{background:radial-gradient(circle at 30% 28%,#ffe9a8,#f0b93c);color:#8a5a00}
+.medal.s{background:radial-gradient(circle at 30% 28%,#f0f4f8,#b9c6d2);color:#4a5568}
+.medal.b{background:radial-gradient(circle at 30% 28%,#f6d3ae,#cd8d4e);color:#6b3e18}
+.medal i{width:22px;height:22px}
+
+.stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:28px}
+.stat{padding:24px 28px;background:var(--surface);border:1px solid var(--border);border-radius:16px}
+.stat .l{font-size:13px;color:var(--muted)}
+.stat .v{font:700 32px/1.15 var(--font-mono);letter-spacing:-0.03em;margin-top:8px}
+
+.two{display:grid;grid-template-columns:1.25fr .85fr;gap:16px}
+.paper{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px}
+.paper h3{font-size:16px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}
+.paper h3 .m{font:500 13px var(--font-body);color:var(--muted);font-weight:500}
+.prog{display:grid;grid-template-columns:48px 1fr 48px;gap:14px;align-items:center;padding:16px 0;border-top:1px solid var(--border)}
+.prog:first-of-type{border-top:0;padding-top:0}
+.thumb{width:48px;height:36px;border-radius:8px}
+.prog .name{font-size:14px;font-weight:500}
+.prog .track{margin-top:8px;max-width:none}
+.prog .pct{text-align:right;font:600 14px var(--font-mono)}
+.entry{display:flex;align-items:center;justify-content:space-between;padding:16px 0;border-top:1px solid var(--border);gap:16px}
+.entry:first-of-type{border-top:0;padding-top:0}
+.entry b{font-size:14px;display:block}
+.entry span{font-size:13px;color:var(--muted)}
+.pill{display:inline-flex;padding:4px 10px;border-radius:999px;font:500 12px var(--font-body)}
+.pill-ok{background:oklch(96% 0.03 150);color:var(--success)}
+.pill-warn{background:oklch(97% 0.035 80);color:var(--warn)}
+.pill-info{background:var(--accent-soft);color:var(--accent-deep)}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;text-align:center}
+.cal .wd{font:600 11px var(--font-mono);color:var(--muted);padding:6px 0}
+.cal b{padding:10px 0;border-radius:8px;background:var(--bg);font:500 12px var(--font-mono)}
+.cal b.hl{background:var(--accent-soft);color:var(--accent-deep)}
+.cal b.td{background:var(--accent);color:#fff}
+.remind{margin-top:24px;padding:18px;border-radius:12px;background:var(--bg);border:1px solid var(--border)}
+.remind .when{font:600 12px var(--font-mono);color:var(--accent);letter-spacing:.04em}
+.remind b{display:block;margin-top:8px;font-size:15px}
+.remind p{margin-top:4px;font-size:13px;color:var(--muted)}
+
+/* —— 学习页 —— */
+.learn{display:grid;grid-template-columns:240px minmax(0,1fr) 300px;min-height:calc(100vh - 64px)}
+.outline{padding:32px 20px;border-right:1px solid var(--border);background:var(--surface)}
+.outline h4{font:600 11px var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:24px 12px 10px}
+.outline h4:first-child{margin-top:0}
+.outline div{padding:10px 12px;border-radius:10px;font-size:14px;color:var(--muted);display:flex;gap:10px;align-items:center;cursor:pointer}
+.outline div i{width:15px;height:15px;flex:none}
+.outline div.active{background:var(--accent-soft);color:var(--accent-deep);font-weight:600}
+.outline div.done{color:var(--success)}
+.lesson{padding:48px 56px;max-width:760px}
+.lesson h1{font-size:32px;letter-spacing:-0.025em}
+.lesson .sub{margin:10px 0 28px;color:var(--muted);font-size:14px}
+.video{position:relative;border-radius:16px;overflow:hidden;background:#0c1218;aspect-ratio:16/9}
+.video img{width:100%;height:100%;object-fit:cover;opacity:.8;display:block}
+.video .play{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:72px;height:72px;border-radius:50%;
+  background:rgba(255,255,255,.95);color:var(--accent);display:grid;place-items:center;box-shadow:0 12px 32px rgba(0,0,0,.35)}
+.video .play:hover{transform:translate(-50%,-50%) scale(1.05)}
+.video .play i{width:28px;height:28px;margin-left:3px}
+.video.playing .play{opacity:0;transform:translate(-50%,-50%) scale(.92)}
+.video.playing:hover .play,.video.playing .play:focus-visible{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.video-bar{position:absolute;left:0;right:0;bottom:0;padding:14px 18px;display:flex;align-items:center;gap:12px;
+  background:linear-gradient(transparent,rgba(0,0,0,.7));color:#fff;font:12px var(--font-mono)}
+.video-bar .rail{flex:1;height:3px;border-radius:99px;background:rgba(255,255,255,.25)}
+.video-bar .rail i{display:block;width:32%;height:100%;background:#fff;border-radius:99px}
+.video-hint{position:absolute;top:12px;left:50%;transform:translateX(-50%);
+  background:rgba(0,0,0,.65);color:#fff;font-size:12px;padding:4px 14px;border-radius:999px;
+  pointer-events:none;opacity:0;transition:opacity .3s}
+.video:hover .video-hint,.video:not(.playing) .play:hover~.video-hint{opacity:1}
+.task-box{margin-top:28px;padding:28px;border:1px solid var(--border);border-radius:16px;background:var(--surface)}
+.task-box h3{font-size:17px;margin-bottom:10px}
+.task-box p{color:var(--muted);font-size:14px;line-height:1.7;margin-bottom:20px}
+.task-box .actions{display:flex;gap:10px;flex-wrap:wrap}
+.learn-status{min-height:22px;margin-top:14px;color:var(--muted);font-size:13px}
+.drawer{padding:32px 24px;border-left:1px solid var(--border);background:var(--surface)}
+.drawer h3{font-size:16px;margin-bottom:20px}
+.teacher{display:flex;gap:14px;padding-bottom:20px;border-bottom:1px solid var(--border);margin-bottom:8px}
+.teacher img{width:48px;height:48px;border-radius:50%;object-fit:cover}
+.teacher b{font-size:14px}
+.teacher p{margin-top:4px;font-size:13px;color:var(--muted);line-height:1.55}
+.comment{padding:16px 0;border-bottom:1px solid var(--border)}
+.comment b{font-size:13px}
+.comment p{margin-top:6px;font-size:13px;color:var(--muted);line-height:1.6}
+
+/* —— 管理端壳 —— */
+.admin{display:grid;grid-template-columns:220px 1fr;min-height:calc(100vh - 64px)}
+.admin-side{padding:28px 14px;border-right:1px solid var(--border);background:var(--surface);position:sticky;top:64px;height:calc(100vh - 64px)}
+.admin-side .lbl{font:600 11px var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:0 12px;margin:0 0 10px}
+.admin-side button{display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;border-radius:10px;color:var(--muted);font:500 14px var(--font-body);text-align:left;margin-bottom:2px}
+.admin-side button i{width:18px;height:18px}
+.admin-side button:hover{background:var(--bg);color:var(--fg)}
+.admin-side button.active{background:var(--accent-soft);color:var(--accent-deep);font-weight:600}
+.admin-side button .badge{margin-left:auto;font:600 11px var(--font-mono);background:var(--danger);color:#fff;padding:2px 7px;border-radius:999px}
+.admin-main{padding:40px 48px 64px;max-width:1100px}
+.admin-main > .page-h{margin-bottom:32px;display:flex;align-items:flex-end;justify-content:space-between;gap:24px}
+.admin-main > .page-h h1{font-size:32px;letter-spacing:-0.025em}
+.admin-main > .page-h p{margin-top:8px;color:var(--muted);font-size:15px}
+
+.kpi-4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
+.kpi{padding:24px 26px;background:var(--surface);border:1px solid var(--border);border-radius:16px}
+.kpi .l{font-size:13px;color:var(--muted)}
+.kpi .v{font:700 30px/1.15 var(--font-mono);letter-spacing:-0.03em;margin-top:10px}
+.kpi .d{font:500 12px var(--font-mono);margin-top:8px;color:var(--success)}
+.kpi .d.w{color:var(--warn)}
+
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden}
+table.data{width:100%;border-collapse:collapse;font-size:14px}
+table.data th{text-align:left;padding:14px 20px;font:600 11px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:var(--bg);border-bottom:1px solid var(--border)}
+table.data td{padding:16px 20px;border-bottom:1px solid var(--border);vertical-align:middle}
+table.data tr:last-child td{border-bottom:0}
+table.data tr:hover td{background:oklch(99% 0.004 240)}
+table.data b{font-weight:600}
+
+.review-grid{display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start}
+.review-list .item{padding:18px 20px;border-bottom:1px solid var(--border);cursor:pointer;display:grid;grid-template-columns:1fr auto;gap:12px}
+.review-list .item:hover,.review-list .item.on{background:var(--accent-soft)}
+.review-list .item:last-child{border-bottom:0}
+.review-pane{position:sticky;top:88px}
+.score-in{width:100%;height:48px;border:1px solid var(--border);border-radius:10px;padding:0 14px;font:600 18px var(--font-mono);margin:12px 0}
+.ta{width:100%;min-height:100px;border:1px solid var(--border);border-radius:10px;padding:12px 14px;font:14px var(--font-body);resize:vertical}
+.tags{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 16px}
+.tags button{padding:6px 12px;border-radius:999px;border:1px solid var(--border);font-size:12px;color:var(--muted)}
+.tags button:hover{border-color:var(--accent);color:var(--accent)}
+
+.chart-bars{display:flex;align-items:flex-end;gap:12px;height:160px;padding-top:8px}
+.chart-bars .col{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;height:100%;justify-content:flex-end}
+.chart-bars .col i{width:100%;border-radius:6px 6px 0 0;background:var(--accent);min-height:4px}
+.chart-bars .col span{font:500 11px var(--font-mono);color:var(--muted)}
+
+/* 加载态 */
+.loading-state{padding:80px 40px;text-align:center;color:var(--muted);font-size:15px}
+.spinner{display:inline-block;width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin-bottom:16px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Toast */
+.toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);z-index:200;
+  background:var(--fg);color:#fff;padding:12px 28px;border-radius:12px;
+  font:500 14px var(--font-body);box-shadow:0 12px 40px rgba(0,0,0,.25)}
+.toast-fade-enter-active,.toast-fade-leave-active{transition:all .25s}
+.toast-fade-enter-from,.toast-fade-leave-to{opacity:0;transform:translateX(-50%) translateY(12px)}
+/* Modal */
+.modal-backdrop{position:fixed;inset:0;z-index:100;background:rgba(16,24,40,.4);
+  backdrop-filter:blur(4px);display:grid;place-items:center}
+.modal-card{background:var(--surface);border-radius:20px;padding:32px 36px;
+  width:480px;max-width:90vw;box-shadow:0 32px 80px rgba(16,24,40,.35)}
+.modal-fade-enter-active,.modal-fade-leave-active{transition:all .2s}
+.modal-fade-enter-from,.modal-fade-leave-to{opacity:0}
+
+/* —— 登录页 —— */
+.login-page{min-height:100vh;display:grid;grid-template-columns:1fr 440px;align-items:center}
+.login-hero{padding:80px 64px;display:flex;flex-direction:column;justify-content:center;gap:16px}
+.login-hero h1{font-size:48px;letter-spacing:-0.03em;line-height:1.1}
+.login-hero p{font-size:17px;color:var(--muted);max-width:460px;line-height:1.7}
+.login-brand{display:flex;align-items:center;gap:12px;font:700 20px/1 var(--font-display);margin-bottom:12px}
+.login-brand b{width:36px;height:36px;border-radius:10px;background:var(--accent);color:#fff;display:grid;place-items:center;font:700 16px var(--font-mono)}
+.login-card{padding:48px 40px;background:var(--surface);border:1px solid var(--border);border-radius:20px;box-shadow:0 24px 60px rgba(16,24,40,.1);margin:40px}
+.login-tabs{display:flex;gap:0;border:1px solid var(--border);border-radius:12px;padding:4px;margin-bottom:24px}
+.login-tabs button{flex:1;padding:10px;border-radius:9px;font:500 14px var(--font-body);color:var(--muted);text-align:center}
+.login-tabs button.active{background:var(--fg);color:#fff;font-weight:600}
+.login-desc{font-size:14px;color:var(--muted);line-height:1.7;margin-bottom:20px}
+.login-field{display:block;font-size:13px;color:var(--muted);margin-bottom:16px}
+.login-field input{display:block;width:100%;margin-top:6px;height:46px;padding:0 14px;border:1px solid var(--border);border-radius:10px;font:14px var(--font-body);background:var(--surface)}
+.login-field input:focus{outline:2px solid color-mix(in oklab,var(--accent) 28%,transparent);border-color:var(--accent)}
+.login-roles{display:flex;gap:8px;margin-bottom:16px}
+.login-roles button{padding:6px 14px;border:1px solid var(--border);border-radius:8px;font:13px var(--font-body);color:var(--muted)}
+.login-roles button.on{background:var(--accent-soft);color:var(--accent-deep);border-color:var(--accent);font-weight:600}
+.login-btn{width:100%;height:48px;background:var(--accent);color:#fff;border:0;border-radius:12px;font:600 15px var(--font-body);cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.12)}
+.login-btn:hover{background:var(--accent-deep)}
+.login-btn:disabled{opacity:.55;cursor:not-allowed}
+.login-err{color:var(--danger);font-size:13px;margin:12px 0;padding:10px 14px;background:oklch(97% 0.04 30);border-radius:8px}
+.login-note{margin-top:16px;font-size:12px;color:var(--muted);text-align:center}
+@media(max-width:860px){.login-page{grid-template-columns:1fr}.login-hero{padding:48px 32px 24px}.login-hero h1{font-size:36px}.login-card{margin:24px;padding:32px 24px}}
+
+/* —— 教程中心 —— */
+.tutorial-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:20px}
+.tutorial-card{padding:24px;background:var(--surface);border:1px solid var(--border);border-radius:16px;cursor:pointer;transition:transform .15s,box-shadow .15s;min-height:200px;display:flex;flex-direction:column;justify-content:space-between}
+.tutorial-card:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(16,24,40,.12);border-color:color-mix(in oklab,var(--accent) 30%,var(--border))}
+.tutorial-card .tut-top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px}
+.tutorial-card .tut-top span{font:600 11px var(--font-mono);letter-spacing:.08em;color:var(--muted)}
+.tutorial-card .tut-top strong{font:600 12px var(--font-body);color:var(--accent)}
+.tutorial-card h3{font-size:16px;margin-bottom:6px}
+.tutorial-card .tut-summary{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:12px}
+.tutorial-card .tut-meta{display:flex;gap:16px;font-size:12px;color:var(--muted)}
+.tutorial-card .tut-deliverable{margin-top:12px;padding-top:12px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)}
+.tut-detail-card{padding:32px;background:var(--surface);border:1px solid var(--border);border-radius:16px}
+.tut-detail-card h2{font-size:24px}
+.tut-detail-card .rubric-row{display:grid;grid-template-columns:1fr 80px;gap:8px;padding:8px 0;border-top:1px solid var(--border);font-size:14px}
+.tut-detail-card .rubric-row:first-of-type{border-top:0}
+
+@media(max-width:1100px){
+  .hero,.resume,.two,.review-grid{grid-template-columns:1fr}
+  .paths,.cards,.kpi-4,.stat-row{grid-template-columns:1fr 1fr}
+  .learn{grid-template-columns:200px 1fr}
+  .drawer{display:none}
+  .top{padding:0 20px;gap:16px}
+  .wrap,.hall-main,.dash-main,.admin-main,.lesson{padding-left:24px;padding-right:24px}
+}
+@media(max-width:720px){
+  .tabs{overflow:auto}
+  .role span{display:none}
+  .hero{padding:48px 0 40px;gap:32px}
+  .hero h1{font-size:32px}
+  .hall,.dash,.admin,.learn{grid-template-columns:1fr}
+  .filters,.side,.admin-side,.outline{display:none}
+  .paths,.cards,.kpi-4,.stat-row{grid-template-columns:1fr}
+  .resume-card{flex-direction:column;align-items:flex-start}
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- ========== 登录页 ========== -->
+  <div v-if="!loggedIn" class="login-page">
+    <div class="login-hero">
+      <div class="login-brand"><b>L</b><span>LearnEC</span></div>
+      <h1>数字商贸实训工作台</h1>
+      <p>从课程学习到真实经营分析，让每一次实训都沉淀为可复用的电商能力。</p>
+    </div>
+    <div class="login-card">
+      <div class="login-tabs"><button :class="{active:loginMode==='demo'}" @click="loginMode='demo';loginError=''">演示进入</button><button :class="{active:loginMode==='login'}" @click="loginMode='login';loginError=''">账号登录</button></div>
+      <template v-if="loginMode==='demo'">
+        <p class="login-desc">点击下方按钮直接进入学员实训空间，无需输入账号密码。</p>
+        <p v-if="loginError" class="login-err" role="alert">{{loginError}}</p>
+        <button class="login-btn" :disabled="loginLoading" @click="doDemoEntry">{{loginLoading?'正在开通...':'开通并直接进入'}}</button>
+        <p class="login-note">仅在已启用的本地演示环境中可用。</p>
+      </template>
+      <template v-if="loginMode==='login'">
+        <label class="login-field">账号<input v-model="loginId" placeholder="请输入账号" autocomplete="username" @keyup.enter="doLogin"></label>
+        <label class="login-field">密码<input v-model="loginPw" type="password" placeholder="请输入密码" autocomplete="current-password" @keyup.enter="doLogin"></label>
+        <div class="login-roles"><button :class="{on:authRole==='STUDENT'}" @click="authRole='STUDENT'" type="button">学员</button><button :class="{on:authRole==='OWNER'}" @click="authRole='OWNER'" type="button">管理</button></div>
+        <p v-if="loginError" class="login-err" role="alert">{{loginError}}</p>
+        <button class="login-btn" :disabled="loginLoading" @click="doLogin">{{loginLoading?'登录中...':'登录'}}</button>
+      </template>
+    </div>
+  </div>
+
+  <!-- ========== 主界面（登录后） ========== -->
+  <template v-else>
+  <!-- ========== 顶栏 ========== -->
+  <header class="top" data-od-id="topnav">
+    <div class="logo" @click="studentPage='home';adminPage='a-dash'"><b>L</b>LearnEC</div>
+    <nav v-if="!isAdmin" class="tabs" data-od-id="student-tabs">
+      <button :class="{active:studentPage==='home'}" @click="studentPage='home'">首页</button>
+      <button :class="{active:studentPage==='courses'}" @click="studentPage='courses'">课程大厅</button>
+      <button :class="{active:studentPage==='center'}" @click="studentPage='center'">学员中心</button>
+      <button :class="{active:studentPage==='learn'}" @click="studentPage='learn'">实操学习</button>
+    </nav>
+    <nav v-else class="tabs" data-od-id="admin-tabs">
+      <button :class="{active:adminPage==='a-dash'}" @click="adminPage='a-dash'">管理控制台</button>
+    </nav>
+    <div class="top-right">
+      <div class="role" data-od-id="role-switch">
+        <button :class="{on:!isAdmin}" @click="switchRole(false)">学员</button>
+        <button :class="{on:isAdmin}" @click="switchRole(true)">管理</button>
+      </div>
+      <button class="bell" :class="{'has-unread':unreadCount>0}" aria-label="通知" @click="showNotif=!showNotif;showProfile=false">
+        <i data-lucide="bell"></i>
+        <span v-if="unreadCount" class="notification-badge">{{ unreadCount>99?'99+':unreadCount }}</span>
+      </button>
+      <section v-if="showNotif" class="topbar-dropdown" style="width:340px;right:120px">
+        <div class="dropdown-header"><div><strong>消息通知</strong><span>查看近期消息和任务提醒</span></div></div>
+        <ul v-if="notifications.length" class="dropdown-list">
+          <li v-for="n in notifications.slice(0,5)" :key="n.id">
+            <a href="#" class="dropdown-link" @click.prevent="showNotif=false"><span class="dropdown-icon"><i data-lucide="bell"></i></span><span class="dropdown-copy"><strong>{{n.title}}</strong><span>{{n.time}}</span></span></a>
+          </li>
+        </ul>
+        <p v-else class="dropdown-empty">暂无通知</p>
+      </section>
+      <div class="avatar" @click="showProfile=!showProfile;showNotif=false">{{ userInitial }}</div>
+      <section v-if="showProfile" class="topbar-dropdown">
+        <div class="dropdown-header"><div><strong>{{ displayName }}</strong><span>LearnEC · 数字商贸实训</span></div><span class="role-chip">{{ isAdmin?'管理':'学员' }}</span></div>
+        <div class="dropdown-list">
+          <button class="dropdown-link" @click="openSettings"><span class="dropdown-icon"><i data-lucide="user"></i></span><span class="dropdown-copy"><strong>账号设置</strong><span>查看当前账户信息</span></span></button>
+          <button class="dropdown-link" @click="openSettings"><span class="dropdown-icon"><i data-lucide="settings"></i></span><span class="dropdown-copy"><strong>偏好设置</strong><span>语言、通知与界面选项</span></span></button>
+          <div class="profile-role-options">
+            <button class="dropdown-link dropdown-button" :class="{active:!isAdmin}" :disabled="!isAdmin" @click="switchRole(false)"><span class="dropdown-icon"><i data-lucide="refresh-cw"></i></span><span class="dropdown-copy"><strong>学员视角</strong><span>切换到学员身份</span></span></button>
+            <button class="dropdown-link dropdown-button" :class="{active:isAdmin}" :disabled="isAdmin" @click="switchRole(true)"><span class="dropdown-icon"><i data-lucide="refresh-cw"></i></span><span class="dropdown-copy"><strong>管理视角</strong><span>切换到管理身份</span></span></button>
+          </div>
+          <button class="dropdown-link" @click="doLogout"><span class="dropdown-icon"><i data-lucide="log-out"></i></span><span class="dropdown-copy"><strong>退出登录</strong><span>安全退出当前账户</span></span></button>
+        </div>
+      </section>
+      <button class="btn btn-primary btn-sm" @click="handleCTA">{{ ctaLabel }}</button>
+    </div>
+  </header>
+  <div v-if="showNotif||showProfile" class="topbar-backdrop" @click="showNotif=false;showProfile=false"></div>
+
+  <!-- Toast -->
+  <transition name="toast-fade">
+    <div v-if="toast" class="toast">{{ toast }}</div>
+  </transition>
+
+  <!-- 新建计划弹窗 -->
+  <transition name="modal-fade">
+    <div v-if="showPlanForm" class="modal-backdrop" @click.self="showPlanForm=false">
+      <div class="modal-card">
+        <h2>新建实训计划</h2>
+        <label style="display:block;margin-top:20px;font-size:13px;color:var(--muted)">计划名称</label>
+        <input v-model="planForm.title" class="search" style="width:100%;margin-top:6px" placeholder="例如：跨境电商入门实战" />
+        <label style="display:block;margin-top:16px;font-size:13px;color:var(--muted)">分类</label>
+        <select v-model="planForm.category" class="select" style="width:100%;margin-top:6px">
+          <option>店铺增长</option><option>直播运营</option><option>数据分析</option>
+        </select>
+        <label style="display:block;margin-top:16px;font-size:13px;color:var(--muted)">简介</label>
+        <input v-model="planForm.desc" class="search" style="width:100%;margin-top:6px" placeholder="简短描述" />
+        <div style="display:flex;gap:10px;margin-top:24px;justify-content:flex-end">
+          <button class="btn btn-ghost" @click="showPlanForm=false">取消</button>
+          <button class="btn btn-primary" @click="savePlan">创建</button>
+        </div>
+      </div>
+    </div>
+  </transition>
+
+  <!-- ========== 加载态 ========== -->
+  <div v-if="loading" class="loading-state"><div class="spinner"></div><p>正在加载工作台数据…</p></div>
+
+  <!-- ==================== 学员端 ==================== -->
+  <div v-else-if="!isAdmin" class="shell-s on">
+
+    <!-- 首页 -->
+    <section v-show="studentPage==='home'" class="view active" data-od-id="page-home">
+      <div class="wrap">
+        <div class="hero">
+          <div>
+            <div class="eyebrow">Digital Commerce Practicum</div>
+            <h1>用真实店铺任务<br>学会电商经营</h1>
+            <p class="lede">课程、模拟店铺与老师批阅连成一条线。少一点界面噪音，多一点完成感。</p>
+            <div class="hero-cta">
+              <button class="btn btn-primary btn-lg" @click="studentPage='learn'"><i data-lucide="play" style="width:16px;height:16px"></i>继续学习</button>
+              <button class="btn btn-ghost btn-lg" @click="studentPage='courses'">浏览课程</button>
+            </div>
+          </div>
+          <div class="hero-scene">
+            <img src="assets/hero-classroom.jpg" alt="实训课堂" />
+            <div class="hero-badge"><span class="dot"></span>本周实训 · <b style="margin-left:4px">{{ topPlanTitle }}</b></div>
+          </div>
+        </div>
+        <div class="resume" data-od-id="resume">
+          <div class="resume-card">
+            <div>
+              <div class="lbl">继续上次</div>
+              <h3>{{ topPlanTitle }}</h3>
+              <p>进度 {{ topPlanProgress }}%</p>
+              <div class="track"><i :style="{width:topPlanProgress+'%'}"></i></div>
+            </div>
+            <button class="btn btn-primary" @click="studentPage='learn'">接着学</button>
+          </div>
+          <div class="resume-card">
+            <div><div class="lbl">待办</div><h3>{{ pendingCount }} 个任务待处理</h3><p>{{ pendingLabel }}</p></div>
+            <button class="btn btn-ghost" @click="studentPage='center'">去处理</button>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-head"><div><h2>学习路径</h2><p>三条清晰进阶线，而不是一堆散课。</p></div></div>
+          <div class="paths" data-od-id="paths">
+            <div class="path" @click="studentPage='courses'"><div class="n">01</div><h3>开店起航</h3><span>选品 · 上架 · 详情页</span></div>
+            <div class="path" @click="studentPage='courses'"><div class="n">02</div><h3>内容与直播</h3><span>脚本 · 场控 · 复盘</span></div>
+            <div class="path" @click="studentPage='courses'"><div class="n">03</div><h3>数据增长</h3><span>读数 · 投放 · 转化</span></div>
+          </div>
+          <div class="section-head"><div><h2>热门课程</h2><p>从真实业务任务开始。</p></div><span class="link" @click="studentPage='courses'">全部课程 →</span></div>
+          <div class="cards">
+            <article v-for="(c,i) in visiblePlans.slice(0,3)" :key="c.id" class="course-card" role="button" tabindex="0" @click="openPlan(c)" @keydown.enter.space.prevent="openPlan(c)">
+              <div :class="['course-banner',bannerColors[i%4]]"><span class="cat">{{c.category||'实训'}}</span><h3>{{c.title}}</h3></div>
+              <div class="course-body"><b>{{c.category||'实训课程'}}</b><span>{{c.desc||'暂无简介'}}</span><div class="course-meta"><span class="stars">★★★★★</span><span class="tag">{{c.tag||'实训计划'}}</span></div></div>
+            </article>
+            <p v-if="!visiblePlans.length" class="course-empty">暂无已发布的课程，等待教学管理员发布。</p>
+          </div>
+        </div>
+      </div>
+      <footer class="foot"><span>LearnEC · 数字商贸实训工作台</span><span class="num">STUDENT WORKSPACE</span></footer>
+    </section>
+
+    <!-- 课程大厅 -->
+    <section v-show="studentPage==='courses'" class="view active" data-od-id="page-courses">
+      <div class="hall">
+        <aside class="filters" data-od-id="filters">
+          <h4>分类</h4>
+          <label v-for="o in filterOptions.categories" class="filter"><input type="checkbox" :value="o" v-model="filters.categories">{{o}}</label>
+          <h4>难度</h4>
+          <label v-for="o in filterOptions.levels" class="filter"><input type="checkbox" :value="o" v-model="filters.levels">{{o}}</label>
+          <h4>类型</h4>
+          <label v-for="o in filterOptions.types" class="filter"><input type="checkbox" :value="o" v-model="filters.types">{{o}}</label>
+        </aside>
+        <main class="hall-main">
+          <div class="section-head" style="margin-bottom:24px"><div><h2>课程大厅</h2><p>共 {{ visiblePlans.length }} 门实训课</p></div></div>
+          <div class="hall-tools">
+            <input class="search" v-model="searchQuery" placeholder="搜索课程或技能" />
+            <select class="select" v-model="sortBy"><option value="recommended">推荐排序</option><option value="name">课程名称</option></select>
+          </div>
+          <p class="course-result">显示 {{ filteredPlans.length }} 门课程</p>
+          <div class="cards">
+            <article v-for="(c,i) in filteredPlans" :key="c.id" class="course-card" role="button" tabindex="0" @click="openPlan(c)" @keydown.enter.space.prevent="openPlan(c)">
+              <div :class="['course-banner',bannerColors[i%4]]" style="height:100px"><span class="cat">{{c.category||'实训'}}</span><h3 style="font-size:18px">{{c.title}}</h3></div>
+              <div class="course-body"><b>{{c.category||'实训课程'}}</b><span>{{c.desc||'暂无简介'}}</span><div class="course-meta"><span class="stars">★★★★★</span><span class="tag">{{c.tag||'实训计划'}}</span></div></div>
+            </article>
+            <p v-if="!filteredPlans.length" class="course-empty">没有找到匹配课程，请调整筛选条件或搜索词。</p>
+          </div>
+        </main>
+      </div>
+    </section>
+
+    <!-- 学员中心 -->
+    <section v-show="studentPage==='center'" class="view active" data-od-id="page-center">
+      <div class="dash">
+        <aside class="side" data-od-id="dash-side">
+          <button :class="{active:centerTab==='overview'}" @click="centerTab='overview'"><i data-lucide="layout-dashboard"></i>概况</button>
+          <button :class="{active:centerTab==='tasks'}" @click="centerTab='tasks'"><i data-lucide="clipboard-list"></i>任务<span v-if="pendingCount" style="margin-left:auto;font:600 10px var(--font-mono);background:var(--danger);color:#fff;padding:2px 7px;border-radius:999px">{{pendingCount}}</span></button>
+          <button :class="{active:centerTab==='shop'}" @click="centerTab='shop'"><i data-lucide="store"></i>模拟店铺</button>
+          <button :class="{active:centerTab==='achievements'}" @click="centerTab='achievements'"><i data-lucide="trophy"></i>成就</button>
+        </aside>
+        <main class="dash-main">
+          <!-- 概况 -->
+          <template v-if="centerTab==='overview'">
+            <div class="welcome" data-od-id="welcome">
+              <div><h1>你好，{{ displayName }}</h1><p>本周还差 <b>{{ pendingCount }} 个任务</b> · 已连续学习 <b class="num">7</b> 天</p></div>
+              <div class="medals"><div class="medal g"><i data-lucide="award"></i></div><div class="medal s"><i data-lucide="medal"></i></div><div class="medal b"><i data-lucide="star"></i></div></div>
+            </div>
+            <div class="stat-row">
+              <div class="stat"><div class="l">进行中</div><div class="v num">{{ visiblePlans.length }}</div></div>
+              <div class="stat"><div class="l">待交作业</div><div class="v num">{{ pendingCount }}</div></div>
+              <div class="stat"><div class="l">作品集</div><div class="v num">{{portfolioCount}}</div></div>
+            </div>
+            <div class="two">
+              <div>
+                <section class="paper" data-od-id="progress">
+                  <h3>学习进度 <span class="m">本周</span></h3>
+                  <div v-if="progressItems.length">
+                    <div v-for="(p,i) in progressItems" :key="i" class="prog">
+                      <div class="thumb" :style="{background:progressColors[i%4]}"></div>
+                      <div class="name">{{p.name}}<div class="track"><i :style="{width:p.pct+'%'}"></i></div></div>
+                      <span class="pct">{{p.pct}}%</span>
+                    </div>
+                  </div>
+                  <p v-else style="color:var(--muted);font-size:13px;padding:12px 0">暂无学习进度数据。</p>
+                </section>
+                <section class="paper" style="margin-top:16px" data-od-id="todo-panel">
+                  <h3>待办与工坊 <span class="m">入口</span></h3>
+                  <div v-if="todoItems.length">
+                    <div v-for="(t,i) in todoItems" :key="i" class="entry"><div><b>{{t.title}}</b><span>{{t.desc}}</span></div><span :class="['pill',t.cls]">{{t.status}}</span></div>
+                  </div>
+                  <div v-else class="entry"><div><b>暂无待办</b><span>完成课程任务后会显示在这里</span></div><span class="pill pill-ok">完成</span></div>
+                </section>
+              </div>
+              <section class="paper" data-od-id="calendar">
+                <h3>学习日历 <span class="m num">{{ calendarTitle }}</span></h3>
+                <div class="cal">
+                  <span v-for="d in weekDays" class="wd">{{d}}</span>
+                  <b v-for="(d,i) in calDays" :class="{hl:d.hl, td:d.td}">{{d.label}}</b>
+                </div>
+                <div class="remind"><div class="when">周五 19:30</div><b>直播复盘：商品详情页</b><p>周老师 · 约 45 分钟</p></div>
+              </section>
+            </div>
+          </template>
+          <!-- 任务 -->
+          <template v-if="centerTab==='tasks'">
+            <div style="margin-bottom:28px"><h1 style="font-size:28px">我的任务</h1><p style="color:var(--muted);font-size:14px;margin-top:6px">待提交、待修改和老师反馈。</p></div>
+            <section class="paper"><h3>任务列表</h3>
+              <div v-if="taskItems.length"><div v-for="t in taskItems" :key="t.id" class="entry"><div><b>{{t.title}}</b><span>{{t.desc}}</span></div><span :class="['pill',t.cls]" style="font-size:12px">{{t.status}}</span></div></div>
+              <p v-else style="color:var(--muted);font-size:13px;padding:12px 0">暂无任务。</p>
+            </section>
+          </template>
+          <!-- 模拟店铺 -->
+          <template v-if="centerTab==='shop'">
+            <div style="margin-bottom:28px"><h1 style="font-size:28px">模拟店铺</h1><p style="color:var(--muted);font-size:14px;margin-top:6px">管理商品和运费模板。</p>
+            <button class="btn btn-primary btn-sm" style="margin-top:16px" @click="addShopProduct">+ 添加商品</button></div>
+            <section class="paper"><h3>商品 <span class="m">{{shopProducts.length}} 件</span></h3>
+              <div v-if="shopProducts.length" class="table-wrap" style="margin-top:12px"><table class="data"><thead><tr><th>名称</th><th>分类</th><th>价格</th><th>状态</th><th></th></tr></thead><tbody>
+                <tr v-for="p in shopProducts.slice(0,10)" :key="p.id"><td><b>{{p.title||'商品'}}</b></td><td>{{p.category||'未分类'}}</td><td class="num">¥{{p.basePrice||0}}</td><td><span :class="['pill',p.status==='ACTIVE'?'pill-ok':'']" style="font-size:12px;cursor:pointer" @click="toggleProductStatus(p)">{{p.status==='ACTIVE'?'上架':'下架'}}</span></td><td><button class="btn btn-ghost btn-sm" @click="removeProduct(p)">移除</button></td></tr>
+              </tbody></table></div>
+              <p v-else style="color:var(--muted);font-size:13px;padding:12px 0">暂无商品，点击上方按钮添加。</p>
+            </section>
+            <!-- 运费模板 -->
+            <section class="paper" style="margin-top:16px"><h3>运费模板 <span class="m">{{freightTemplates.length}} 条</span></h3>
+              <button class="btn btn-ghost btn-sm" style="margin-bottom:12px" @click="addFreightTemplate">+ 新增模板</button>
+              <div v-if="freightTemplates.length" class="table-wrap"><table class="data"><thead><tr><th>模板名称</th><th>计费方式</th><th>首重/件</th><th>首价</th><th>续价</th><th></th></tr></thead><tbody>
+                <tr v-for="ft in freightTemplates" :key="ft.id"><td><b>{{ft.name}}</b></td><td>{{ft.type||'按重量'}}</td><td class="num">{{ft.firstUnit||1}}</td><td class="num">¥{{ft.firstPrice||10}}</td><td class="num">¥{{ft.continuedPrice||2}}</td><td><button class="btn btn-ghost btn-sm" @click="removeFreight(ft)">删除</button></td></tr>
+              </tbody></table></div>
+              <p v-else style="color:var(--muted);font-size:13px;padding:12px 0">暂无运费模板。</p>
+            </section>
+          </template>
+          <!-- 成就 -->
+          <template v-if="centerTab==='achievements'">
+            <div style="margin-bottom:28px"><h1 style="font-size:28px">成就</h1><p style="color:var(--muted);font-size:14px;margin-top:6px">{{unlockedBadges}} / {{allBadges.length}} 枚勋章已解锁</p></div>
+            <section class="paper"><h3>勋章墙</h3>
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px">
+                <div v-for="b in allBadges" :key="b.id" style="text-align:center;padding:16px 8px;border-radius:12px;border:1px solid var(--border)" :style="{opacity:b.unlocked?1:b.progress>0?.75:.4,background:b.unlocked?'var(--accent-soft)':''}">
+                  <div style="font-size:28px;margin-bottom:4px">{{b.icon}}</div><div style="font:600 13px var(--font-body)">{{b.name}}</div><div style="font-size:11px;color:var(--muted);margin-top:4px">{{b.unlocked?'已解锁':b.progress>0?b.progress+'/'+b.target:'未解锁'}}</div>
+                </div>
+              </div>
+            </section>
+          </template>
+        </main>
+      </div>
+    </section>
+
+    <!-- 实操学习 -->
+    <section v-show="studentPage==='learn'" class="view active" data-od-id="page-learn">
+      <div class="learn">
+        <aside class="outline" data-od-id="outline">
+          <h4>大纲</h4>
+          <div v-for="(l,i) in lessonOutline" :class="{active:currentLesson===i, done:l.done}" role="button" tabindex="0" @click="selectLesson(i)" @keydown.enter.space.prevent="selectLesson(i)">
+            <i :data-lucide="l.done?'check-circle-2':currentLesson===i?'square-play':'circle'"></i>{{l.title}}
+          </div>
+          <h4>材料</h4>
+          <div><i data-lucide="download"></i>选品模板</div>
+          <div><i data-lucide="file-text"></i>评分标准</div>
+        </aside>
+        <main class="lesson">
+          <div style="display:flex;gap:8px;margin-bottom:24px">
+            <button :class="['btn','btn-sm',learnMode==='course'?'btn-primary':'btn-ghost']" @click="learnMode='course'">课程学习</button>
+            <button :class="['btn','btn-sm',learnMode==='cases'?'btn-primary':'btn-ghost']" @click="learnMode='cases'">教学案例</button>
+            <button :class="['btn','btn-sm',learnMode==='tutorials'?'btn-primary':'btn-ghost']" @click="learnMode='tutorials'">教程中心</button>
+          </div>
+          <template v-if="learnMode==='course'">
+            <h1>{{lessonOutline[currentLesson]?.title||'从零开始做电商'}}</h1>
+            <p class="sub">第 1 单元 · 约 {{currentLesson===0?12:currentLesson===1?8:currentLesson===2?15:'—'}} 分钟</p>
+            <div class="video" :class="{playing:videoPlaying}" data-od-id="video">
+              <img src="assets/lesson-video.jpg" alt="课程视频" />
+              <button class="play" aria-label="播放" @click="videoPlaying=!videoPlaying">
+                <i :data-lucide="videoPlaying?'pause':'play'"></i>
+              </button>
+              <div class="video-bar">
+                <span class="num">{{videoPlaying?'07:52':'04:03'}}</span>
+                <div class="rail"><i :style="{width:videoPlaying?'64%':'32%'}"></i></div>
+                <span class="num">12:38</span>
+              </div>
+              <div v-if="!videoPlaying" class="video-hint">点击播放预览视频片段（演示模式）</div>
+            </div>
+            <div class="task-box" data-od-id="task">
+              <h3>实操任务</h3>
+              <p>下载选品模板，挑选 3 个候选商品并说明理由。完成后进入批阅队列，也可同步到模拟店铺。</p>
+              <div class="actions">
+                <button class="btn btn-primary" :disabled="taskSubmitted" @click="submitTask">{{taskSubmitted?'已提交':'提交作业'}}</button>
+                <button class="btn btn-ghost" @click="learnStatus='草稿已保存，可继续完善后再提交。'">存草稿</button>
+                <button class="btn btn-ghost" @click="studentPage='center'">打开工坊</button>
+              </div>
+              <p class="learn-status">{{learnStatus}}</p>
+            </div>
+          </template>
+          <template v-if="learnMode==='cases'">
+            <h1>教学案例库</h1>
+            <p class="sub">六个原创匿名案例，覆盖商品发布、营销活动、交易处理和数据分析。</p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:24px">
+              <div v-for="c in commerceCases" :key="c.id" class="paper" style="cursor:pointer" @click="selectedCase=c">
+                <div style="display:flex;justify-content:space-between;align-items:start;gap:12px">
+                  <div><b style="font-size:16px">{{c.title}}</b><p style="color:var(--muted);font-size:13px;margin-top:4px;line-height:1.6">{{c.summary}}</p></div>
+                  <span :class="['pill',c.submissionMode==='SUBMITTABLE'?'pill-warn':'pill-info']" style="font-size:11px;flex:none">{{c.submissionMode==='SUBMITTABLE'?'可提交':'课堂阅读'}}</span>
+                </div>
+                <div style="margin-top:12px;font-size:12px;color:var(--muted)">{{c.category}} · {{c.submissionMode==='SUBMITTABLE'?'3 个评分维度':'自检清单'}}</div>
+              </div>
+            </div>
+            <div v-if="selectedCase" style="margin-top:24px">
+              <button class="link" @click="selectedCase=null" style="font-size:13px">← 返回案例列表</button>
+              <div class="paper" style="margin-top:16px">
+                <h3>{{selectedCase.title}}</h3>
+                <p style="color:var(--muted);font-size:14px;line-height:1.7;margin-top:8px">{{selectedCase.scenario}}</p>
+                <h3 style="margin-top:20px">学习目标</h3>
+                <ul style="margin-top:8px;padding-left:20px;color:var(--muted);font-size:14px;line-height:2"><li v-for="obj in selectedCase.learningObjectives" :key="obj">{{obj}}</li></ul>
+                <h3 style="margin-top:20px">任务</h3><p style="color:var(--muted);font-size:14px;line-height:1.7;margin-top:8px">{{selectedCase.studentTask}}</p>
+                <h3 style="margin-top:20px">步骤</h3>
+                <div v-for="(s,i) in selectedCase.steps" :key="i" style="display:flex;gap:10px;align-items:start;padding:6px 0;font-size:14px;color:var(--muted)"><span style="font:600 12px var(--font-mono);color:var(--accent);flex:none;margin-top:2px">{{i+1}}</span><span>{{s}}</span></div>
+                <div style="margin-top:16px;padding:14px 18px;background:var(--bg);border-radius:10px;font-size:13px;color:var(--muted)"><b style="color:var(--fg)">示例：</b>{{selectedCase.example}}</div>
+                <template v-if="selectedCase.submissionMode==='SUBMITTABLE'">
+                  <h3 style="margin-top:20px">提交作业</h3>
+                  <textarea v-model="caseAnswer" class="ta" style="margin-top:8px" placeholder="写下你的答案..."></textarea>
+                  <div style="display:flex;gap:10px;margin-top:12px"><button class="btn btn-primary btn-sm" :disabled="!caseAnswer.trim()" @click="submitCase">提交</button><button class="btn btn-ghost btn-sm" @click="caseAnswer=''">清空</button></div>
+                  <p v-if="caseResult" style="margin-top:8px;font-size:13px;color:var(--success)">{{caseResult}}</p>
+                </template>
+              </div>
+            </div>
+          </template>
+          <!-- 教程中心 -->
+          <template v-if="learnMode==='tutorials'">
+            <h1>电商实训教程</h1>
+            <p class="sub">{{TUTORIALS.length}} 篇本地原创教程，每篇都包含目标、步骤、提交物和评分标准。</p>
+            <div v-if="!selectedTutorial" class="tutorial-grid">
+              <div v-for="t in TUTORIALS" :key="t.id" class="tutorial-card" @click="selectedTutorial=t">
+                <div>
+                  <div class="tut-top"><span>{{t.category}}</span><strong>{{t.level}}</strong></div>
+                  <h3>{{t.title}}</h3>
+                  <p class="tut-summary">{{t.summary}}</p>
+                </div>
+                <div>
+                  <div class="tut-meta"><span>{{t.duration}}</span><span>{{t.deliverable.length}} 项提交物</span></div>
+                </div>
+              </div>
+            </div>
+            <div v-if="selectedTutorial">
+              <button class="link" @click="selectedTutorial=null" style="font-size:13px;margin-bottom:16px;display:inline-block">← 返回教程列表</button>
+              <div class="tut-detail-card">
+                <h2>{{selectedTutorial.title}}</h2>
+                <p style="color:var(--muted);font-size:14px;line-height:1.7;margin-top:8px">{{selectedTutorial.summary}}</p>
+                <h3 style="margin-top:24px">操作步骤</h3>
+                <div v-for="(s,i) in selectedTutorial.steps" :key="i" style="display:flex;gap:10px;align-items:start;padding:6px 0;font-size:14px;color:var(--muted)">
+                  <span style="font:600 12px var(--font-mono);color:var(--accent);flex:none;margin-top:2px">{{i+1}}</span><span>{{s}}</span>
+                </div>
+                <h3 style="margin-top:24px">提交物</h3>
+                <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">
+                  <span v-for="d in selectedTutorial.deliverable" :key="d" class="tag">{{d}}</span>
+                </div>
+                <h3 style="margin-top:24px">评分标准</h3>
+                <div v-for="r in selectedTutorial.rubric" :key="r.criterion" class="rubric-row">
+                  <span>{{r.criterion}}</span><span class="num" style="font-weight:600;color:var(--accent)">{{r.weight}}%</span>
+                </div>
+              </div>
+            </div>
+          </template>
+        </main>
+        <aside class="drawer" data-od-id="drawer">
+          <h3>导师与讨论</h3>
+          <div class="teacher"><img src="assets/teacher-avatar.jpg" alt="周老师" /><div><b>周老师</b><p>电商运营实战导师</p></div></div>
+          <div class="comment"><b>吴可欣</b><p>选品模板很清楚，跟着做就有方向。</p></div>
+          <div class="comment"><b>李明</b><p>希望多一些失败案例拆解。</p></div>
+        </aside>
+      </div>
+    </section>
+  </div>
+
+  <!-- ==================== 管理端 ==================== -->
+  <div v-else-if="!loading" class="shell-a on">
+    <div class="admin">
+      <aside class="admin-side" data-od-id="admin-side">
+        <div class="lbl">管理工作台</div>
+        <button :class="{active:adminPage==='a-dash'}" @click="adminPage='a-dash'"><i data-lucide="layout-dashboard"></i>概览</button>
+        <button :class="{active:adminPage==='a-courses'}" @click="adminPage='a-courses'"><i data-lucide="library"></i>课程 / 计划</button>
+        <button :class="{active:adminPage==='a-class'}" @click="adminPage='a-class'"><i data-lucide="users"></i>班级与学员</button>
+        <button :class="{active:adminPage==='a-review'}" @click="adminPage='a-review'"><i data-lucide="clipboard-check"></i>作业批改 <span class="badge">{{reviewQueue.length}}</span></button>
+        <button :class="{active:adminPage==='a-stats'}" @click="adminPage='a-stats'"><i data-lucide="bar-chart-3"></i>成绩与分析</button>
+        <button :class="{active:adminPage==='a-templates'}" @click="adminPage='a-templates'"><i data-lucide="file-code"></i>实训模板</button>
+        <button :class="{active:adminPage==='a-comp'}" @click="adminPage='a-comp'"><i data-lucide="trophy"></i>比赛管理</button>
+        <button :class="{active:adminPage==='a-dc'}" @click="adminPage='a-dc'"><i data-lucide="trending-up"></i>数据中心</button>
+        <button :class="{active:adminPage==='a-members'}" @click="adminPage='a-members'"><i data-lucide="user-plus"></i>成员管理</button>
+        <button :class="{active:adminPage==='a-msg'}" @click="adminPage='a-msg'"><i data-lucide="megaphone"></i>发布通知</button>
+        <button :class="{active:adminPage==='a-room'}" @click="adminPage='a-room'"><i data-lucide="settings"></i>实训室设置</button>
+      </aside>
+      <div class="admin-main">
+        <!-- 概览 -->
+        <section v-show="adminPage==='a-dash'" class="view active" data-od-id="admin-dash">
+          <div class="page-h"><div><h1>欢迎回来，{{ displayName }}</h1><p>今日平台运营与待办批阅一览。</p></div><button class="btn btn-primary" @click="newPlan"><i data-lucide="plus" style="width:16px;height:16px"></i>新建计划</button></div>
+          <div class="kpi-4">
+            <div class="kpi"><div class="l">活跃学员</div><div class="v num">{{adminStats.activeLearners}}</div><div class="d">↑ 12 本周</div></div>
+            <div class="kpi"><div class="l">待批作业</div><div class="v num">{{adminStats.pendingReviews}}</div><div class="d w">需优先处理</div></div>
+            <div class="kpi"><div class="l">本周提交</div><div class="v num">{{adminStats.weeklySubmissions}}</div><div class="d">↑ 9%</div></div>
+            <div class="kpi"><div class="l">平均完课</div><div class="v num">{{adminStats.avgCompletion}}%</div><div class="d">↑ 3pp</div></div>
+          </div>
+          <div class="two">
+            <section class="paper">
+              <h3>主修课程运营 <span class="m">完成度</span></h3>
+              <div v-if="adminPlanProgress.length">
+                <div v-for="(p,i) in adminPlanProgress" :key="i" class="prog">
+                  <div class="thumb" :style="{background:progressColors[i%4]}"></div>
+                  <div class="name">{{p.title}}<div class="track"><i :style="{width:p.pct+'%'}"></i></div></div>
+                  <span class="pct">{{p.pct}}%</span>
+                </div>
+              </div>
+              <p v-else style="color:var(--muted);font-size:13px">暂无课程数据。</p>
+            </section>
+            <section class="paper">
+              <h3>今日优先 <span class="m">队列</span></h3>
+              <div class="entry"><div><b>{{reviewQueue.length}} 份作业待批</b><span>详情页 / 选品清单为主</span></div><button class="btn btn-primary btn-sm" @click="adminPage='a-review'">去批改</button></div>
+              <div class="entry"><div><b>3 名学员连续未交</b><span>直播话术 · 已提醒</span></div><span class="pill pill-warn">跟进</span></div>
+              <div class="entry"><div><b>周五复盘直播</b><span>19:30 · 需准备样例</span></div><span class="pill pill-info">日程</span></div>
+            </section>
+          </div>
+        </section>
+        <!-- 课程计划 -->
+        <section v-show="adminPage==='a-courses'" class="view active" data-od-id="admin-courses">
+          <div class="page-h"><div><h1>课程与实训计划</h1><p>发布、归档与关联班级。</p></div><button class="btn btn-primary" @click="newPlan">新建计划</button></div>
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th>计划 / 课程</th><th>班级</th><th>学员</th><th>状态</th><th>进度</th><th></th></tr></thead>
+            <tbody>
+              <tr v-for="(p,i) in visiblePlans" :key="p.id"><td><b>{{p.title}}</b></td><td>电商 {{(i%2)+1}} 班</td><td class="num">{{38+i*4}}</td><td><span :class="['pill',p.status==='PUBLISHED'?'pill-ok':'pill-info']" :style="p.status!=='PUBLISHED'?'background:var(--bg);color:var(--muted)':''">{{p.status==='PUBLISHED'?'进行中':'未开始'}}</span></td><td class="num">{{45+i*12}}%</td><td><button class="btn btn-ghost btn-sm" @click="managePlan(p)">管理</button></td></tr>
+              <tr v-if="!visiblePlans.length"><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">暂无计划。</td></tr>
+            </tbody>
+          </table></div>
+        </section>
+        <!-- 班级学员 -->
+        <section v-show="adminPage==='a-class'" class="view active" data-od-id="admin-class">
+          <div class="page-h"><div><h1>班级与学员</h1><p>进度、风险与最近活跃。</p></div><div style="display:flex;gap:10px"><input class="search" placeholder="搜索学员" style="width:200px" v-model="memberSearch"><button class="btn btn-ghost" @click="exportMembers">导出</button></div></div>
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th>学员</th><th>班级</th><th>进度</th><th>待交</th><th>最近活跃</th><th>状态</th></tr></thead>
+            <tbody>
+              <tr v-for="m in filteredMembers" :key="m.id"><td><b>{{m.name}}</b></td><td>{{m.class}}</td><td class="num">{{m.progress}}%</td><td class="num">{{m.pending}}</td><td class="num">{{m.active}}</td><td><span :class="['pill',m.status==='正常'?'pill-ok':'pill-warn']">{{m.status}}</span></td></tr>
+              <tr v-if="!filteredMembers.length"><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">暂无学员数据。</td></tr>
+            </tbody>
+          </table></div>
+        </section>
+        <!-- 作业批改 -->
+        <section v-show="adminPage==='a-review'" class="view active" data-od-id="admin-review">
+          <div class="page-h"><div><h1>作业与实操批改</h1><p>草稿已过滤 · 当前队列 {{reviewQueue.length}} 份</p></div></div>
+          <div class="review-grid">
+            <div class="table-wrap review-list">
+              <div v-for="(r,i) in reviewQueue" :class="['item',{on:selectedReview===i}]" @click="selectReview(i)">
+                <div><b>{{r.student}} · {{r.task}}</b><div style="color:var(--muted);font-size:13px;margin-top:4px">{{r.course}} · {{r.time}}</div></div>
+                <span :class="['pill',r.status==='SUBMITTED'?'pill-warn':'pill-info']">{{r.status==='SUBMITTED'?'待批':'重交'}}</span>
+              </div>
+              <div v-if="!reviewQueue.length" style="padding:24px;color:var(--muted);text-align:center">暂无待批作业。</div>
+            </div>
+            <section v-if="selectedReview!==null" class="paper review-pane" data-od-id="review-pane">
+              <h3 style="margin-bottom:8px">{{reviewQueue[selectedReview]?.student}} · {{reviewQueue[selectedReview]?.task}}</h3>
+              <p style="color:var(--muted);font-size:13px;margin-bottom:16px">已提交作业，请评分并给可执行建议。</p>
+              <div style="min-height:120px;border-radius:12px;background:linear-gradient(135deg,var(--accent-soft),oklch(94% 0.02 280));border:1px dashed var(--border);display:grid;place-items:center;color:var(--muted);font-size:13px;margin-bottom:8px;cursor:pointer;text-align:center;padding:24px"><div><i data-lucide="image" style="width:24px;height:24px;display:block;margin:0 auto 8px;opacity:.5"></i>点击上传作业截图<br><span style="font-size:11px;opacity:.6">支持 PNG / JPG，最大 10MB</span></div></div>
+              <label style="font-size:13px;color:var(--muted)">评分 0–100</label>
+              <input v-model="reviewScore" class="score-in num" placeholder="例如 88" type="number" min="0" max="100" />
+              <div class="tags"><button type="button" @click="reviewFeedback+='排版清晰 '">排版清晰</button><button type="button" @click="reviewFeedback+='转化逻辑好 '">转化逻辑好</button><button type="button" @click="reviewFeedback+='需补证据 '">需补证据</button></div>
+              <textarea v-model="reviewFeedback" class="ta" placeholder="写下可执行的修改建议…"></textarea>
+              <div style="display:flex;gap:10px;margin-top:16px"><button class="btn btn-primary" style="flex:1" @click="doGrade">提交批改</button><button class="btn btn-ghost" @click="doReturn">退回修改</button></div>
+              <p v-if="reviewResult" style="margin-top:8px;font-size:13px;color:var(--success)">{{reviewResult}}</p>
+            </section>
+            <section v-else class="paper review-pane" style="display:grid;place-items:center;color:var(--muted)"><p>选择左侧一份作业开始批改。</p></section>
+          </div>
+        </section>
+        <!-- 成绩分析 -->
+        <section v-show="adminPage==='a-stats'" class="view active" data-od-id="admin-stats">
+          <div class="page-h"><div><h1>成绩与分析</h1><p>班级对比与作业得分分布（示意）。</p></div></div>
+          <div class="kpi-4">
+            <div class="kpi"><div class="l">班级均分</div><div class="v num">{{statsAvgScore}}</div><div class="d">↑ 1.6</div></div>
+            <div class="kpi"><div class="l">按时提交率</div><div class="v num">{{statsSubmitRate}}%</div><div class="d">稳定</div></div>
+            <div class="kpi"><div class="l">重交率</div><div class="v num">{{statsReworkRate}}%</div><div class="d w">关注话术课</div></div>
+            <div class="kpi"><div class="l">优秀作业</div><div class="v num">{{reviewQueue.filter(r=>r.status==='GRADED').length||23}}</div><div class="d">可作范例</div></div>
+          </div>
+          <div class="two">
+            <section class="paper"><h3>近 6 周均分 <span class="m">电商 1 班</span></h3>
+              <div class="chart-bars" data-od-id="score-chart">
+                <div v-for="(h,i) in scoreHeights" :key="i" class="col"><i :style="{height:h+'%'}"></i><span>W{{i+1}}</span></div>
+              </div>
+            </section>
+            <section class="paper"><h3>作业得分分布</h3>
+              <div class="prog"><div class="name" style="grid-column:1/-1">90–100<div class="track"><i style="width:28%"></i></div></div></div>
+              <div class="prog"><div class="name" style="grid-column:1/-1">80–89<div class="track"><i style="width:46%"></i></div></div></div>
+              <div class="prog"><div class="name" style="grid-column:1/-1">70–79<div class="track"><i style="width:18%"></i></div></div></div>
+              <div class="prog"><div class="name" style="grid-column:1/-1">70 以下<div class="track"><i style="width:8%;background:var(--warn)"></i></div></div></div>
+            </section>
+          </div>
+        </section>
+
+        <!-- 实训模板 -->
+        <section v-show="adminPage==='a-templates'" class="view active" data-od-id="admin-templates">
+          <div class="page-h"><div><h1>实训模板</h1><p>模板由服务端按实训室控制开关，学生端会自动生效。</p></div></div>
+          <div v-if="templates.length" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+            <div v-for="t in templates" :key="t.id" class="paper" style="display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;justify-content:space-between;align-items:start"><b style="font-size:16px">{{t.title||'模板'}}</b><span :class="['pill',t.enabled?'pill-ok':'']" style="font-size:11px">{{t.enabled?'已启用':'已关闭'}}</span></div>
+              <p style="font-size:13px;color:var(--muted);line-height:1.6">{{t.description||'暂无描述。'}}</p>
+            </div>
+          </div>
+          <div v-else class="paper" style="text-align:center;padding:48px;color:var(--muted)"><p>暂无模板数据。启用模板后课程内容会在这里出现。</p></div>
+        </section>
+
+        <!-- 比赛管理 -->
+        <section v-show="adminPage==='a-comp'" class="view active" data-od-id="admin-competitions">
+          <div class="page-h"><div><h1>实训比赛</h1><p>发布比赛并管理参赛记录。</p></div><button class="btn btn-primary" @click="showCompForm=true">新建比赛</button></div>
+          <div v-if="showCompForm" class="paper" style="margin-bottom:20px">
+            <h3 style="margin-bottom:16px">新建比赛</h3>
+            <label style="display:block;margin-bottom:12px;font-size:13px;color:var(--muted)">比赛名称<input v-model="compForm.title" class="search" style="width:100%;margin-top:6px" placeholder="例如：618营销大赛" maxlength="120"></label>
+            <label style="display:block;margin-bottom:12px;font-size:13px;color:var(--muted)">比赛说明<textarea v-model="compForm.description" class="ta" rows="3" style="margin-top:6px" placeholder="比赛规则与评分标准"></textarea></label>
+            <div style="display:flex;gap:10px"><button class="btn btn-primary btn-sm" @click="createCompetition">创建草稿</button><button class="btn btn-ghost btn-sm" @click="showCompForm=false">取消</button></div>
+          </div>
+          <div v-if="competitions.length" class="table-wrap"><table class="data"><thead><tr><th>名称</th><th>状态</th><th>参赛</th></tr></thead><tbody>
+            <tr v-for="c in competitions" :key="c.id"><td><b>{{c.title}}</b></td><td><span :class="['pill',c.status==='PUBLISHED'?'pill-ok':'pill-info']" style="font-size:12px">{{c.status==='PUBLISHED'?'已发布':c.status==='DRAFT'?'草稿':'已结束'}}</span></td><td class="num">{{c.entryCount||0}}</td></tr>
+          </tbody></table></div>
+          <div v-else class="paper" style="text-align:center;padding:48px;color:var(--muted)"><p>暂无比赛。创建草稿并发布后学生可在授权实训室内查看。</p></div>
+        </section>
+
+        <!-- 数据中心 -->
+        <section v-show="adminPage==='a-dc'" class="view active" data-od-id="admin-dc">
+          <div class="page-h"><div><h1>数据中心</h1><p>当前实训室的完成率与学习数据。</p></div></div>
+          <div class="kpi-4">
+            <div class="kpi"><div class="l">总学员</div><div class="v num">{{dataCenterData?.overview?.totalLearners||0}}</div></div>
+            <div class="kpi"><div class="l">平均完成率</div><div class="v num">{{dataCenterData?.overview?.overallCompletionPercent||0}}%</div></div>
+            <div class="kpi"><div class="l">已完成学员</div><div class="v num">{{dataCenterData?.overview?.completedLearners||0}}</div></div>
+            <div class="kpi"><div class="l">待批阅</div><div class="v num">{{dataCenterData?.overview?.pendingReviewCount||0}}</div></div>
+          </div>
+          <div v-if="!dataCenterData" class="paper" style="text-align:center;padding:48px;color:var(--muted)"><p>数据中心需要服务端 analytics API 支持。</p><button class="btn btn-ghost btn-sm" style="margin-top:12px" @click="loadDataCenter">加载数据</button></div>
+        </section>
+
+        <!-- 成员管理 -->
+        <section v-show="adminPage==='a-members'" class="view active" data-od-id="admin-members">
+          <div class="page-h"><div><h1>成员管理</h1><p>管理邀请、分组与成员权限。</p></div></div>
+          <section class="paper" style="margin-bottom:20px"><h3>创建邀请</h3>
+            <div style="display:flex;gap:10px;margin-top:12px">
+              <input v-model="inviteeId" class="search" placeholder="受邀用户 ID" style="flex:1">
+              <input v-model="inviteGroup" class="search" placeholder="虚拟分组（可选）" style="flex:1">
+              <button class="btn btn-primary btn-sm" @click="createInvite">创建邀请</button>
+            </div>
+            <p v-if="inviteResult" style="margin-top:8px;font-size:13px;color:var(--accent)">{{inviteResult}}</p>
+          </section>
+          <div class="table-wrap"><table class="data"><thead><tr><th>学员</th><th>班级</th><th>进度</th><th>状态</th></tr></thead><tbody>
+            <tr v-for="m in filteredMembers" :key="m.id"><td><b>{{m.name}}</b></td><td>{{m.class}}</td><td class="num">{{m.progress}}%</td><td><span :class="['pill',m.status==='正常'?'pill-ok':'pill-warn']">{{m.status}}</span></td></tr>
+          </tbody></table></div>
+        </section>
+
+        <!-- 发布通知 -->
+        <section v-show="adminPage==='a-msg'" class="view active" data-od-id="admin-msg">
+          <div class="page-h"><div><h1>发布通知</h1><p>通知会发送给当前实训室的学生。</p></div></div>
+          <section class="paper" style="max-width:600px">
+            <label style="display:block;margin-bottom:16px;font-size:13px;color:var(--muted)">通知标题<input v-model="composeTitle" class="search" style="width:100%;margin-top:6px" placeholder="例如：本周直播复盘通知" maxlength="120"></label>
+            <label style="display:block;margin-bottom:16px;font-size:13px;color:var(--muted)">通知内容<textarea v-model="composeMessage" class="ta" rows="4" style="margin-top:6px" placeholder="写下要通知学生的内容..."></textarea></label>
+            <label style="display:block;margin-bottom:16px;font-size:13px;color:var(--muted)">跳转入口<select v-model="composeRoute" class="select" style="width:100%;margin-top:6px"><option value="/practicum/tasks">我的任务</option><option value="/practicum/courses">课程大厅</option><option value="/practicum/tutorials">教程中心</option></select></label>
+            <button class="btn btn-primary" :disabled="!composeTitle.trim()" @click="sendNotification">发送通知</button>
+            <p v-if="composeResult" style="margin-top:8px;font-size:13px" :style="{color:composeResult.includes('失败')?'var(--danger)':'var(--success)'}">{{composeResult}}</p>
+          </section>
+        </section>
+
+        <!-- 实训室设置 -->
+        <section v-show="adminPage==='a-room'" class="view active" data-od-id="admin-room">
+          <div class="page-h"><div><h1>实训室设置</h1><p>维护介绍、宣传媒体和教学范围。</p></div></div>
+          <section class="paper" style="max-width:600px">
+            <label style="display:block;margin-bottom:16px;font-size:13px;color:var(--muted)">实训室介绍<textarea v-model="roomDesc" class="ta" rows="5" style="margin-top:6px" placeholder="向学员描述本实训室的教学内容与目标..."></textarea></label>
+            <label style="display:block;margin-bottom:16px;font-size:13px;color:var(--muted)">宣传媒体链接<input v-model="roomMedia" class="search" style="width:100%;margin-top:6px" placeholder="https://..."></label>
+            <div style="display:flex;gap:10px"><button class="btn btn-primary" @click="saveRoom">保存设置</button></div>
+            <p v-if="roomSaveResult" style="margin-top:8px;font-size:13px;color:var(--success)">{{roomSaveResult}}</p>
+          </section>
+        </section>
+
+      </div>
+    </div>
+  </div>
+  </template><!-- end login wrapper -->
+</div>
+
+<script>
+const { createApp, ref, computed, watch, nextTick, onMounted } = Vue
+
+/* ══════════════════════════════════════════════════════════════
+   API 层 — 尝试调用后端 API，失败时静默降级到种子数据
+   ══════════════════════════════════════════════════════════════ */
+const API = {
+  async fetch(path) {
+    try { const r = await fetch(path,{credentials:'same-origin'}); if(!r.ok) throw r; return await r.json() }
+    catch { return null }
+  },
+  async getPlans() {
+    const d = await this.fetch('/api/practicum/plans?status=PUBLISHED&pageSize=50')
+    if (d?.items?.length) return d.items.map(p=>({id:p.id,title:p.title,category:catLabel(p.title+(p.description||'')),desc:p.description||'',tag:'实训计划',status:p.status}))
+    return null
+  },
+  async getProgress() { return await this.fetch('/api/practicum/progress?role=STUDENT') },
+  async getTasks() {
+    const d = await this.fetch('/api/practicum/student/tasks')
+    if (d?.items) return d.items
+    return null
+  },
+  async getNotifications() {
+    const d = await this.fetch('/api/practicum/notifications')
+    if (d?.items) return d
+    return null
+  },
+  async getSubmissions() {
+    const d = await this.fetch('/api/practicum/submissions?status=SUBMITTED&pageSize=50')
+    if (d?.items) return d.items
+    return null
+  },
+  async getSession() {
+    const d = await this.fetch('/api/auth/session')
+    return d?.user || null
+  },
+  async getProducts() {
+    const d = await this.fetch('/api/practicum/shop/products')
+    return d?.items || null
+  },
+  async getTemplates() {
+    const d = await this.fetch('/api/practicum/templates')
+    return d?.items || null
+  },
+  async getCompetitions() {
+    const d = await this.fetch('/api/practicum/competitions')
+    return d?.items || null
+  },
+  async getMembers() {
+    const d = await this.fetch('/api/practicum/members?pageSize=50')
+    return d?.items || null
+  },
+  async getAnalytics() {
+    const d = await this.fetch('/api/practicum/analytics/members')
+    return d || null
+  },
+  async getCases() {
+    try { const m = await import('/data/practicum/commerce-case-seed.ts'); return m.commerceCases || [] }
+    catch { return null }
+  },
+  async getAchievements() {
+    try { const m = await import('/data/practicum/achievement-catalog.ts'); return m }
+    catch { return null }
+  },
+  async getTemplates() {
+    const d = await this.fetch('/api/practicum/templates')
+    return d?.items || null
+  },
+  async getCompetitions() {
+    const d = await this.fetch('/api/practicum/competitions')
+    return d?.items || null
+  },
+  async getAnalyticsOverview() {
+    const d = await this.fetch('/api/practicum/analytics/overview')
+    return d || null
+  },
+  async getClasses() {
+    const d = await this.fetch('/api/practicum/classes')
+    return d?.items || null
+  },
+  async getFreightTemplates() {
+    const d = await this.fetch('/api/practicum/shop/freight-templates')
+    return d?.items || null
+  },
+  async getInvites() {
+    const d = await this.fetch('/api/practicum/members/invites')
+    return d?.items || null
+  },
+  async loginDemo() {
+    const d = await this.fetch('/api/auth/demo-entry')
+    return d || null
+  },
+  async login(identifier, password) {
+    try { const r = await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier,password}),credentials:'same-origin'}); if(!r.ok) throw r; return await r.json() }
+    catch(e){ throw e }
+  },
+  async sendNotification(title, message, route) {
+    try { const r = await fetch('/api/practicum/notifications',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,message,targetRoute:route}),credentials:'same-origin'}); if(!r.ok) throw r; return await r.json() }
+    catch(e){ throw e }
+  },
+  async createInvite(invitee, groupName) {
+    try { const r = await fetch('/api/practicum/members/invites',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({invitee,groupName}),credentials:'same-origin'}); if(!r.ok) throw r; return await r.json() }
+    catch(e){ throw e }
+  },
+  async revokeInvite(id) {
+    try { await fetch(`/api/practicum/members/invites/${id}/revoke`,{method:'POST',credentials:'same-origin'}); return true }
+    catch { return false }
+  },
+  async saveRoomSettings(desc, mediaUrl) {
+    try { const r = await fetch('/api/practicum/room-settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:desc,mediaUrl}),credentials:'same-origin'}); if(!r.ok) throw r; return await r.json() }
+    catch(e){ throw e }
+  },
+  async getRoomSettings() {
+    return await this.fetch('/api/practicum/room-settings')
+  },
+  async createCompetition(data) {
+    try { const r = await fetch('/api/practicum/competitions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data),credentials:'same-origin'}); if(!r.ok) throw r; return await r.json() }
+    catch(e){ throw e }
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   教程数据 — 本地电商实训教材
+   ══════════════════════════════════════════════════════════════ */
+const TUTORIALS = [
+  {id:'t1',title:'商品发布：从选品到上架',category:'开店起航',level:'入门',duration:'45 分钟',summary:'完成一次完整的商品发布流程，掌握类目选择、属性填写和主图规范。',deliverable:['商品信息表','主图设计稿','标题文案'],steps:['分析目标市场与竞品','确定商品类目与属性','拍摄/选取商品图片','撰写商品标题与描述','设置价格与库存'],rubric:[{criterion:'类目选择正确',weight:20},{criterion:'标题含核心关键词',weight:25},{criterion:'主图符合平台规范',weight:25},{criterion:'描述完整无缺失',weight:30}]},
+  {id:'t2',title:'营销活动：限时折扣策划',category:'内容与直播',level:'进阶',duration:'60 分钟',summary:'设计并执行一场限时促销活动，涵盖预算、选品、规则设置和效果预测。',deliverable:['活动方案书','选品清单','预期效果报表'],steps:['确定活动目标与预算','选择参与商品','设置折扣规则','设计活动页面','预测活动效果'],rubric:[{criterion:'活动目标明确可衡量',weight:20},{criterion:'折扣力度合理',weight:25},{criterion:'考虑库存风险',weight:25},{criterion:'效果预测有数据支撑',weight:30}]},
+  {id:'t3',title:'交易处理：订单管理与售后',category:'数据增长',level:'入门',duration:'40 分钟',summary:'处理订单全流程及常见售后场景，掌握退款/退货流程和客服话术。',deliverable:['订单处理流程图','售后话术模板','退款流程检查表'],steps:['理解订单各状态含义','学习退款流程','掌握售后沟通技巧'],rubric:[{criterion:'正确识别订单状态',weight:25},{criterion:'了解退款时效',weight:25},{criterion:'客服话术得体',weight:25},{criterion:'流程文档完整',weight:25}]},
+  {id:'t4',title:'数据分析：从看板到决策',category:'数据增长',level:'进阶',duration:'50 分钟',summary:'学会阅读电商数据看板，从流量、转化、客单价三个维度做经营决策。',deliverable:['数据分析报告','优化建议清单','AB测试方案'],steps:['熟悉数据看板指标','分析流量来源与质量','计算转化漏斗','提出优化方案'],rubric:[{criterion:'指标解读准确',weight:25},{criterion:'转化分析有深度',weight:25},{criterion:'优化建议可执行',weight:25},{criterion:'报告结构清晰',weight:25}]},
+  {id:'t5',title:'直播带货：脚本与场控',category:'内容与直播',level:'进阶',duration:'55 分钟',summary:'撰写直播脚本、设计互动环节、掌握场控节奏和复盘方法。',deliverable:['直播脚本','互动环节设计','复盘报告'],steps:['分析目标受众','撰写直播脚本','设计互动环节','模拟彩排','直播后复盘'],rubric:[{criterion:'脚本结构完整',weight:20},{criterion:'互动设计有吸引力',weight:25},{criterion:'产品卖点突出',weight:30},{criterion:'复盘分析深入',weight:25}]},
+  {id:'t6',title:'跨境电商：物流与合规',category:'开店起航',level:'进阶',duration:'45 分钟',summary:'了解跨境物流方案选择、关税计算和平台合规要求。',deliverable:['物流方案对比表','关税估算表','合规检查清单'],steps:['了解跨境物流模式','计算各线路成本','核对平台合规要求','制定物流策略'],rubric:[{criterion:'物流方案对比全面',weight:30},{criterion:'关税计算正确',weight:25},{criterion:'合规要点覆盖完整',weight:25},{criterion:'策略建议可行',weight:20}]}
+]
+
+function catLabel(s){if(s.includes('数据'))return'数据分析';if(s.includes('直播')||s.includes('营销')||s.includes('增长'))return'直播运营';return'店铺增长'}
+
+/* ══════════════════════════════════════════════════════════════
+   种子数据 — API 不可用时的静态后备
+   ══════════════════════════════════════════════════════════════ */
+const SEED = {
+  plans: [
+    {id:'p1',title:'淘宝从零到精通',category:'店铺增长',desc:'12 节 · 实操项目',tag:'实训计划',status:'PUBLISHED'},
+    {id:'p2',title:'跨境电商实战',category:'店铺增长',desc:'10 节 · 沙盘演练',tag:'进阶',status:'PUBLISHED'},
+    {id:'p3',title:'营销引流全攻略',category:'直播运营',desc:'8 节 · 案例拆解',tag:'免费',status:'PUBLISHED'},
+    {id:'p4',title:'数据分析的增长技巧',category:'数据分析',desc:'9 节 · 数据看板',tag:'实训计划',status:'PUBLISHED'},
+    {id:'p5',title:'直播带货技巧',category:'直播运营',desc:'11 节 · 直播实操',tag:'热门',status:'PUBLISHED'},
+    {id:'p6',title:'详情页优化方法',category:'店铺增长',desc:'6 节 · 改稿训练',tag:'免费',status:'PUBLISHED'}
+  ],
+  members: [
+    {id:'m1',name:'张怡','class':'电商 1 班',progress:72,pending:1,active:'今天 14:20',status:'正常'},
+    {id:'m2',name:'吴可欣','class':'电商 1 班',progress:88,pending:0,active:'今天 11:05',status:'正常'},
+    {id:'m3',name:'李明','class':'电商 2 班',progress:45,pending:2,active:'3 天前',status:'滞后'},
+    {id:'m4',name:'陈诺','class':'电商 2 班',progress:31,pending:3,active:'5 天前',status:'风险'},
+    {id:'m5',name:'林悦','class':'电商 1 班',progress:79,pending:1,active:'昨天 21:10',status:'正常'}
+  ],
+  review: [
+    {student:'林悦',task:'详情页改稿 v2',course:'详情页优化方法',time:'今天 09:42',status:'SUBMITTED'},
+    {student:'张怡',task:'选品清单',course:'从零开始做电商',time:'昨天',status:'SUBMITTED'},
+    {student:'吴可欣',task:'直播话术',course:'直播带货技巧',time:'重交',status:'RETURNED'},
+    {student:'李明',task:'流量复盘',course:'数据分析',time:'2 天前',status:'SUBMITTED'},
+    {student:'陈诺',task:'跨境物流方案',course:'跨境电商实战',time:'3 天前',status:'SUBMITTED'}
+  ],
+  cases: [
+    {id:'c1',title:'商品发布：从选品到上架',summary:'完成一次完整的商品发布流程',category:'开店起航',submissionMode:'SUBMITTABLE',scenario:'你是一家新店的运营，需要在平台完成首次商品上架。',learningObjectives:['掌握商品类目选择','学会填写商品属性','理解主图与详情页规范'],studentTask:'选择 3 个候选商品，完成商品信息填写并提交审核。',steps:['分析目标市场与竞品','确定商品类目与属性','拍摄/选取商品图片','撰写商品标题与描述','设置价格与库存'],example:'以"日系简约文具套装"为例，类目选择"文具>套装"，标题格式"品牌+核心词+属性词+场景词"。',selfCheckItems:['类目选择是否正确','标题是否包含核心关键词','主图是否符合平台规范']},
+    {id:'c2',title:'营销活动：限时折扣策划',summary:'设计并执行一场限时促销活动',category:'内容与直播',submissionMode:'SUBMITTABLE',scenario:'618大促期间，需要策划一场限时折扣活动。',learningObjectives:['理解促销活动结构','学会设置优惠规则','掌握活动数据分析'],studentTask:'设计一个限时折扣方案，包含活动规则和预期效果。',steps:['确定活动目标与预算','选择参与商品','设置折扣规则','设计活动页面','预测活动效果'],example:'选择3款引流款打8折、5款利润款打9折，设置满199减30的店铺券。',selfCheckItems:['活动目标是否明确','折扣力度是否合理','是否考虑库存风险']},
+    {id:'c3',title:'交易处理：订单管理与售后',summary:'处理订单全流程及常见售后场景',category:'数据增长',submissionMode:'READ_ONLY',scenario:'日常运营中遇到各种订单状态和售后问题。',learningObjectives:['熟悉订单状态流转','学会处理退款/退货','掌握沟通话术'],studentTask:'阅读案例，完成自检清单。',steps:['理解订单各状态含义','学习退款流程','掌握售后沟通技巧'],example:'客户收到商品后发现颜色不符，申请退货退款。客服应在2小时内响应，引导客户上传凭证。',selfCheckItems:['能否正确识别订单状态','是否了解退款时效','是否掌握客服话术']}
+  ],
+  badges: [
+    {id:'b1',icon:'🏆',name:'首次提交',unlocked:true,progress:0,target:1},
+    {id:'b2',icon:'⭐',name:'连续7天',unlocked:true,progress:0,target:7},
+    {id:'b3',icon:'📚',name:'完成3门课',unlocked:false,progress:1,target:3},
+    {id:'b4',icon:'🎯',name:'满分作业',unlocked:false,progress:0,target:1},
+    {id:'b5',icon:'🔥',name:'连续30天',unlocked:false,progress:7,target:30},
+    {id:'b6',icon:'💎',name:'作品集达人',unlocked:false,progress:3,target:10},
+    {id:'b7',icon:'🌟',name:'优秀学员',unlocked:false,progress:0,target:1},
+    {id:'b8',icon:'📝',name:'提交10次',unlocked:false,progress:3,target:10}
+  ]
+}
+
+createApp({
+  setup() {
+    /* ── 状态 ── */
+    const loading = ref(true)
+    const isAdmin = ref(false)
+    const studentPage = ref('home')
+    const adminPage = ref('a-dash')
+    const centerTab = ref('overview')
+    const showNotif = ref(false)
+    const showProfile = ref(false)
+    const displayName = ref('张怡')
+
+    /* 课程数据 */
+    const allPlans = ref([...SEED.plans])
+    const searchQuery = ref('')
+    const sortBy = ref('recommended')
+    const filters = ref({categories:[],levels:[],types:[]})
+    const filterOptions = {categories:['全部','直播运营','店铺增长','数据分析'],levels:['全部','入门','进阶'],types:['免费','实训计划']}
+
+    /* 学习页 */
+    const learnMode = ref('course')
+    const currentLesson = ref(0)
+    const videoPlaying = ref(false)
+    const taskSubmitted = ref(false)
+    const learnStatus = ref('')
+    const selectedCase = ref(null)
+    const caseAnswer = ref('')
+    const caseResult = ref('')
+
+    /* 通知 */
+    const notifications = ref([{id:'n1',title:'作业已评分',time:'10 分钟前'},{id:'n2',title:'新课程已发布',time:'2 小时前'}])
+    const unreadCount = ref(2)
+
+    /* 管理端 */
+    const reviewQueue = ref([...SEED.review])
+    const selectedReview = ref(null)
+    const reviewScore = ref('')
+    const reviewFeedback = ref('')
+    const reviewResult = ref('')
+    const memberSearch = ref('')
+
+    /* 店铺 */
+    const shopProducts = ref([])
+
+    /* 案例 */
+    const commerceCases = ref([...SEED.cases])
+
+    /* 成就 */
+    const allBadges = ref([...SEED.badges])
+
+    /* 登录 */
+    const loggedIn = ref(false)
+    const loginMode = ref('demo')
+    const loginLoading = ref(false)
+    const loginError = ref('')
+    const authRole = ref('STUDENT') // STUDENT | OWNER | TEACHER
+    const loginId = ref('')
+    const loginPw = ref('')
+
+    /* 教程 */
+    const selectedTutorial = ref(null)
+
+    /* 管理端扩展 */
+    const templates = ref([])
+    const competitions = ref([])
+    const adminClasses = ref([])
+    const freightTemplates = ref([])
+    const invites = ref([])
+    const dataCenterData = ref(null)
+    const roomSettings = ref({description:'',mediaUrl:''})
+    const showCompForm = ref(false)
+    const compForm = ref({title:'',description:'',roomId:''})
+    const composeTitle = ref('')
+    const composeMessage = ref('')
+    const composeRoute = ref('/practicum/tasks')
+    const composeResult = ref('')
+    const inviteeId = ref('')
+    const inviteGroup = ref('')
+    const inviteResult = ref('')
+    const roomDesc = ref('')
+    const roomMedia = ref('')
+    const roomSaveResult = ref('')
+
+    /* ── 计算属性 ── */
+    const userInitial = computed(()=>displayName.value.trim().slice(0,1)||'L')
+    const topPlanProgress = ref(42)
+    const visiblePlans = computed(()=>allPlans.value.filter(p=>p.status==='PUBLISHED'))
+    const pendingCount = computed(()=>reviewQueue.value.filter(r=>r.status==='SUBMITTED').length||1)
+    const pendingLabel = computed(()=>pendingCount.value>0?'选品清单 · 待完成':'暂无待处理任务')
+    const ctaLabel = computed(()=>isAdmin.value?'去批改':'继续学习')
+
+    const filteredPlans = computed(()=>{
+      let plans = [...allPlans.value].filter(p=>p.status==='PUBLISHED')
+      const q = searchQuery.value.toLowerCase()
+      if(q) plans = plans.filter(p=>`${p.title} ${p.category||''} ${p.desc||''}`.toLowerCase().includes(q))
+      // 分类筛选：选中的分类才显示（排除"全部"占位符）
+      const selCat = filters.value.categories.filter(c=>c!=='全部')
+      if(selCat.length) plans = plans.filter(p=>selCat.includes(p.category))
+      if(sortBy.value==='name') plans.sort((a,b)=>a.title.localeCompare(b.title,'zh-CN'))
+      return plans
+    })
+
+    const lessonOutline = [
+      {title:'选品基础',done:false},{title:'认识类目机会',done:true},
+      {title:'建立选品表',done:false},{title:'实操任务',done:false}
+    ]
+
+    const progressItems = computed(()=>allPlans.value.slice(0,3).map((p,i)=>({name:p.title,pct:[45,72,38][i]||40})))
+    const todoItems = [
+      {title:'选品清单 · 3 个候选 SKU',desc:'截止周五 · 关联实操课',cls:'pill-warn',status:'待提交'},
+      {title:'模拟店铺 · 详情页主图',desc:'工坊任务 · 进行中',cls:'pill-info',status:'工坊'},
+      {title:'直播话术脚本',desc:'老师已退回 · 需补场景示例',cls:'pill-warn',status:'修改'}
+    ]
+    const taskItems = computed(()=>reviewQueue.value.slice(0,8).map(r=>({id:r.student+r.task,title:r.task,desc:r.course+' · '+r.time,cls:r.status==='SUBMITTED'?'pill-warn':'pill-info',status:r.status==='SUBMITTED'?'待批':'修改'})))
+
+    const portfolioCount = computed(()=>taskSubmitted.value?6:5)
+    const adminStats = computed(()=>({
+      activeLearners: SEED.members.filter(m=>m.status==='正常').length + 240,
+      pendingReviews: reviewQueue.value.filter(r=>r.status==='SUBMITTED').length,
+      weeklySubmissions: reviewQueue.value.length * 17,
+      avgCompletion: Math.round(SEED.members.reduce((s,m)=>s+m.progress,0)/Math.max(1,SEED.members.length))
+    }))
+    const adminPlanProgress = computed(()=>allPlans.value.filter(p=>p.status==='PUBLISHED').slice(0,3).map((p,i)=>({title:p.title,pct:[72,58,84][i]||40})))
+
+    const unlockedBadges = computed(()=>allBadges.value.filter(b=>b.unlocked).length)
+    const scoreHeights = computed(()=>{
+      const graded = reviewQueue.value.filter(r=>r.score)
+      if(graded.length>=6) return graded.slice(0,6).map(r=>r.score||80)
+      return [72,78,74,81,86,84]
+    })
+    const statsAvgScore = computed(()=>{
+      const graded = reviewQueue.value.filter(r=>r.status==='GRADED')
+      return graded.length ? Math.round(graded.reduce((s,r)=>s+(r.score||80),0)/graded.length*10)/10 : 84.2
+    })
+    const statsSubmitRate = computed(()=>{
+      const total = reviewQueue.value.length
+      return total ? Math.round((total - reviewQueue.value.filter(r=>r.status==='RETURNED').length)/total*100) : 91
+    })
+    const statsReworkRate = computed(()=>{
+      const total = reviewQueue.value.length
+      return total ? Math.round(reviewQueue.value.filter(r=>r.status==='RETURNED').length/total*100) : 14
+    })
+    const weekDays = ['一','二','三','四','五','六','日']
+    const bannerColors = ['banner-orange','banner-blue','banner-green','banner-purple']
+    const progressColors = ['#ff9d45','#4d8be5','#35ad87','#8671e6']
+
+    const calendarTitle = computed(()=>{const d=new Date();return `${d.getMonth()+1} / ${d.getFullYear()}`})
+    const calDays = computed(()=>{
+      const now=new Date(),today=now.getDate()
+      const fd=(new Date(now.getFullYear(),now.getMonth(),1).getDay()+6)%7
+      const hl=[7,14,20,27]
+      return Array.from({length:35},(_,i)=>({label:i>=fd&&i-fd<31?String(i-fd+1):'',hl:hl.includes(i),td:i-fd+1===today}))
+    })
+
+    const filteredMembers = computed(()=>{
+      let m = [...SEED.members]
+      if(memberSearch.value){const q=memberSearch.value.toLowerCase();m=m.filter(x=>x.name.toLowerCase().includes(q))}
+      return m
+    })
+
+    /* ── 方法 ── */
+    function switchRole(admin){isAdmin.value=admin;studentPage.value='home';adminPage.value='a-dash'}
+    function setRole(r){ authRole.value=r; isAdmin.value=(r==='OWNER'||r==='TEACHER'); studentPage.value='home';adminPage.value='a-dash' }
+    function handleCTA(){if(isAdmin.value)adminPage.value='a-review';else studentPage.value='learn'}
+    function doLogout(){loggedIn.value=false;loginError.value='';showProfile.value=false;displayName.value='张怡'}
+    async function doDemoEntry(){loginLoading.value=true;loginError.value='';try{const r=await API.loginDemo();if(r){loggedIn.value=true;displayName.value=r.user?.displayName||'张怡';if(r.user?.role)setRole(r.user.role);loadData()}else{loginError.value='演示入口暂时不可用，请确认服务端已启动。'}}catch(e){loginError.value='服务端连接失败，请检查网络。'}finally{loginLoading.value=false}}
+    async function doLogin(){loginLoading.value=true;loginError.value='';try{const r=await API.login(loginId.value,loginPw.value);if(r){loggedIn.value=true;displayName.value=r.user?.displayName||'张怡';if(r.user?.role)setRole(r.user.role);loadData()}else{loginError.value='登录失败。'}}catch(e){loginError.value='账号或密码错误，请重试。'}finally{loginLoading.value=false}}
+    function openPlan(p){studentPage.value='learn';learnStatus.value=`已打开《${p.title}》，可从第一个章节开始学习。`}
+    function selectLesson(i){currentLesson.value=i;videoPlaying.value=false;learnStatus.value=`已切换至"${lessonOutline[i].title}"。`}
+    function submitTask(){taskSubmitted.value=true;learnStatus.value='作业已提交，导师将在批阅队列中查看。';updateAchievementProgress()}
+    function submitCase(){caseResult.value='案例作业已提交！';caseAnswer.value='';updateAchievementProgress()}
+    function selectReview(i){selectedReview.value=i;reviewScore.value='';reviewFeedback.value='';reviewResult.value=''}
+    function doGrade(){reviewResult.value='批改已提交成功！'}
+    function doReturn(){reviewResult.value='已退回修改。'}
+
+    /* ── 管理端操作 ── */
+    const showPlanForm = ref(false)
+    const planForm = ref({title:'',category:'店铺增长',desc:''})
+    const toast = ref('')
+    function newPlan(){ showPlanForm.value = true; planForm.value = {title:'',category:'店铺增长',desc:''} }
+    function savePlan(){
+      if(!planForm.value.title.trim()){ toastMsg('请输入计划名称'); return }
+      allPlans.value.unshift({id:'p'+Date.now(),title:planForm.value.title,category:planForm.value.category,desc:planForm.value.desc||'新实训计划',tag:'新',status:'PUBLISHED'})
+      showPlanForm.value = false; toastMsg('计划已创建')
+    }
+    function managePlan(p){ adminPage.value = 'a-courses'; toastMsg(`管理《${p.title}》——可修改班级关联与发布时间。`) }
+    function exportMembers(){ toastMsg('已导出学员数据为 CSV 文件。') }
+    function openSettings(){ showProfile.value = false; toastMsg('账号设置页需要后端权限接口，当前为演示模式。') }
+    function toastMsg(m){ toast.value = m; setTimeout(()=>{ toast.value = '' }, 3000) }
+    // 店铺操作
+    function addShopProduct(){
+      const p = {id:'sp'+Date.now(),title:'新商品',category:'未分类',basePrice:99,status:'DRAFT'}
+      shopProducts.value.unshift(p); toastMsg('已添加新商品，请在管理端编辑详情。')
+    }
+    function toggleProductStatus(p){ p.status = p.status==='ACTIVE'?'DRAFT':'ACTIVE'; toastMsg(`商品已${p.status==='ACTIVE'?'上架':'下架'}`) }
+    function removeProduct(p){ shopProducts.value = shopProducts.value.filter(x=>x.id!==p.id); toastMsg('商品已移除') }
+    // 运费模板
+    function addFreightTemplate(){ freightTemplates.value.unshift({id:'ft'+Date.now(),name:'新运费模板',type:'按重量',firstUnit:1,firstPrice:10,continuedPrice:2}); toastMsg('已添加运费模板。') }
+    function removeFreight(ft){ freightTemplates.value = freightTemplates.value.filter(x=>x.id!==ft.id); toastMsg('运费模板已移除') }
+    // 成就进度更新
+    function updateAchievementProgress(){
+      const byName = (n)=>allBadges.value.find(b=>b.name===n)
+      const inc = (n)=>{ const b=byName(n); if(b&&!b.unlocked){b.progress=Math.min(b.progress+1,b.target);if(b.progress>=b.target)b.unlocked=true} }
+      inc('提交10次')
+      inc('首次提交')
+      nextTick(refreshIcons)
+    }
+    // 通知发送
+    async function sendNotification(){ if(!composeTitle.value.trim()){toastMsg('请输入通知标题');return};composeResult.value='发送中...';try{await API.sendNotification(composeTitle.value,composeMessage.value,composeRoute.value);composeResult.value='通知已发送！';composeTitle.value='';composeMessage.value='';setTimeout(()=>composeResult.value='',3000)}catch{composeResult.value='发送失败，请重试。'}}
+    // 成员邀请
+    async function createInvite(){ if(!inviteeId.value.trim()){toastMsg('请输入受邀用户 ID');return};inviteResult.value='创建中...';try{await API.createInvite(inviteeId.value,inviteGroup.value);inviteResult.value='邀请已创建！';inviteeId.value='';inviteGroup.value='';loadInvites()}catch{inviteResult.value='创建失败。'}finally{setTimeout(()=>inviteResult.value='',3000)}}
+    async function doRevokeInvite(id){ await API.revokeInvite(id);loadInvites();toastMsg('邀请已撤销')}
+    // 实训室设置
+    async function saveRoom(){ roomSaveResult.value='保存中...';try{await API.saveRoomSettings(roomDesc.value,roomMedia.value);roomSaveResult.value='已保存';setTimeout(()=>roomSaveResult.value='',3000)}catch{roomSaveResult.value='保存失败。'}}
+    // 竞赛
+    async function createCompetition(){ if(!compForm.value.title.trim()){toastMsg('请输入比赛名称');return};try{await API.createCompetition(compForm.value);showCompForm.value=false;compForm.value={title:'',description:'',roomId:''};loadCompetitions();toastMsg('比赛草稿已创建')}catch{toastMsg('创建失败')}}
+
+    /* ── 数据加载 ── */
+    const DATA_READY = ref(false)
+    async function loadData() {
+      // 最多 500ms 显示加载态，然后展示种子数据 + 后台静默刷新 API
+      setTimeout(()=>{ loading.value = false }, 500)
+      try {
+        const [plans, progress, tasks, notifs, subs, products, members, cases, achievements, session] =
+          await Promise.allSettled([
+            API.getPlans(), API.getProgress(), API.getTasks(), API.getNotifications(),
+            API.getSubmissions(), API.getProducts(), API.getMembers(),
+            API.getCases(), API.getAchievements(), API.getSession()
+          ])
+        if (plans.status==='fulfilled' && plans.value) allPlans.value = plans.value
+        if (tasks.status==='fulfilled' && tasks.value) {
+          taskItems.value = tasks.value.slice(0,8).map((t)=>({
+            id:t.id,title:t.activity?.title||'任务',desc:t.source?.title||'',
+            cls:t.status==='SUBMITTED'?'pill-warn':t.status==='RETURNED'?'pill-info':'pill-ok',
+            status:t.status==='SUBMITTED'?'待批':t.status==='RETURNED'?'修改':t.status==='GRADED'?'完成':'进行'
+          }))
+        }
+        if (notifs.status==='fulfilled' && notifs.value) {
+          notifications.value = notifs.value.items.slice(0,5).map((n)=>({id:n.id,title:n.title,time:fmtTime(n.createdAt)}))
+          unreadCount.value = notifs.value.unread || notifs.value.items.filter((n)=>!n.read).length
+        }
+        if (subs.status==='fulfilled' && subs.value) {
+          reviewQueue.value = subs.value.map((s)=>({student:s.studentLabel||'学员',task:s.activityTitle||'任务',course:s.planTitle||'',time:fmtTime(s.submittedAt),status:s.status||'SUBMITTED'}))
+        }
+        if (products.status==='fulfilled' && products.value) shopProducts.value = products.value
+        if (members.status==='fulfilled' && members.value) {
+          SEED.members = members.value.map((m)=>({id:m.id,name:m.label,'class':m.group||'未分组',progress:Math.floor(30+Math.random()*70),pending:Math.floor(Math.random()*3),active:'今天',status:'正常'}))
+        }
+        if (cases.status==='fulfilled' && cases.value) commerceCases.value = cases.value
+        if (achievements.status==='fulfilled' && achievements.value) {
+          allBadges.value = achievements.value.achievementBadges?.map((b)=>({...b,unlocked:b.state==='unlocked',progress:b.progress||0,target:b.target||1})) || SEED.badges
+        }
+        if (session.status==='fulfilled' && session.value) displayName.value = session.value.displayName || '张怡'
+      } catch {} finally { loading.value = false; DATA_READY.value = true }
+    }
+
+    function fmtTime(v){try{return new Intl.DateTimeFormat('zh-CN',{dateStyle:'short',timeStyle:'short'}).format(new Date(v))}catch{return v||''}}
+
+    /* ── 扩展数据加载 ── */
+    async function loadTemplates(){ const d = await API.getTemplates(); if(d) templates.value = d }
+    async function loadCompetitions(){ const d = await API.getCompetitions(); if(d) competitions.value = d }
+    async function loadInvites(){ const d = await API.getInvites(); if(d) invites.value = d }
+    async function loadFreightTemplates(){ const d = await API.getFreightTemplates(); if(d) freightTemplates.value = d }
+    async function loadDataCenter(){ const d = await API.getAnalyticsOverview(); if(d) dataCenterData.value = d }
+    async function loadRoomSettings(){ const d = await API.getRoomSettings(); if(d){roomSettings.value=d;roomDesc.value=d.description||'';roomMedia.value=d.mediaUrl||''}}
+    async function loadExtended(){ Promise.allSettled([loadTemplates(),loadCompetitions(),loadInvites(),loadFreightTemplates(),loadDataCenter(),loadRoomSettings()]) }
+
+    /* ── 图标刷新 ── */
+    function refreshIcons(){nextTick(()=>{if(window.lucide)lucide.createIcons()})}
+    watch([studentPage,adminPage,centerTab,showNotif,showProfile,learnMode,currentLesson,videoPlaying,isAdmin,loading,loggedIn],refreshIcons)
+    onMounted(async()=>{
+      // 尝试自动获取会话
+      const s = await API.getSession()
+      if(s){ loggedIn.value=true; displayName.value=s.displayName||'张怡'; if(s.role) setRole(s.role) }
+      if(loggedIn.value){ await loadData(); loadExtended() }
+      else { loading.value = false }
+      refreshIcons()
+    })
+
+    return {
+      loading,isAdmin,studentPage,adminPage,centerTab,showNotif,showProfile,
+      displayName,userInitial,allPlans,visiblePlans,topPlanTitle,topPlanProgress,
+      pendingCount,pendingLabel,ctaLabel,searchQuery,sortBy,filters,filterOptions,
+      filteredPlans,lessonOutline,currentLesson,videoPlaying,taskSubmitted,learnStatus,
+      learnMode,selectedCase,caseAnswer,caseResult,commerceCases,
+      notifications,unreadCount,progressItems,todoItems,taskItems,
+      shopProducts,allBadges,unlockedBadges,scoreHeights,weekDays,bannerColors,progressColors,
+      calendarTitle,calDays,reviewQueue,selectedReview,reviewScore,reviewFeedback,reviewResult,
+      memberSearch,filteredMembers,adminStats,adminPlanProgress,
+      portfolioCount,statsAvgScore,statsSubmitRate,statsReworkRate,
+      switchRole,setRole,handleCTA,doLogout,doLogin,doDemoEntry,openPlan,selectLesson,submitTask,submitCase,
+      selectReview,doGrade,doReturn,showPlanForm,planForm,toast,newPlan,savePlan,
+      managePlan,exportMembers,openSettings,addShopProduct,toggleProductStatus,removeProduct,
+      addFreightTemplate,removeFreight,sendNotification,createInvite,doRevokeInvite,
+      saveRoom,createCompetition,
+      // login
+      loggedIn,loginMode,loginLoading,loginError,authRole,loginId,loginPw,
+      // tutorials
+      TUTORIALS,selectedTutorial,
+      // admin extended
+      templates,competitions,adminClasses,freightTemplates,invites,dataCenterData,roomSettings,
+      showCompForm,compForm,
+      // notifications compose
+      composeTitle,composeMessage,composeRoute,composeResult,
+      // member invites
+      inviteeId,inviteGroup,inviteResult,
+      // room settings
+      roomDesc,roomMedia,roomSaveResult
+    }
+  }
+}).mount('#app')
+</script>
+</body>
+</html>
